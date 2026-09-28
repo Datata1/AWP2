@@ -1,4 +1,4 @@
-.PHONY: help setup lab docs docs-build lint format clean
+.PHONY: help setup lab docs docs-build lint format stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -22,6 +22,10 @@ lint: ## Code prüfen (ruff)
 format: ## Code formatieren (ruff)
 	uv run ruff format .
 	uv run ruff check --fix .
+
+stunden: ## Stundendoku anzeigen und als xlsx exportieren (für BWSyncAndShare)
+	uv run python tools/timesheet.py show
+	uv run python tools/timesheet.py export
 
 clean: ## Caches und Build-Artefakte entfernen
 	rm -rf site .ruff_cache

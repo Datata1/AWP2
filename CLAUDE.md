@@ -10,6 +10,7 @@
   - `/status [since]` — prepare the weekly status meeting summary (git + GitHub board).
   - `/issue <task>` — create a concise issue with label, milestone and board entry.
   - `/start <nr>` — assign an issue, set it "In Progress", create the linked branch.
+  - `/stunden [datum] [stunden] [notizen]` — fill in the personal time sheet from own activity.
   - `/pr [reviewer]` — open a concise PR for the current branch, set the issue to "Review".
 - Board: `python3 .claude/scripts/board.py <nr> "<Status>" [--bereich <Bereich>]`
   (`--options` lists valid values). Prefer it over raw `gh project` calls (rate limits).
