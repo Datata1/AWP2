@@ -14,6 +14,8 @@ make setup
 Danach die Rohdaten nach `data/raw/` und die Kursunterlagen aus ILIAS nach `data/assets/`
 kopieren (siehe `data/README.md`).
 
+Stundendoku anlegen: `/stunden init` (siehe [Stundendoku](#stundendoku)).
+
 ## Pro Aufgabe
 
 | # | Schritt | Mit Claude | Ohne Claude | Board |
@@ -62,7 +64,8 @@ Jedes Issue hat einen **Bereich**: Orga, Domäne, EDA, Data Prep, Modellierung, 
 
 | Wann | Was |
 | --- | --- |
-| Vor dem Statusmeeting | `/status` – Zusammenfassung aus Board, PRs und Experimenten; Stundenkontierung spätestens 24 h vorher |
+| Täglich | Stundendoku mit `/stunden <stunden>` ([Details](#stundendoku)) |
+| Vor dem Statusmeeting | `/status` – Zusammenfassung aus Board, PRs und Experimenten; spätestens 24 h vorher `make stunden` und `.xlsx` nach BWSyncAndShare |
 | Im Meeting | Notizen machen |
 | Nach dem Meeting | `/protokoll <Notizen>`, neue Aufgaben mit `/issue` anlegen und verteilen |
 | Laufend | Board aktuell halten, Experimente in [Experimente](../modelle/experimente.md) eintragen |
