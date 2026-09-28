@@ -35,6 +35,7 @@ If initials are missing, derive them from `git config user.name` and confirm.
 
    from awp2.config import FIGURES_DIR, SEED
    from awp2.data import band_columns, load_train, wavelengths
+   from awp2.plots import plot_spectra, save_doc_figure
    ```
 
    **Code (data):**
