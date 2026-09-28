@@ -25,9 +25,20 @@ kopieren (siehe `data/README.md`).
 | 5 | **Mergen** – Reviewer:in klickt *Squash and merge*, Issue schließt sich | | | Done |
 | 6 | **Aufräumen** | | `git switch main && git pull` | |
 
-Das Board wird zum Teil automatisch gepflegt: Neue Issues und PRs landen auf *Todo*, geschlossene
-bzw. gemergte auf *Done*. *In Progress* und *Review* setzen `/start` und `/pr` – ohne Claude das
-Issue im Board von Hand verschieben.
+Das Board wird zum Teil automatisch gepflegt: Neue Issues landen auf *Todo*, geschlossene auf
+*Done*. *In Progress* und *Review* setzen `/start` und `/pr` – ohne Claude das Issue im Board von
+Hand verschieben.
+
+### Board-Ansichten
+
+Jedes Issue hat einen **Bereich**: Orga, Domäne, EDA, Data Prep, Modellierung, Abgabe
+(`/issue` setzt ihn automatisch, sonst im Board von Hand). Das Board hat drei Tabs:
+
+| Tab | Zeigt | Wofür |
+| --- | --- | --- |
+| **Aktuell** | Kanban des aktuellen Meilensteins, Spalten = Status | Tagesgeschäft, Statusmeeting |
+| **Nach Bereich** | Offene Issues als Tabelle, gruppiert nach Bereich | Überblick, Planung |
+| **Meine** | Nur mir zugewiesene offene Issues | Was mache ich als Nächstes? |
 
 ## Grundregeln
 

@@ -88,6 +88,8 @@ Always commit `pyproject.toml` and `uv.lock` together.
 - Use the `gh` CLI for everything on GitHub (issues, PRs, labels, milestones, project).
 - Who does what is tracked in issues + the project board **AWP2** (owner `Datata1`):
   Status `Todo` → `In Progress` → `Review` → `Done`. Milestones M1–M3 + Endabgabe.
+- Board field **Bereich** groups issues: `Orga`, `Domäne`, `EDA`, `Data Prep`, `Modellierung`,
+  `Abgabe` — set it for every new issue.
 - Labels: one type (`feat`, `exp`, `data`, `docs`, `bug`, `orga`), optionally `crop` / `stage`,
   `blocked` when waiting.
 - Issues and PRs are written in **German** and kept **short**: no filler, no repeating the
