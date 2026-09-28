@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Daten & Modelle (nur Ordnerstruktur wird versioniert)
+data/**/*
+!data/**/
+!data/**/.gitkeep
+!data/README.md
+models/*
+!models/.gitkeep
+reports/figures/*
+!reports/figures/.gitkeep
+
+# Claude Code (persönliche Einstellungen)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Docs-Build
+site/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/

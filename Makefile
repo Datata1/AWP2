@@ -1,0 +1,28 @@
+.PHONY: help setup lab docs docs-build lint format clean
+
+help: ## Diese Hilfe anzeigen
+	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+setup: ## Umgebung installieren + nbstripout-Git-Filter aktivieren
+	uv sync
+	uv run nbstripout --install
+
+lab: ## Jupyter Lab starten
+	uv run jupyter lab
+
+docs: ## Doku lokal mit Live-Reload servieren (http://127.0.0.1:8000)
+	uv run mkdocs serve
+
+docs-build: ## Doku statisch nach site/ bauen
+	uv run mkdocs build --strict
+
+lint: ## Code prüfen (ruff)
+	uv run ruff check .
+
+format: ## Code formatieren (ruff)
+	uv run ruff format .
+	uv run ruff check --fix .
+
+clean: ## Caches und Build-Artefakte entfernen
+	rm -rf site .ruff_cache
+	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} +

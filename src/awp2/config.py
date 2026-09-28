@@ -1,0 +1,30 @@
+"""Central paths and constants – always import from here, never hardcode them."""
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+DATA_DIR = PROJECT_ROOT / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+INTERIM_DATA_DIR = DATA_DIR / "interim"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+
+MODELS_DIR = PROJECT_ROOT / "models"
+REPORTS_DIR = PROJECT_ROOT / "reports"
+FIGURES_DIR = REPORTS_DIR / "figures"
+
+# Raw data
+TRAIN_FILE = RAW_DATA_DIR / "train.csv"
+TEST_FILE = RAW_DATA_DIR / "test.csv"
+
+# Columns
+ID_COL = "id"
+TARGET_COLS = ("Crop", "Stage")
+META_COLS = ("AEZ", "Month")
+BAND_PREFIX = "X"  # band columns: X<wavelength in nm>, e.g. X427
+
+# Valid labels
+CROPS = ("corn", "cotton", "rice", "soybean", "winter_wheat")
+STAGES = ("Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest")
+
+SEED = 42

@@ -1,0 +1,56 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(uv sync *)",
+      "Bash(make *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git show *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)"
+    ],
+    "ask": [
+      "Bash(uv add *)",
+      "Bash(uv remove *)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Edit(data/raw/**)",
+      "Write(data/raw/**)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push * main)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_raw_data.py\"; [ ! -f \"$f\" ] || python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"; [ ! -f \"$f\" ] || python3 \"$f\""
+          }
+        ]
+      }
+    ]
+  }
+}
