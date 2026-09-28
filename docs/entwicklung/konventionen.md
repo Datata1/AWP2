@@ -36,8 +36,9 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 
 ## Git-Workflow
 
-1. Neuen Branch von `main` anlegen: `git switch -c <typ>/<kurzer-name>`
-   (`feat/`, `exp/`, `fix/`, `docs/`, `chore/`), z. B. `exp/svm-baseline`.
+1. Jede Aufgabe ist ein GitHub-Issue (`/issue`). Zum Start Branch von `main` anlegen, am besten
+   mit `/start <nr>`: `<typ>/<nr>-<kurzer-name>` (`feat/`, `exp/`, `fix/`, `docs/`, `chore/`),
+   z. B. `exp/12-svm-baseline`.
 2. Committen nach [Conventional Commits](https://www.conventionalcommits.org/)
    (englisch, Imperativ, max. 72 Zeichen):
 
@@ -51,5 +52,6 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
     | `refactor` | Umbau ohne Verhaltensänderung | `refactor: move split logic to src` |
     | `chore` | Tooling, Abhängigkeiten | `chore: add xgboost` |
 
-3. Pushen, Pull Request auf `main` öffnen, von einer zweiten Person reviewen lassen, mergen.
+3. Pushen, Pull Request auf `main` öffnen (`/pr`, enthält `Closes #nr`), von einer zweiten Person
+   reviewen lassen, mergen – das Issue schließt sich dann automatisch.
 4. Nie direkt auf `main` pushen. Keine Co-Author- oder „Generated with"-Zeilen.
