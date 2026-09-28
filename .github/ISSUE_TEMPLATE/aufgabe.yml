@@ -1,0 +1,24 @@
+name: Aufgabe
+description: Eine konkrete Aufgabe (Feature, Experiment, Doku, Orga)
+body:
+  - type: textarea
+    id: ziel
+    attributes:
+      label: Ziel
+      description: 1–2 Sätze – was und warum.
+    validations:
+      required: true
+  - type: textarea
+    id: fertig
+    attributes:
+      label: Fertig wenn
+      description: 1–4 überprüfbare Kriterien.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: hinweise
+    attributes:
+      label: Hinweise
+      description: Optional – Links, Abhängigkeiten (#nr), Ideen.

@@ -79,5 +79,20 @@ Always commit `pyproject.toml` and `uv.lock` together.
   Example: `exp: add random forest baseline for crop classification`
 - **No AI attribution**: no `Co-Authored-By` trailers or "Generated with …" lines in commits
   or pull requests.
+- Link work to issues: branch `<type>/<issue-nr>-<name>`, PR body `Closes #<nr>`.
 - Notebook outputs are stripped on commit by nbstripout (installed via `make setup`).
-- Never commit data files, models or secrets.
+- Never commit data files, models or secrets. The repository is **public**.
+
+## GitHub (issues, PRs, project board)
+
+- Use the `gh` CLI for everything on GitHub (issues, PRs, labels, milestones, project).
+- Who does what is tracked in issues + the project board **AWP2** (owner `Datata1`):
+  Status `Todo` → `In Progress` → `Review` → `Done`. Milestones M1–M3 + Endabgabe.
+- Labels: one type (`feat`, `exp`, `data`, `docs`, `bug`, `orga`), optionally `crop` / `stage`,
+  `blocked` when waiting.
+- Issues and PRs are written in **German** and kept **short**: no filler, no repeating the
+  title, bullets over prose, reference `#nr` instead of re-explaining.
+  - Issue: title ≤ 60 chars; body = `Ziel` (1–2 sentences), `Fertig wenn` (1–4 checkboxes),
+    optional `Hinweise`.
+  - PR: `Closes #nr`, `Was` (1–4 bullets), `Ergebnis` only for experiments (scores vs. best).
+  - Comments: only decisions, results or blockers — one to three lines.
