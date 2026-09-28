@@ -29,9 +29,14 @@ Write in **German**, short and concrete — no filler, no restating the obvious.
    - **Milestone**: the current one (`gh api repos/{owner}/{repo}/milestones --jq '.[] | "\(.title) \(.due_on)"'`
      → earliest open milestone whose due date is not past), unless the task clearly belongs later.
    - **Assignee**: only if given (`@me` for "ich"/"mir").
+   - **Bereich** (board category): `Orga` (organisation, meetings, deliverables per person),
+     `Domäne` (domain docs), `EDA`, `Data Prep` (cleaning/preprocessing pipeline),
+     `Modellierung` (baselines, models, evaluation, feature importance), `Abgabe` (report,
+     presentation, predictions, reproducibility).
 3. Show title, labels, milestone and body in 5–10 lines and create it right away unless something
    is ambiguous:
-   `gh issue create --title … --body … --label … --milestone … --project AWP2 [--assignee …]`
+   `gh issue create --title … --body … --label … --milestone … [--assignee …]`, then
+   `python3 .claude/scripts/board.py <nr> Todo --bereich <Bereich>` (adds it to the board).
 4. Reply with one line: `#<nr> <title> → <url>`.
 
 Several tasks at once: create one issue per task, then list them as `#nr title` lines.

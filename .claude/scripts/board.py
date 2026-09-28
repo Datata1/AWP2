@@ -1,68 +1,107 @@
-"""Set the status of an issue/PR on the GitHub project board (adds it to the board if missing).
+"""Set Status and/or Bereich of an issue or PR on the GitHub project board.
 
-Usage: python3 .claude/scripts/board.py <issue-or-pr-number> "<Status>"
-       python3 .claude/scripts/board.py --statuses
+Adds the item to the board if it is missing. Uses one read and one write request.
+
+Usage:
+    python3 .claude/scripts/board.py <nr> "<Status>" [--bereich "<Bereich>"]
+    python3 .claude/scripts/board.py <nr> --bereich "<Bereich>"
+    python3 .claude/scripts/board.py --options
 """
 
+import argparse
 import json
 import subprocess
 import sys
 
 OWNER = "Datata1"
 REPO = "AWP2"
-PROJECT_TITLE = "AWP2"
+PROJECT_NUMBER = 2
+FIELDS = {"status": "Status", "bereich": "Bereich"}
+
+_FIELD = "... on ProjectV2SingleSelectField { id options { id name } }"
+_ITEMS = "id projectItems(first: 20) { nodes { id project { number } } }"
 
 
-def gh(*args: str) -> dict | list:
-    out = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if out.returncode != 0:
-        sys.exit(f"gh {' '.join(args[:3])} failed: {out.stderr.strip()}")
-    return json.loads(out.stdout) if out.stdout.strip() else {}
+def graphql(query: str) -> dict:
+    out = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={query}"], capture_output=True, text=True
+    )
+    data = json.loads(out.stdout or "{}")
+    if out.returncode != 0 or "errors" in data:
+        sys.exit(f"GitHub API error: {data.get('errors') or out.stderr.strip()}")
+    return data["data"]
 
 
-def project() -> dict:
-    projects = gh("project", "list", "--owner", OWNER, "--format", "json")["projects"]
-    for p in projects:
-        if p["title"] == PROJECT_TITLE:
-            return p
-    sys.exit(f"Project '{PROJECT_TITLE}' not found for {OWNER}.")
+def load(number: int | None) -> tuple[dict, dict | None]:
+    """Fetch project fields and (optionally) the issue/PR with its board items."""
+    content = ""
+    if number is not None:
+        content = (
+            f'repository(owner: "{OWNER}", name: "{REPO}") {{ '
+            f"issueOrPullRequest(number: {number}) {{ "
+            f"... on Issue {{ {_ITEMS} }} ... on PullRequest {{ {_ITEMS} }} }} }}"
+        )
+    fields = " ".join(
+        f'{key}: field(name: "{name}") {{ {_FIELD} }}' for key, name in FIELDS.items()
+    )
+    data = graphql(
+        f'{{ user(login: "{OWNER}") {{ projectV2(number: {PROJECT_NUMBER}) {{ id {fields} }} }} '
+        f"{content} }}"
+    )
+    project = data["user"]["projectV2"]
+    item = data.get("repository", {}).get("issueOrPullRequest") if number is not None else None
+    if number is not None and item is None:
+        sys.exit(f"#{number} not found in {OWNER}/{REPO}.")
+    return project, item
 
 
-def status_field(number: int) -> dict:
-    fields = gh("project", "field-list", str(number), "--owner", OWNER, "--format", "json")
-    return next(f for f in fields["fields"] if f["name"] == "Status")
-
-
-def find_or_add_item(number: int, content_number: int) -> str:
-    items = gh(
-        "project", "item-list", str(number), "--owner", OWNER, "--format", "json", "--limit", "500"
-    )["items"]
-    for item in items:
-        content = item.get("content", {})
-        if content.get("number") == content_number and REPO in content.get("repository", ""):
-            return item["id"]
-    # The issues endpoint works for both issues and pull requests.
-    url = gh("api", f"repos/{OWNER}/{REPO}/issues/{content_number}")["html_url"]
-    added = gh("project", "item-add", str(number), "--owner", OWNER, "--url", url,
-               "--format", "json")  # fmt: skip
-    return added["id"]
+def option_id(project: dict, key: str, value: str) -> str:
+    options = {o["name"]: o["id"] for o in project[key]["options"]}
+    if value not in options:
+        sys.exit(f"Unknown {FIELDS[key]} '{value}'. Options: {', '.join(options)}")
+    return options[value]
 
 
 def main() -> None:
-    proj = project()
-    field = status_field(proj["number"])
-    options = {o["name"]: o["id"] for o in field["options"]}
-    if sys.argv[1:] == ["--statuses"]:
-        print(", ".join(options))
-        return
-    if len(sys.argv) != 3 or sys.argv[2] not in options:
-        sys.exit(f"Usage: board.py <number> <status>; statuses: {', '.join(options)}")
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("number", nargs="?", type=lambda s: int(s.lstrip("#")))
+    parser.add_argument("status", nargs="?")
+    parser.add_argument("--bereich")
+    parser.add_argument("--options", action="store_true", help="list Status/Bereich options")
+    args = parser.parse_args()
 
-    content_number, status = int(sys.argv[1].lstrip("#")), sys.argv[2]
-    item_id = find_or_add_item(proj["number"], content_number)
-    gh("project", "item-edit", "--id", item_id, "--project-id", proj["id"],
-       "--field-id", field["id"], "--single-select-option-id", options[status])  # fmt: skip
-    print(f"#{content_number} → {status}")
+    if args.options:
+        project, _ = load(None)
+        for key, name in FIELDS.items():
+            print(f"{name}: {', '.join(o['name'] for o in project[key]['options'])}")
+        return
+    if args.number is None or not (args.status or args.bereich):
+        parser.error("need an issue number and a status and/or --bereich")
+
+    project, content = load(args.number)
+    # Validate before writing anything.
+    values = {"status": args.status, "bereich": args.bereich}
+    selected = {k: option_id(project, k, v) for k, v in values.items() if v}
+
+    items = [n["id"] for n in content["projectItems"]["nodes"]
+             if n["project"]["number"] == PROJECT_NUMBER]  # fmt: skip
+    if items:
+        item_id = items[0]
+    else:  # not on the board yet: add it (one extra request)
+        added = graphql(
+            f'mutation {{ add: addProjectV2ItemById(input: {{projectId: "{project["id"]}", '
+            f'contentId: "{content["id"]}"}}) {{ item {{ id }} }} }}'
+        )
+        item_id = added["add"]["item"]["id"]
+
+    updates = [
+        f'{key}: updateProjectV2ItemFieldValue(input: {{projectId: "{project["id"]}", '
+        f'itemId: "{item_id}", fieldId: "{project[key]["id"]}", '
+        f'value: {{singleSelectOptionId: "{opt}"}}}}) {{ projectV2Item {{ id }} }}'
+        for key, opt in selected.items()
+    ]
+    graphql("mutation { " + " ".join(updates) + " }")
+    print(f"#{args.number} → " + ", ".join(f"{FIELDS[k]}: {values[k]}" for k in selected))
 
 
 if __name__ == "__main__":

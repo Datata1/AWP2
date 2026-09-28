@@ -11,7 +11,8 @@
   - `/issue <task>` — create a concise issue with label, milestone and board entry.
   - `/start <nr>` — assign an issue, set it "In Progress", create the linked branch.
   - `/pr [reviewer]` — open a concise PR for the current branch, set the issue to "Review".
-- Move board items with `python3 .claude/scripts/board.py <nr> "<Status>"`.
+- Board: `python3 .claude/scripts/board.py <nr> "<Status>" [--bereich <Bereich>]`
+  (`--options` lists valid values). Prefer it over raw `gh project` calls (rate limits).
 - **Subagent** `ml-reviewer`: use it to review ML code/notebooks before opening a pull request.
 - **Hooks** (`.claude/settings.json`): Python files are auto-formatted with ruff after every
   edit — no need to run ruff manually afterwards. Writes to `data/raw/` are blocked.
