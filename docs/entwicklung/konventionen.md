@@ -36,22 +36,25 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 
 ## Git-Workflow
 
-1. Jede Aufgabe ist ein GitHub-Issue (`/issue`). Zum Start Branch von `main` anlegen, am besten
-   mit `/start <nr>`: `<typ>/<nr>-<kurzer-name>` (`feat/`, `exp/`, `fix/`, `docs/`, `chore/`),
-   z. B. `exp/12-svm-baseline`.
-2. Committen nach [Conventional Commits](https://www.conventionalcommits.org/)
-   (englisch, Imperativ, max. 72 Zeichen):
+Der Ablauf (Issue → Branch → PR → Merge) steht unter [Arbeitsablauf](workflow.md). Hier nur
+die Namensregeln:
 
-    | Typ | Wofür | Beispiel |
-    | --- | --- | --- |
-    | `feat` | neue Funktionalität in `src/` | `feat: add vegetation index features` |
-    | `fix` | Bugfix | `fix: handle missing bands in loader` |
-    | `exp` | Experimente, Notebooks | `exp: add random forest baseline` |
-    | `data` | Laden / Preprocessing | `data: drop all-NaN water absorption bands` |
-    | `docs` | Dokumentation | `docs: describe band selection` |
-    | `refactor` | Umbau ohne Verhaltensänderung | `refactor: move split logic to src` |
-    | `chore` | Tooling, Abhängigkeiten | `chore: add xgboost` |
+**Branches:** `<typ>/<issue-nr>-<kurzer-name>`, englisch, kebab-case, z. B. `exp/12-svm-baseline`.
+Typen: `feat/`, `exp/`, `fix/`, `docs/`, `chore/`.
 
-3. Pushen, Pull Request auf `main` öffnen (`/pr`, enthält `Closes #nr`), von einer zweiten Person
-   reviewen lassen, mergen – das Issue schließt sich dann automatisch.
-4. Nie direkt auf `main` pushen. Keine Co-Author- oder „Generated with"-Zeilen.
+**Commits:** [Conventional Commits](https://www.conventionalcommits.org/), englisch, Imperativ,
+max. 72 Zeichen, keine Co-Author- oder „Generated with"-Zeilen:
+
+| Typ | Wofür | Beispiel |
+| --- | --- | --- |
+| `feat` | neue Funktionalität in `src/` | `feat: add vegetation index features` |
+| `fix` | Bugfix | `fix: handle missing bands in loader` |
+| `exp` | Experimente, Notebooks | `exp: add random forest baseline` |
+| `data` | Laden / Preprocessing | `data: drop all-NaN water absorption bands` |
+| `docs` | Dokumentation | `docs: describe band selection` |
+| `refactor` | Umbau ohne Verhaltensänderung | `refactor: move split logic to src` |
+| `chore` | Tooling, Abhängigkeiten | `chore: add xgboost` |
+
+**Issues und PRs:** Deutsch, kurz. Titel ≤ 60 Zeichen; Issue = *Ziel* + *Fertig wenn*-Checkboxen;
+PR = `Closes #nr` + 1–4 Stichpunkte. Labels: ein Typ (`feat`, `exp`, `data`, `docs`, `bug`,
+`orga`), optional `crop` / `stage`, bei Wartezeit `blocked`.
