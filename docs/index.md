@@ -42,7 +42,7 @@ sie sich befindet. Domänenprojekt 2 · WS 2026/27.
 
     ---
 
-    Ansätze, Experiment-Log und Ergebnisse für Kulturart und Entwicklungsstadium.
+    Modellierungsansätze mit Begründung, Experiment-Log und aktuell bestes Modell.
 
     [:octicons-arrow-right-24: Zu den Modellen](modelle/index.md)
 
