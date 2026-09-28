@@ -11,7 +11,8 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
-FIGURES_DIR = REPORTS_DIR / "figures"
+FIGURES_DIR = REPORTS_DIR / "figures"  # scratch figures, not in git
+DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "daten" / "img"  # figures shown in the docs, in git
 
 # Raw data
 TRAIN_FILE = RAW_DATA_DIR / "train.csv"
