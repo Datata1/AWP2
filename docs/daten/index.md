@@ -17,6 +17,20 @@ Hyperspektral-Signaturen landwirtschaftlicher Kulturpflanzen, aufgenommen vom
 - 30 m räumliche Auflösung, 16-Tage-Wiederholzyklus
 - Harmonisierter Datensatz aus weltweiten Quellen, verschiedene agroökologische Zonen (AEZ)
 
+## Herkunft & AEZ
+
+!!! todo "Leitfragen"
+    - Stammt der Datensatz aus der USGS **GHISA** (Global Hyperspectral Imaging Spectral-library
+      of Agricultural crops, Thenkabail / Aneece)? Originalpublikation finden und lesen.
+    - Was ist eine Zeile: ein einzelnes Pixel, ein gemitteltes Feldspektrum? Aus welchen Jahren
+      und Regionen stammen die Aufnahmen?
+    - Welche Vorverarbeitung haben die Autor:innen schon gemacht (atmosphärische Korrektur,
+      Bandauswahl, Glättung)?
+    - Wie definiert die Quelle die Stadien-Labels? (→ [Kulturpflanzen](../domaene/kulturpflanzen.md))
+    - **AEZ:** Welche Einteilung wird verwendet (FAO/GAEZ, USGS)? Was bedeuten die Zonen
+      2 und 5–10 (Klima, Region)? Warum könnte die AEZ bei der Klassifikation helfen?
+    - Bekannte Schwächen oder Einschränkungen laut Quelle?
+
 ## Dateien in `data/raw/`
 
 | Datei | Zeilen | Inhalt |

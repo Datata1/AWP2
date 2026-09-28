@@ -10,6 +10,7 @@ Aus Satellitendaten landwirtschaftlicher Felder entwickeln wir Modelle, die
 | Bereich | Inhalt |
 | --- | --- |
 | **Projekt** | Aufgabenstellung, Zeitplan & Meilensteine, Bewertung & Abgabe |
+| **Domäne** | Projektziel, Fernerkundung, Vegetation, Kulturpflanzen, ML-Aufgabe & Metriken, Glossar |
 | **Entwicklung** | Setup, Konventionen, Repo-Struktur |
 | **Daten** | Datenquellen, erwartete Rohdateien, Pipeline-Schritte |
 | **Modelle** | Ansätze, Experimente und Ergebnisse je Aufgabe |
