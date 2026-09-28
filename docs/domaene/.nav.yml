@@ -1,0 +1,10 @@
+nav:
+  - index.md
+  - fernerkundung.md
+  - vegetation.md
+  - kulturpflanzen.md
+  - ml-aufgabe.md
+  - glob: "*"
+    ignore_no_matches: true
+  - glossar.md
+  - quellen.md

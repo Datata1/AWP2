@@ -58,3 +58,13 @@ max. 72 Zeichen, keine Co-Author- oder „Generated with"-Zeilen:
 **Issues und PRs:** Deutsch, kurz. Titel ≤ 60 Zeichen; Issue = *Ziel* + *Fertig wenn*-Checkboxen;
 PR = `Closes #nr` + 1–4 Stichpunkte. Labels: ein Typ (`feat`, `exp`, `data`, `docs`, `bug`,
 `orga`), optional `crop` / `stage`, bei Wartezeit `blocked`.
+
+## Doku
+
+- Neue Seite: `.md`-Datei in den passenden Ordner unter `docs/` legen – sie erscheint automatisch
+  in der Navigation. Die `index.md` eines Ordners ist dessen Übersichtsseite.
+- Reihenfolge und Titel steuert die `.nav.yml` im jeweiligen Ordner; nicht aufgeführte Seiten
+  landen an der Stelle von `"*"`.
+- Quellen als Fußnote: `Text[^1]` und am Seitenende `[^1]: Autor (Jahr): Titel.`
+- Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern (siehe [EDA](../daten/eda.md)).
+- Vorschau: `make docs` → <http://127.0.0.1:8000>

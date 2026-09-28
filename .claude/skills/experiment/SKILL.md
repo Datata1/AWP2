@@ -36,8 +36,10 @@ Follow these steps. Code and comments in English, documentation in German.
 - Append one row to the table in `docs/modelle/experimente.md`
   (Datum, ID, Autor (git user.name), Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert,
   Macro-F1 kombiniert, Samples-F1, Notiz).
-- Add findings (German, 2–5 bullets) to `docs/modelle/pflanzenart.md` and/or
-  `docs/modelle/entwicklungsstadium.md`. Preprocessing decisions → `docs/daten/index.md`.
+- Add findings (German, 2–5 bullets) to the matching approach section in
+  `docs/modelle/ansaetze.md` and update its row in the overview table (status, best experiment).
+  If it beats the current best, update "Aktueller Stand" in `docs/modelle/index.md`.
+  Preprocessing decisions → `docs/daten/index.md`.
 
 ## 5. Report back
 Summarize in chat: what was tried, the scores vs. the previous best, the main confusion, and a

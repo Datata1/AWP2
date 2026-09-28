@@ -1,27 +1,72 @@
-site_name: awp2
-site_description: Pflanzenart- und Entwicklungsstadium-Klassifikation aus Satellitendaten
+site_name: AWP2 · Hyperspektrale Pflanzenklassifikation
+site_description: Kulturart und Entwicklungsstadium aus EO-1-Hyperion-Spektren – Domänenprojekt 2, WS 2026/27
+repo_url: https://github.com/Datata1/AWP2
+repo_name: Datata1/AWP2
+edit_uri: edit/main/docs/
+copyright: Domänenprojekt 2 · WS 2026/27
 
 theme:
   name: material
   language: de
+  icon:
+    logo: material/sprout
+    repo: fontawesome/brands/github
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: light green
+      toggle:
+        icon: material/weather-night
+        name: Dunkles Design
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: light green
+      toggle:
+        icon: material/weather-sunny
+        name: Helles Design
   features:
+    - navigation.tabs
     - navigation.sections
     - navigation.indexes
-    - content.code.copy
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
     - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search:
+      lang: de
+  - awesome-nav
+
+extra_css:
+  - assets/extra.css
 
 markdown_extensions:
+  - abbr
   - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
   - tables
   - toc:
       permalink: true
-  - pymdownx.superfences
-  - pymdownx.highlight
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.details
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
 extra_javascript:
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
