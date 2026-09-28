@@ -14,3 +14,5 @@ make help    # alle Befehle
 
 Rohdaten nach `data/raw/` kopieren (siehe [data/README.md](data/README.md)).
 Ausführliche Anleitung: [docs/entwicklung/index.md](docs/entwicklung/index.md) bzw. `make docs`.
+
+So arbeiten wir zusammen (Issue → Branch → PR): [docs/entwicklung/workflow.md](docs/entwicklung/workflow.md).

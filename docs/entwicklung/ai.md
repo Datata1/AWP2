@@ -28,24 +28,9 @@ liegt in git und gilt damit für alle im Team.
 
 Beispiel: `/experiment random forest auf allen gültigen Bändern mit class_weight=balanced`
 
-## Typischer Ablauf mit GitHub
-
-```text
-/issue Random-Forest-Baseline für Crop und Stage @me   → #12 im Board (Todo)
-/start 12                                              → Branch exp/12-rf-baseline (In Progress)
-/experiment random forest baseline                     → Code, Scores, Experiment-Log
-/pr                                                    → PR „Closes #12" (Review)
-Merge des PR                                           → Issue zu, Board auf Done
-```
-
-Board: [GitHub Project „AWP2"](https://github.com/users/Datata1/projects/2) mit
-Todo → In Progress → Review → Done. Meilensteine M1–M3 und Endabgabe sind als GitHub-Milestones
-mit Fälligkeitsdatum angelegt, Labels: `feat`, `exp`, `data`, `docs`, `bug`, `orga`, `crop`,
-`stage`, `blocked`.
-
-Issues und PRs schreibt Claude auf Deutsch und bewusst knapp: Titel ≤ 60 Zeichen, Issue =
-Ziel + „Fertig wenn"-Checkboxen, PR = `Closes #nr` + 1–4 Stichpunkte. Die Vorlagen in `.github/`
-sorgen dafür, dass das auch im Browser so bleibt.
+Wie die Skills im Alltag zusammenspielen, zeigt der [Arbeitsablauf](workflow.md). Issues und PRs
+schreibt Claude nach den [Konventionen](konventionen.md#git-workflow) – kurz und auf Deutsch; die
+Vorlagen in `.github/` sorgen dafür, dass das auch im Browser so bleibt.
 
 ## Subagent `ml-reviewer`
 
