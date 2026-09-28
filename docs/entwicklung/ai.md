@@ -25,6 +25,7 @@ liegt in git und gilt damit für alle im Team.
 | `/issue <Aufgabe> [@person]` | Knappes Issue mit Label, Meilenstein und Board-Eintrag. Mehrere Aufgaben auf einmal gehen auch. |
 | `/start <nr>` | Issue übernehmen: dir zuweisen, Board auf „In Progress", verknüpften Branch anlegen. |
 | `/pr [reviewer]` | PR für den aktuellen Branch (max. ~10 Zeilen, `Closes #nr`, bei Experimenten die Scores), Board auf „Review". |
+| `/stunden [datum] [stunden] [notizen]` | Stundendoku: Eintrag aus deinen Commits, PRs, Issues und der Session formulieren; du nennst nur die Stunden. Details: [Arbeitsablauf](workflow.md#stundendoku). |
 
 Beispiel: `/experiment random forest auf allen gültigen Bändern mit class_weight=balanced`
 

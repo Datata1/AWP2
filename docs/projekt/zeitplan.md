@@ -37,6 +37,7 @@ Siehe [Bewertung & Abgabe](bewertung.md#abgabe-checkliste).
 ## Statusmeetings
 
 - Wöchentlich (ab Woche 2), Pflicht, abwechselnd Präsenz / online
-- **Stundenkontierung spätestens 24 h vorher aktualisieren** (Template in ILIAS)
+- **Stundenkontierung spätestens 24 h vorher aktualisieren** – mit `/stunden` und `make stunden`,
+  siehe [Arbeitsablauf → Stundendoku](../entwicklung/workflow.md#stundendoku)
 - Kurze Zusammenfassung der Tätigkeiten und Ergebnisse vorbereiten, ggf. live zeigen
 - Blocker sofort melden: `dozenten@domaenenprojekt2.de` oder Matrix-Kanal Domänenprojekt2

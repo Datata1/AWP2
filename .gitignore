@@ -18,6 +18,10 @@ models/*
 reports/figures/*
 !reports/figures/.gitkeep
 
+# Persönliche Stundendoku (Repo ist öffentlich)
+stundendoku/*
+!stundendoku/README.md
+
 # Claude Code (persönliche Einstellungen)
 CLAUDE.local.md
 .claude/settings.local.json

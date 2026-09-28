@@ -14,6 +14,8 @@ make setup
 Danach die Rohdaten nach `data/raw/` und die Kursunterlagen aus ILIAS nach `data/assets/`
 kopieren (siehe `data/README.md`).
 
+Stundendoku anlegen: `/stunden init` (siehe [Stundendoku](#stundendoku)).
+
 ## Pro Aufgabe
 
 | # | Schritt | Mit Claude | Ohne Claude | Board |
@@ -62,7 +64,23 @@ Jedes Issue hat einen **Bereich**: Orga, Domäne, EDA, Data Prep, Modellierung, 
 
 | Wann | Was |
 | --- | --- |
-| Vor dem Statusmeeting | `/status` – Zusammenfassung aus Board, PRs und Experimenten; Stundenkontierung spätestens 24 h vorher |
+| Täglich | Stundendoku mit `/stunden <stunden>` ([Details](#stundendoku)) |
+| Vor dem Statusmeeting | `/status` – Zusammenfassung aus Board, PRs und Experimenten; spätestens 24 h vorher `make stunden` und `.xlsx` nach BWSyncAndShare |
 | Im Meeting | Notizen machen |
 | Nach dem Meeting | `/protokoll <Notizen>`, neue Aufgaben mit `/issue` anlegen und verteilen |
 | Laufend | Board aktuell halten, Experimente in [Experimente](../modelle/experimente.md) eintragen |
+
+## Stundendoku
+
+Jede Person führt ihre Stundendokumentation tagesgenau (Pflicht, spätestens 24 h vor jedem
+Statusmeeting aktuell). Die Datei liegt lokal in `stundendoku/` und ist **nicht in git**.
+
+| Wann | Was |
+| --- | --- |
+| Einmalig | Vorlage aus ILIAS als `data/assets/Stundendokumentation_Vorlage.csv` ablegen, dann `/stunden init` |
+| Am Ende jedes Arbeitstags | `/stunden 4.5` – Claude formuliert den Eintrag aus deinen Commits, PRs, Reviews, Issues und der Session; Meetings oder Lesezeit als Notiz dazuschreiben: `/stunden 6 Teammeeting EDA-Aufteilung` |
+| Vergessen? | Beim Start von Claude erscheint ein Hinweis, für welche Tage mit Commits ein Eintrag fehlt; nachtragen mit `/stunden gestern 3` |
+| Vor dem Statusmeeting | `make stunden` → `.xlsx` in den Teamordner in BWSyncAndShare hochladen |
+
+Die **Stunden** gibst du selbst an – aus Commits lässt sich die Zeit nicht seriös ableiten.
+Ohne Claude: `python3 tools/timesheet.py set heute 4.5 "<konkrete Tätigkeiten>"`.
