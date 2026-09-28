@@ -1,0 +1,7 @@
+nav:
+  - index.md
+  - zeitplan.md
+  - bewertung.md
+  - offene-fragen.md
+  - glob: "*"
+    ignore_no_matches: true

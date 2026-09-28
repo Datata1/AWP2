@@ -1,0 +1,21 @@
+/* Darker green than Material's default for better contrast with white header text */
+:root {
+  --md-primary-fg-color: #2e7d32;
+  --md-primary-fg-color--light: #4caf50;
+  --md-primary-fg-color--dark: #1b5e20;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1b5e20;
+  --md-typeset-a-color: #81c784; /* readable links and active nav item on dark background */
+}
+
+/* Headings: stronger and full contrast in both schemes */
+.md-typeset h1 { font-weight: 600; letter-spacing: -0.01em; color: var(--md-default-fg-color); }
+.md-typeset h2 { font-weight: 500; }
+
+/* Tables use the full content width */
+.md-typeset__table { width: 100%; }
+.md-typeset__table table:not([class]) { display: table; width: 100%; }
+
+/* Home page intro */
+.md-typeset .hero { font-size: 1.1rem; margin-bottom: 1.5rem; }
