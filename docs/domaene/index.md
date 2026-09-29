@@ -24,16 +24,56 @@ Zum Datensatz selbst (Herkunft, Spalten, AEZ): [Daten](../daten/index.md).
 
 ## Projektziel & Nutzen
 
-!!! todo "Leitfragen"
-    - Warum ist es wichtig, Kulturart **und** Entwicklungsstadium aus dem All zu erkennen?
-      Wer nutzt so etwas (Landwirtschaft, Versicherungen, Agrarstatistik, Behörden)?
-    - Welche Entscheidungen hängen vom Entwicklungsstadium ab (Düngung, Bewässerung,
-      Pflanzenschutz, Erntezeitpunkt, Ertragsprognose)?
-    - Was kostet ein Fehler? Ist eine falsche Kultur schlimmer als ein falsches Stadium?
-      Sind manche Verwechslungen (z. B. benachbarte Stadien) weniger schlimm?
-    - Woran messen wir Erfolg – fachlich und laut Bewertung (Balanced Accuracy)?
+### Projektziel
+
+Ziel dieses Projekts ist es, anhand hyperspektraler Satellitenmessungen automatisch zu
+erkennen, welche Kultur auf einer beobachteten Fläche wächst und in welchem
+Entwicklungsstadium sie sich befindet. Dazu erhält ein Modell die Reflexionswerte über viele
+Wellenlängen sowie Kontextinformationen zur agroökologischen Zone und zum Aufnahmemonat.
+Es soll daraus die Kulturart (`Crop`) und das Entwicklungsstadium (`Stage`) ableiten.
+
+### Möglicher Nutzen und Nutzergruppen
+
+Satellitendaten ermöglichen wiederholte Beobachtungen großer oder schwer zugänglicher
+Gebiete und können Feldbegehungen ergänzen.[^1] Mögliche Nutzergruppen solcher Informationen
+sind landwirtschaftliche Betriebe, Beratungsdienste, Behörden und Agrarstatistik. Das Projekt
+prüft jedoch nur die Vorhersagequalität im vorliegenden Datensatz; ob die Ergebnisse für eine
+bestimmte Anwendung ausreichen, ist nicht Teil der Untersuchung.
+
+### Bedeutung des Entwicklungsstadiums
+
+Das Entwicklungsstadium ordnet eine Kultur in ihren saisonalen Entwicklungsverlauf ein.
+Zusammen mit der Kulturart kann es eine Grundlage für Fragen zur Bewässerung, Düngung,
+Pflanzenschutz, Ernteplanung und Ertragsprognose bilden.[^1] Welche dieser Entscheidungen
+durch die Daten tatsächlich verbessert wird, untersuchen wir in diesem Projekt nicht.
+
+### Bewertung und Bedeutung von Fehlern
+
+Unabhängig vom gewählten Modellansatz bewerten wir die Vorhersagequalität für Kulturart und
+Entwicklungsstadium jeweils separat. Die Balanced Accuracy ist die primäre Metrik; ergänzend
+berichten wir Macro-F1 und Samples-F1. Balanced Accuracy und Macro-F1 behandeln alle Klassen
+gleich gewichtet. Der Samples-F1 berücksichtigt beide Labels je Beobachtung gemeinsam.
+
+Die Aufgabenstellung legt nicht fest, ob bestimmte Fehler schwerer wiegen als andere. Deshalb
+behandeln wir eine falsche Kulturart und ein falsches Stadium gleich. Auch benachbarte Stadien
+erhalten in Balanced Accuracy und Macro-F1 keine besondere Teilbewertung: Ein vorhergesagtes
+Label ist dort entweder richtig oder falsch.
 
 ## Zusammenfassung
 
-!!! todo "Zum Schluss"
-    5–10 Sätze, die das Problem für Außenstehende erklären – Basis für den M1-Kurzreport.
+In diesem Projekt soll ein Modell aus hyperspektralen Satellitenmessungen erkennen, welche
+Kultur auf einer Fläche wächst und in welchem Entwicklungsstadium sie sich befindet. Ein
+Spektrum beschreibt dafür, wie stark die Fläche Licht bei vielen verschiedenen Wellenlängen
+reflektiert. Zusätzlich stehen die agroökologische Zone und der Aufnahmemonat als
+Kontextinformationen zur Verfügung. Solche Satellitendaten können Feldbegehungen durch
+wiederholte Beobachtungen großer oder schwer zugänglicher Gebiete ergänzen. Kulturart und
+Entwicklungsstadium zusammen beschreiben, was auf einer Fläche wächst und wo sich die Kultur
+in ihrem saisonalen Entwicklungsverlauf befindet. Welche Modellansätze wir vergleichen,
+entscheiden wir später. Die Vorhersagequalität bewerten wir für beide Zielgrößen. Da die
+Klassen unterschiedlich häufig vorkommen, ist die Balanced Accuracy die primäre Metrik.
+Macro-F1 und Samples-F1 ergänzen sie. Die Untersuchung bewertet die Vorhersagequalität im
+Datensatz, nicht den praktischen Nutzen für eine konkrete Entscheidung.
+
+[^1]: Mulla, D. J. (2013): *Twenty five years of remote sensing in precision agriculture:
+Key advances and remaining knowledge gaps*. Biosystems Engineering, 114(4), 358-371.
+https://doi.org/10.1016/j.biosystemseng.2012.08.009.
