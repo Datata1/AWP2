@@ -43,28 +43,56 @@ zurückführen.
 
 | Begriff | Bedeutung | Bei uns |
 | --- | --- | --- |
-| **Experiment** | Sammelmappe für zusammengehörige Läufe | Eines: `awp2` |
+| **Experiment** | Sammelmappe für Läufe, die dieselbe Frage beantworten | `crop-stage` für die Hauptaufgabe; eigene Experimente nur für andere Fragen (z. B. die Bandstudie in M3) |
 | **Run** (Lauf) | Ein Training mit Bewertung | Ein Aufruf von `run()`, z. B. `rf_baseline` |
+| **Beschreibung** | Freitext am Lauf | Was probiert wurde und warum (`description`) |
 | **Parameter** | Einstellungen eines Laufs | `preprocessing.scale`, `balance_samples`, `model.max_depth` … |
 | **Metrik** | Gemessene Zahl | `bacc_combined`, `bacc_crop`, `f1_samples` … |
-| **Tag** | Zusatzinformation | `git.commit`, `git.branch`, `git.dirty`, `author`, `data.version` |
-| **Artefakt** | Datei am Lauf | `confusion_matrices.png`, optional das Modell |
+| **Tag** | Zusatzinformation | `approach` (Ansatz), `git.commit`, `git.branch`, `git.dirty`, `author` |
+| **Dataset** | Welche Daten ein Lauf nutzte – nur Name, Hash, Schema und Quelle, nicht die Daten | `training` und `validation` aus `data/processed/split.csv` |
+| **Logged Model** | Gespeichertes Modell eines Laufs, mit seinen Metriken | Jeder Lauf speichert sein Modell (Tab *Models*) |
+| **Artefakt** | Datei am Lauf | `confusion_matrices.png` |
+| **System-Metriken** | CPU-, Speicher-, Festplatten-Verlauf während des Laufs | Nur mit `system_metrics=True` |
 | **Tracking-Store** | Datenbank der Läufe | `mlflow.db` im Projekt-Root (nicht in git) |
 | **Artefakt-Store** | Ablage der Dateien | `mlruns/` im Projekt-Root (nicht in git) |
+
+**Ein Experiment je Frage, nicht je Ansatz:** Die Kernfrage „welcher Ansatz ist am besten?“
+vergleicht Läufe *verschiedener* Ansätze – das geht innerhalb eines Experiments am einfachsten.
+Der Ansatz steht deshalb als Tag `approach` an jedem Lauf; in der Oberfläche lässt sich danach
+filtern (`tags.approach = 'hierarchical'`) und gruppieren (*Group by*).
 
 ## Was wir nutzen – und was nicht
 
 | Bestandteil | Nutzen wir? | Warum |
 | --- | --- | --- |
-| **Tracking** | ✅ ja | Kern: Läufe vergleichbar und nachvollziehbar machen |
-| **Models** | ✅ teilweise | Nur zum Speichern und Wiederladen einzelner Modelle (`log_model=True`) |
+| **Tracking** | ✅ ja | Kern: Läufe vergleichbar und nachvollziehbar machen – mit Beschreibung, Datasets und optional System-Metriken |
+| **Models** (Logged Models) | ✅ ja | Jeder Lauf speichert sein Modell; es lässt sich laden, z. B. für die Vorhersagen der Abgabe |
 | Tracking-**Server** | ❌ nein | Wir speichern lokal; kein Dienst, den jemand betreiben muss |
-| **Model Registry** | ❌ nein | Wir bringen kein Modell in Produktion – abgegeben wird eine Vorhersage-CSV |
+| **Model Registry** | ❌ nein | Freigabe-Workflow für den Betrieb – wir liefern eine Vorhersage-CSV, kein Modell in Produktion |
 | **Evaluate** | ❌ nein | Unsere Metriken sind durch die Bewertung vorgegeben und stecken in `awp2.evaluation` |
 | **Autologging** | ❌ nein | Loggt sehr viel Unwichtiges; wir loggen gezielt, was wir vergleichen |
 | **Projects** | ❌ nein | Reproduzierbarkeit lösen wir mit `uv` und `make data` |
 | **Serving / Deployments** | ❌ nein | Kein Betrieb eines Modells vorgesehen |
 | **Tracing / GenAI** | ❌ nein | Für LLM-Anwendungen gedacht, nicht für unsere Klassifikatoren |
+
+## Die Oberfläche
+
+Oben links schaltet MLflow zwischen **GenAI** und **Model training** um. Standardmäßig steht es
+auf *GenAI* – für LLM-Anwendungen. **Einmal auf „Model training“ klicken**, der Browser merkt
+sich die Wahl. Danach:
+
+| Wo | Was du siehst |
+| --- | --- |
+| Experiment `crop-stage` → **Runs** | Alle Läufe mit Datasets, Dauer; Spalten für Metriken/Parameter wählbar, *Group by* `approach` |
+| Lauf → **Overview** | Beschreibung, Parameter, Metriken, Tags, Datasets, verknüpftes Modell |
+| Lauf → **Model metrics** | Metriken als Diagramm |
+| Lauf → **System metrics** | CPU/Speicher – nur bei `system_metrics=True` |
+| Lauf → **Artifacts** | `confusion_matrices.png` (anklicken für die Vorschau) |
+| Experiment → **Models** | Alle gespeicherten Modelle mit ihren Metriken |
+
+**Bewusst leer:** *Traces*, *Sessions*, *Judges*, *Prompts*, *Evaluation*, *Model Registry*,
+*AI Gateway* und der *MLflow Assistant* – das sind Funktionen für LLM-Anwendungen oder den
+Betrieb, die wir nicht nutzen.
 
 Im Code spricht nur `awp2.tracking` mit MLflow. Alle anderen Module wissen nichts davon – ein
 Wechsel des Werkzeugs betrifft nur diese eine Datei.

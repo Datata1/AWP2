@@ -4,29 +4,47 @@ Only this module talks to MLflow, so the tracking tool can be swapped without to
 rest of the code. Browse the runs with ``make mlflow``.
 """
 
-import hashlib
 import subprocess
+import warnings
 from collections.abc import Mapping
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
+import pandas as pd
+from mlflow.data.pandas_dataset import from_pandas
 from mlflow.exceptions import MlflowException
 from sklearn.base import BaseEstimator
 
 from awp2.config import (
-    CLEAN_TRAIN_FILE,
     MLFLOW_ARTIFACTS_DIR,
-    MLFLOW_EXPERIMENT,
+    MLFLOW_EXPERIMENT_KIND_TAG,
     MLFLOW_PARAM_MAX_CHARS,
+    MLFLOW_SYSTEM_METRICS_INTERVAL_S,
     MLFLOW_TRACKING_URI,
     PROJECT_ROOT,
     SPLIT_FILE,
 )
 
 _LOCAL_STORE_SCHEMES = ("sqlite:", "file:")
+# MLflow warns about a doubly registered local dataset source and about integer columns in the
+# inferred schema; we never use the dataset schema to validate inputs, so both are noise here.
+_IRRELEVANT_DATASET_WARNINGS = ("can be interpreted in multiple ways", "Hint: Inferred schema")
 _UNKNOWN = "unknown"
-_DATA_HASH_CHARS = 8
+
+
+class TrackedRun(NamedTuple):
+    """Where a run ended up in MLflow.
+
+    Attributes:
+        run_id: MLflow run id.
+        model_uri: URI to load the stored model with ``mlflow.sklearn.load_model``
+            (``models:/<id>``), ``None`` if no model was stored.
+    """
+
+    run_id: str
+    model_uri: str | None
 
 
 def _git(*args: str) -> str:
@@ -37,28 +55,24 @@ def _git(*args: str) -> str:
     return out.stdout.strip() if out.returncode == 0 else _UNKNOWN
 
 
-def _data_version() -> str:
-    digest = hashlib.sha256()
-    for path in (CLEAN_TRAIN_FILE, SPLIT_FILE):
-        digest.update(path.read_bytes() if path.exists() else b"")
-    return digest.hexdigest()[:_DATA_HASH_CHARS]
-
-
-def _use_project_experiment() -> None:
+def _use_experiment(name: str) -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    experiment = mlflow.get_experiment_by_name(MLFLOW_EXPERIMENT)
+    kind_key, kind_value = MLFLOW_EXPERIMENT_KIND_TAG
+    experiment = mlflow.get_experiment_by_name(name)
     if experiment is None:
         # A shared server decides itself where artifacts go; only a local store gets ours.
         is_local = MLFLOW_TRACKING_URI.startswith(_LOCAL_STORE_SCHEMES)
-        location = MLFLOW_ARTIFACTS_DIR.as_uri() if is_local else None
+        location = (MLFLOW_ARTIFACTS_DIR / name).as_uri() if is_local else None
         try:
-            mlflow.create_experiment(MLFLOW_EXPERIMENT, artifact_location=location)
+            mlflow.create_experiment(name, artifact_location=location, tags={kind_key: kind_value})
         except MlflowException as error:
             if error.error_code != "RESOURCE_ALREADY_EXISTS":  # created by a parallel run
                 raise
     elif experiment.lifecycle_stage == "deleted":
         mlflow.MlflowClient().restore_experiment(experiment.experiment_id)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+    active = mlflow.set_experiment(name)
+    if active.tags.get(kind_key) != kind_value:
+        mlflow.set_experiment_tag(kind_key, kind_value)
 
 
 def estimator_params(estimator: BaseEstimator, prefix: str) -> dict[str, str]:
@@ -83,43 +97,76 @@ def estimator_params(estimator: BaseEstimator, prefix: str) -> dict[str, str]:
 
 
 def log_run(
+    *,
+    experiment: str,
     name: str,
+    approach: str,
+    description: str,
     params: Mapping[str, str | bool],
     metrics: Mapping[str, float],
+    train: pd.DataFrame,
+    validation: pd.DataFrame,
     model: BaseEstimator | None = None,
     figures: Mapping[str, plt.Figure] | None = None,
-) -> str:
-    """Record one run in the MLflow store.
+    system_metrics: bool = False,
+) -> TrackedRun:
+    """Record one run in MLflow.
 
-    Every run is tagged with git commit, branch, author, whether ``src/`` or ``notebooks/`` had
-    uncommitted changes, and a short hash of the data artifacts – so a result can always be
-    traced back to the code and the split that produced it.
+    Besides parameters and metrics, the run gets the git state (commit, branch, author, whether
+    ``src/`` or ``notebooks/`` had uncommitted changes), the approach as tag, the training and
+    validation data as datasets (metadata and hash only) and – if given – the fitted model, to
+    which the metrics are linked so it shows up with its scores in the experiment's *Models* tab.
 
     Args:
+        experiment: MLflow experiment, one per question (e.g. ``"crop-stage"``).
         name: Run name shown in the MLflow UI.
+        approach: Modelling approach, stored as tag ``approach`` for filtering and grouping.
+        description: Free text on what was tried and why; shown as the run description.
         params: Settings of the run (configuration and hyperparameters).
-        metrics: Scores of the run.
-        model: Fitted model to store; omit it for quick runs because models can be large.
+        metrics: Scores on the validation data.
+        train: Training data (features and targets) the model was fitted on.
+        validation: Validation data (features and targets) the metrics were computed on.
+        model: Fitted model to store; omit it for quick runs.
         figures: Plots to store, keyed by file name (e.g. ``"confusion_matrices.png"``).
+        system_metrics: Also record CPU/memory usage during the run.
 
     Returns:
-        The MLflow run id.
+        Run id and – if a model was stored – the URI to load it.
     """
-    _use_project_experiment()
+    _use_experiment(experiment)
+    if system_metrics:
+        mlflow.set_system_metrics_sampling_interval(MLFLOW_SYSTEM_METRICS_INTERVAL_S)
+        mlflow.set_system_metrics_samples_before_logging(1)
     tags = {
+        "approach": approach,
         "git.commit": _git("rev-parse", "--short", "HEAD"),
         "git.branch": _git("branch", "--show-current"),
         "git.dirty": str(bool(_git("status", "--porcelain", "--", "src", "notebooks"))),
         "author": _git("config", "user.name"),
-        "data.version": _data_version(),
     }
-    with mlflow.start_run(run_name=name, tags=tags) as active:
+    with mlflow.start_run(
+        run_name=name,
+        tags=tags,
+        description=description or None,
+        log_system_metrics=system_metrics,
+    ) as active:
         mlflow.log_params(dict(params))
-        mlflow.log_metrics(dict(metrics))
+        datasets = {}
+        with warnings.catch_warnings():
+            for message in _IRRELEVANT_DATASET_WARNINGS:
+                warnings.filterwarnings("ignore", message=f".*{message}")
+            for context, frame in (("training", train), ("validation", validation)):
+                datasets[context] = from_pandas(frame, source=str(SPLIT_FILE), name=context)
+                mlflow.log_input(datasets[context], context=context)
         for file_name, fig in (figures or {}).items():
             mlflow.log_figure(fig, file_name)
+        model_id = model_uri = None
         if model is not None:
             # skops cannot serialise our own transformers; the models are our own and stay
             # local, so cloudpickle is safe here.
-            mlflow.sklearn.log_model(model, name="model", serialization_format="cloudpickle")
-    return active.info.run_id
+            logged = mlflow.sklearn.log_model(
+                model, name=name, serialization_format="cloudpickle", params=dict(params)
+            )
+            model_id, model_uri = logged.model_id, logged.model_uri
+        mlflow.log_metrics(dict(metrics), model_id=model_id, dataset=datasets["validation"])
+    return TrackedRun(active.info.run_id, model_uri)

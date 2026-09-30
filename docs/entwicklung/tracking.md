@@ -30,19 +30,29 @@ from awp2.preprocessing import PreprocessingConfig
 
 result = run(
     RandomForestClassifier(class_weight="balanced", random_state=SEED),
-    RunConfig(name="rf_baseline", preprocessing=PreprocessingConfig(use_meta=True)),
+    RunConfig(
+        name="rf_baseline",
+        approach="baseline",
+        description="Random Forest auf allen Bändern als erste Referenz.",
+        preprocessing=PreprocessingConfig(use_meta=True),
+    ),
 )
 result.metrics.bacc_combined   # Score
 result.run_id                  # Lauf in MLflow
+result.model_uri               # gespeichertes Modell, z. B. für Vorhersagen
 ```
 
-| Option in `RunConfig` | Wirkung |
-| --- | --- |
-| `name` | Name des Laufs, klein und ohne Leerzeichen |
-| `preprocessing` | Optionen der Vorverarbeitung, siehe [Pipeline](../daten/pipeline.md) |
-| `balance_samples=True` | Ausgleichsgewichte für Modelle ohne `class_weight` |
-| `track=False` | Schneller Test, der nicht gespeichert wird |
-| `log_model=True` | Modell mitspeichern – für Läufe, die man weiterverwenden will (dauert einige Sekunden länger und zeigt eine Hinweis-Warnung zum Speicherformat) |
+| Option in `RunConfig` | Standard | Wirkung |
+| --- | --- | --- |
+| `name` | – | Name des Laufs, klein und ohne Leerzeichen |
+| `approach` | – | Ansatz, zu dem der Lauf gehört, z. B. `baseline`, `hierarchical` – zum Filtern und Gruppieren |
+| `description` | leer | Was probiert wurde und warum – erscheint als Beschreibung des Laufs |
+| `experiment` | `crop-stage` | Nur für andere Fragen ändern, z. B. `band-reduction` für die Studie in M3 |
+| `preprocessing` | Standard | Optionen der Vorverarbeitung, siehe [Pipeline](../daten/pipeline.md) |
+| `balance_samples` | `False` | Ausgleichsgewichte für Modelle ohne `class_weight` |
+| `log_model` | `True` | Modell speichern (Tab *Models*); für schnelle Tests `False` |
+| `system_metrics` | `False` | CPU-/Speicherverlauf aufzeichnen – lohnt sich bei längeren Trainings |
+| `track` | `True` | `False` = gar nichts speichern |
 
 Das Modell muss **Crop und Stage** vorhersagen – wie, entscheidet der [Ansatz](../modelle/ansaetze.md).
 
@@ -52,10 +62,11 @@ Das Modell muss **Crop und Stage** vorhersagen – wie, entscheidet der [Ansatz]
 make mlflow   # http://127.0.0.1:5000
 ```
 
-Experiment **awp2** öffnen → nach `bacc_combined` sortieren → interessante Läufe anhaken →
-**Compare** zeigt Parameter und Metriken nebeneinander. Im Lauf liegt unter *Artifacts* die
-Confusion Matrix; gespeicherte Modelle erscheinen im Tab *Logged models*. Nur Läufe mit gleicher
-`data.version` sind direkt vergleichbar.
+Oben links auf **Model training** umschalten (einmalig, siehe [Überblick → Oberfläche](mlflow.md#die-oberflache)),
+Experiment **crop-stage** öffnen → nach `bacc_combined` sortieren oder mit *Group by* nach
+`approach` gruppieren → Läufe anhaken → **Compare** zeigt Parameter und Metriken nebeneinander.
+Im Lauf liegt unter *Artifacts* die Confusion Matrix; alle Modelle stehen im Tab *Models*.
+Direkt vergleichbar sind nur Läufe mit gleichem Dataset-Hash (Spalte *Dataset*).
 
 !!! warning "Nicht auf der Validierung tunen"
     `run()` bewertet auf dem 30-%-Holdout – er ist für den Vergleich **fertiger** Ansätze da.
@@ -73,7 +84,7 @@ from awp2.config import MLFLOW_TRACKING_URI
 from awp2.data import load_test
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-model = mlflow.sklearn.load_model("runs:/<run_id>/model")
+model = mlflow.sklearn.load_model(result.model_uri)   # oder "models:/<Model-ID>" aus dem Tab Models
 model.predict(load_test())
 ```
 
@@ -96,12 +107,18 @@ make data            # falls data/interim und data/processed noch fehlen
 uv run python -c "
 from sklearn.dummy import DummyClassifier
 from awp2.experiment import RunConfig, run
-r = run(DummyClassifier(), RunConfig(name='smoke_test'))
+r = run(DummyClassifier(), RunConfig(name='smoke_test', approach='baseline', description='Schnelltest'))
 print(r.metrics.bacc_crop, r.run_id)
 "
 make mlflow          # http://127.0.0.1:5000
 ```
 
-Erwartet: `0.2` (Zufallsniveau bei 5 Kulturen) und eine Run-ID; in der Oberfläche erscheint im
-Experiment **awp2** der Lauf `smoke_test` mit Parametern, Metriken, Tags und der Confusion Matrix
-unter *Artifacts*. Den Testlauf danach in der Oberfläche löschen (Lauf anhaken → *Delete*).
+Erwartet: `0.2` (Zufallsniveau bei 5 Kulturen) und eine Run-ID. In der Oberfläche (auf
+**Model training** umschalten) im Experiment **crop-stage**:
+
+- [ ] Lauf `smoke_test` mit Datasets `training` und `validation` in der Liste
+- [ ] *Overview*: Beschreibung „Schnelltest“, Parameter, 8 Metriken, Tag `approach = baseline`
+- [ ] *Artifacts*: `confusion_matrices.png`
+- [ ] Tab *Models*: Modell `smoke_test` mit seinen Metriken
+
+Den Testlauf danach löschen (Lauf anhaken → *Delete*).
