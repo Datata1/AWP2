@@ -86,6 +86,9 @@ Die Confusion Matrix verrät, welche Klassen verwechselt werden – Stoff für d
   der Run-ID
 - Erkenntnisse und Begründung im Abschnitt des Ansatzes in [Ansätze](ansaetze/index.md), Status in der
   Übersichtstabelle aktualisieren
+- jede Erkenntnis mit einem Plot belegen: im Notebook direkt darunter, die wichtigsten mit
+  `save_doc_figure(fig, "<ansatz>_<was>", MODEL_DOCS_FIGURES_DIR)` speichern und auf der Seite
+  des Ansatzes einbinden (Vorbild: [Baseline](ansaetze/baseline.md))
 - committen, `/pr`
 
 ## Was am Ende eines Ansatzes steht

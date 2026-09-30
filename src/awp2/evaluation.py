@@ -49,6 +49,17 @@ MetricName = Literal[
     "f1_samples",
 ]
 
+METRIC_LABELS: dict[str, str] = {
+    "bacc_crop": "BAcc Kultur",
+    "bacc_stage": "BAcc Stadium",
+    "bacc_combined": "BAcc kombiniert",
+    "f1_macro_crop": "Macro-F1 Kultur",
+    "f1_macro_stage": "Macro-F1 Stadium",
+    "f1_macro_combined": "Macro-F1 kombiniert",
+    "f1_samples": "Samples-F1",
+}
+"""Readable (German) names of the metrics for plots and tables."""
+
 
 def as_target_frame(pred: pd.DataFrame | np.ndarray, index: pd.Index) -> pd.DataFrame:
     """Bring model predictions into the ``Crop``/``Stage`` form that ``evaluate`` expects.

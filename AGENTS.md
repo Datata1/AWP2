@@ -36,7 +36,8 @@ Always commit `pyproject.toml` and `uv.lock` together.
   pandera schema in `src/awp2/data/schema.py`). Use `band_columns()` / `wavelengths()` for bands.
 - `data/raw/` is **read-only**. Derived data → `data/interim/` or `data/processed/`
   (must be reproducible from raw), trained models → `models/`, figures → `reports/figures/`
-  (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` (`docs/daten/img/`).
+  (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` into `docs/daten/img/`
+  (data, EDA) or `MODEL_DOCS_FIGURES_DIR` = `docs/modelle/img/` (model results).
 - Plots: use and extend `awp2.plots` (e.g. `plot_spectra()`) instead of ad-hoc plotting code.
 - Notebook names: `<nr>_<initials>_<topic>.ipynb`, e.g. `03_jd_baseline.ipynb`.
 
