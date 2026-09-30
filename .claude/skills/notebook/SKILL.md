@@ -34,7 +34,9 @@ If initials are missing, derive them from `git config user.name` and confirm.
    import pandas as pd
 
    from awp2.config import FIGURES_DIR, SEED
-   from awp2.data import band_columns, load_train, wavelengths
+   from awp2.data import band_columns, load_split, load_train, wavelengths
+   from awp2.experiment import RunConfig, TuneConfig, run, tune
+   from awp2.preprocessing import PreprocessingConfig
    from awp2.plots import plot_spectra, save_doc_figure
    ```
 
