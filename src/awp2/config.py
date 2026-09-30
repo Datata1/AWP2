@@ -1,5 +1,6 @@
 """Central paths and constants – always import from here, never hardcode them."""
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -13,6 +14,13 @@ MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"  # scratch figures, not in git
 DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "daten" / "img"  # figures shown in the docs, in git
+
+# Experiment tracking (MLflow, local, not in git); override with the MLFLOW_TRACKING_URI env var
+MLFLOW_TRACKING_URI = os.environ.get(
+    "MLFLOW_TRACKING_URI", f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
+)
+MLFLOW_ARTIFACTS_DIR = Path(os.environ.get("MLFLOW_ARTIFACTS_DIR", PROJECT_ROOT / "mlruns"))
+MLFLOW_EXPERIMENT = "awp2"
 
 # Raw data
 TRAIN_FILE = RAW_DATA_DIR / "train.csv"

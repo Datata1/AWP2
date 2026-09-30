@@ -1,4 +1,4 @@
-.PHONY: help setup lab docs docs-build lint format stunden clean
+.PHONY: help setup lab docs docs-build lint format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -22,6 +22,9 @@ lint: ## Code prüfen (ruff)
 format: ## Code formatieren (ruff)
 	uv run ruff format .
 	uv run ruff check --fix .
+
+mlflow: ## MLflow-UI mit den eigenen Runs starten (http://127.0.0.1:5000)
+	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 
 stunden: ## Stundendoku anzeigen und als xlsx exportieren (für BWSyncAndShare)
 	uv run python tools/timesheet.py show

@@ -3,6 +3,7 @@
 import warnings
 from dataclasses import dataclass
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
@@ -18,8 +19,9 @@ from awp2.data import (
     train_val_split,
     valid_combinations,
 )
-from awp2.evaluation import as_target_frame, evaluate
+from awp2.evaluation import as_target_frame, evaluate, plot_confusion_matrices
 from awp2.preprocessing import build_preprocessor
+from awp2.tracking import estimator_params, log_run
 
 
 class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
@@ -64,6 +66,7 @@ class RunResult:
     pipeline: Pipeline
     y_val: pd.DataFrame
     y_pred: pd.DataFrame
+    run_id: str | None = None
 
 
 def run(
@@ -71,6 +74,8 @@ def run(
     name: str,
     preprocessor: BaseEstimator | None = None,
     balance_samples: bool = False,
+    track: bool = True,
+    log_model: bool = False,
 ) -> RunResult:
     """Fit ``preprocessor + model`` on the shared training split and evaluate on validation.
 
@@ -84,6 +89,8 @@ def run(
             ``build_preprocessor(scale=True)`` for SVM, logistic regression or MLP.
         balance_samples: Pass balanced ``sample_weight`` (by crop+stage) to ``fit`` – for models
             without a ``class_weight`` option.
+        track: Log parameters, metrics and confusion matrices to MLflow (``make mlflow``).
+        log_model: Also store the fitted pipeline in MLflow (can be large).
 
     The 30 % validation split is for comparing finished models. Tune hyperparameters with
     cross-validation on the training part (``awp2.data.cv_splits(X_train, y_train)``).
@@ -110,4 +117,23 @@ def run(
             "– consider CombinedLabelClassifier.",
             stacklevel=2,
         )
-    return RunResult(name, metrics, pipeline, y_val, y_pred)
+
+    run_id = None
+    if track:
+        params = {
+            **estimator_params(preprocessor, "prep"),
+            **estimator_params(model, "model"),
+            "balance_samples": balance_samples,
+            "n_train": len(X_train),
+            "n_val": len(X_val),
+        }
+        fig = plot_confusion_matrices(y_val, y_pred)
+        run_id = log_run(
+            name,
+            params,
+            metrics,
+            model=pipeline if log_model else None,
+            figures={"confusion_matrices.png": fig},
+        )
+        plt.close(fig)
+    return RunResult(name, metrics, pipeline, y_val, y_pred, run_id)

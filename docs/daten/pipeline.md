@@ -16,7 +16,10 @@ result = run(
     preprocessor=build_preprocessor(use_meta=True, scale=False),
 )
 result.metrics   # bacc_crop, bacc_stage, bacc_combined, f1_…, invalid_combinations
+result.run_id    # jeder Lauf landet in MLflow → make mlflow
 ```
+
+Vergleichen der Läufe: [Experiment-Tracking](../entwicklung/tracking.md).
 
 ## Ablauf
 

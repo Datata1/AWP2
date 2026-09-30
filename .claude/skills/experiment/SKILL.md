@@ -33,10 +33,11 @@ Follow these steps. Code and comments in English, documentation in German.
 - Name the most confused classes and give a hypothesis why (spectral similarity, stage overlap).
 
 ## 4. Persist
-- Save the fitted pipeline: `joblib.dump(pipeline, MODELS_DIR / "<id>.joblib")`.
 - Append one row to the table in `docs/modelle/experimente.md`
   (Datum, ID, Autor (git user.name), Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert,
-  Macro-F1 kombiniert, Samples-F1, Notiz).
+  Macro-F1 kombiniert, Samples-F1, MLflow-Run = first 8 chars of `result.run_id`, Notiz).
+  `run()` already logged params, metrics and confusion matrices to MLflow; pass
+  `log_model=True` instead of `joblib.dump` for models worth keeping.
 - Add findings (German, 2–5 bullets) to the matching approach section in
   `docs/modelle/ansaetze.md` and update its row in the overview table (status, best experiment).
   If it beats the current best, update "Aktueller Stand" in `docs/modelle/index.md`.
