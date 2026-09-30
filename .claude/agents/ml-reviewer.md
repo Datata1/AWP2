@@ -16,8 +16,11 @@ Check, in this order:
    target encoding) before the split or on validation/test data; preprocessing outside an
    sklearn `Pipeline` in cross-validation; `test.csv` used for fitting; duplicate spectra
    (there are 2) ending up in both train and validation; hyperparameter tuning on the final
-   hold-out.
-2. **Evaluation** — metrics not from `awp2.evaluation`; plain accuracy reported as the main
+   hold-out – e.g. many `run()` calls with different settings and picking the best instead of
+   `tune()`; own `train_test_split` instead of `load_split()`/`load_folds()`.
+2. **Evaluation** — models not evaluated via `awp2.experiment.run()` (missing MLflow run,
+   `approach` or `description`); results missing in `docs/modelle/experimente.md`; metrics not
+   from `awp2.evaluation`; plain accuracy reported as the main
    result; only crop *or* only stage evaluated; missing confusion matrix analysis; comparing
    runs with different splits.
 3. **Imbalance** — no class weights/balanced sampling while rare classes (rice, Harvest) exist;
