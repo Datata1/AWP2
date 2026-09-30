@@ -26,6 +26,10 @@ stundendoku/*
 CLAUDE.local.md
 .claude/settings.local.json
 
+# MLflow (lokaler Tracking-Store)
+mlflow.db
+mlruns/
+
 # Docs-Build
 site/
 

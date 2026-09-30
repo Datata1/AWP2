@@ -69,6 +69,8 @@ search = GridSearchCV(model, {"model__strategy": ["most_frequent", "stratified"]
 search.fit(split.X_train, split.y_train)
 ```
 
+Modelle einheitlich ausführen und in MLflow vergleichen: [Experimente & MLflow](../entwicklung/tracking.md).
+
 `scoring=scorer(...)` ist nötig, weil sklearns Standard-Score keine zwei Zielspalten kennt.
 Für Modelle ohne `class_weight` gegen das Klassenungleichgewicht:
 [`balanced_sample_weight`][awp2.data.split.balanced_sample_weight].

@@ -3,5 +3,7 @@ nav:
   - data.md
   - preprocessing.md
   - evaluation.md
+  - experiment.md
+  - tracking.md
   - glob: "*"
     ignore_no_matches: true
