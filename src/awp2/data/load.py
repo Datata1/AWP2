@@ -16,20 +16,49 @@ def _load(path: Path, schema: pa.DataFrameSchema) -> pd.DataFrame:
 
 
 def load_train(path: Path = TRAIN_FILE) -> pd.DataFrame:
-    """Labeled data: AEZ, Month, Crop, Stage and all spectral bands."""
+    """Load the labelled training data, validated against the raw-data schema.
+
+    Args:
+        path: CSV file to read.
+
+    Returns:
+        One row per spectrum (index ``id``) with ``AEZ``, ``Month``, ``Crop``, ``Stage`` and all
+            band columns.
+    """
     return _load(path, train_schema)
 
 
 def load_test(path: Path = TEST_FILE) -> pd.DataFrame:
-    """Unlabeled data: AEZ, Month and all spectral bands."""
+    """Load the unlabelled test data, validated against the raw-data schema.
+
+    Args:
+        path: CSV file to read.
+
+    Returns:
+        One row per spectrum (index ``id``) with ``AEZ``, ``Month`` and all band columns.
+    """
     return _load(path, feature_schema)
 
 
 def band_columns(df: pd.DataFrame) -> list[str]:
-    """Names of the spectral band columns in wavelength order."""
+    """Select the spectral band columns.
+
+    Args:
+        df: Any frame that contains band columns (``X<nm>``).
+
+    Returns:
+        Band column names in wavelength order.
+    """
     return [c for c in df.columns if c.startswith(BAND_PREFIX) and c[1:].isdigit()]
 
 
 def wavelengths(df: pd.DataFrame) -> list[int]:
-    """Band wavelengths in nm, e.g. X427 -> 427."""
+    """Wavelengths of the band columns.
+
+    Args:
+        df: Any frame that contains band columns (``X<nm>``).
+
+    Returns:
+        Wavelengths in nm, e.g. ``X427`` becomes ``427``.
+    """
     return [int(c[1:]) for c in band_columns(df)]

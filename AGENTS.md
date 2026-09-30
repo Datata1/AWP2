@@ -60,7 +60,9 @@ Always commit `pyproject.toml` and `uv.lock` together.
   short labels); split or use a table when it grows.
 - ruff (line length 100) — `make format` before committing.
 - Every function has type hints for all arguments **and the return type** (enforced by ruff
-  `ANN`), plus a short docstring if public. `make lint` type-checks `src/` with **ty** (pinned
+  `ANN`). Public functions/classes in `src/` have **Google-style docstrings** (`Args:`,
+  `Returns:`, `Raises:`; continuation lines indented by 4 more spaces) – the API reference in
+  `docs/referenz/` is generated from them (mkdocstrings), ruff `D`/`DOC` checks them. `make lint` type-checks `src/` with **ty** (pinned
   version – update deliberately). Return named types instead of bare tuples/sets
   (`NamedTuple`, pydantic model) so the caller sees what comes back.
 - **No magic values** in code: column names, labels, sizes, thresholds, seeds, patterns and
