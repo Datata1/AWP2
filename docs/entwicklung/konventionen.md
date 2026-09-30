@@ -34,6 +34,17 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 - **Englisch**: Variablen- und Funktionsnamen, Docstrings, Kommentare, Commit-Messages
 - **Deutsch**: alles in `docs/`, Berichte, Präsentationen
 
+## Code
+
+- **Keine fest verdrahteten Werte:** Spaltennamen, Labels, Größen, Schwellen, Seeds, Muster und
+  Pfade stehen als Konstanten in `awp2.config`. Ausnahme: reine Darstellungsdetails wie die
+  Größe eines Plots.
+- **Typen überall:** Alle Argumente und der Rückgabetyp jeder Funktion sind annotiert (ruff-Regeln
+  `ANN` prüfen das), `ty` prüft die Typen in `make lint`. Statt namenloser Tupel/Sets benannte
+  Typen zurückgeben (`NamedTuple`, pydantic-Modell), damit sofort klar ist, was zurückkommt.
+- Konfigurationen und Ergebnisse an Schnittstellen sind pydantic-Modelle (streng validiert,
+  unveränderlich); sklearn-Klassen bleiben normale Klassen.
+
 ## Kommentare
 
 Der Code zeigt, **was** passiert – Kommentare erklären nur, **warum** (Grund, Einschränkung,
@@ -84,4 +95,6 @@ PR = `Closes #nr` + 1–4 Stichpunkte. Labels: ein Typ (`feat`, `exp`, `data`, `
   landen an der Stelle von `"*"`.
 - Quellen als Fußnote: `Text[^1]` und am Seitenende `[^1]: Autor (Jahr): Titel.`
 - Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern (siehe [EDA](../daten/eda.md)).
+- Diagramme als **Mermaid** (` ```mermaid `), bewusst einfach: meist `flowchart TD`, höchstens
+  ~8 Knoten, kurze Beschriftungen. Wird es größer, lieber aufteilen oder als Tabelle darstellen.
 - Vorschau: `make docs` → <http://127.0.0.1:8000>

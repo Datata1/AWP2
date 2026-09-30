@@ -56,8 +56,20 @@ Always commit `pyproject.toml` and `uv.lock` together.
 
 - **English** for identifiers, docstrings, comments and commit messages.
   **German** for everything in `docs/` and reports.
+- Diagrams in docs: simple **Mermaid** (` ```mermaid `, usually `flowchart TD`, ≤ ~8 nodes,
+  short labels); split or use a table when it grows.
 - ruff (line length 100) — `make format` before committing.
-- Type hints and a short docstring for public functions in `src/`.
+- Every function has type hints for all arguments **and the return type** (enforced by ruff
+  `ANN`), plus a short docstring if public. `make lint` type-checks `src/` with **ty** (pinned
+  version – update deliberately). Return named types instead of bare tuples/sets
+  (`NamedTuple`, pydantic model) so the caller sees what comes back.
+- **No magic values** in code: column names, labels, sizes, thresholds, seeds, patterns and
+  paths are named constants in `awp2.config` (label sets as `Literal` types there). Only purely
+  local presentation details (e.g. a plot's `figsize`) may stay inline.
+- Configs and results at API boundaries are frozen, strict **pydantic** models with field
+  descriptions; new options become a field there, not a loose function argument. sklearn
+  estimators/transformers stay plain classes (sklearn's `clone`/`get_params` conventions break
+  with pydantic).
 - Keep it simple: small functions, no premature abstractions.
 
 ## Comments
