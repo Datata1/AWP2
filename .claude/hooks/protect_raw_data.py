@@ -6,15 +6,19 @@ import sys
 
 RAW = "data/raw"
 FILE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-# Shell commands that write, move or delete files *in* data/raw (not just mention it).
-_ARGS = r"[^;|&\n]*"  # arguments within the same simple command
-_RAW = r"\S*data/raw\b"
-WRITE_PATTERNS = [
-    re.compile(rf"\b(rm|mv|unlink|truncate|chmod|touch|sed\s+-i){_ARGS}{_RAW}"),
-    re.compile(rf"\b(cp|rsync|ln){_ARGS}\s{_RAW}\S*\s*($|[;|&])"),  # raw dir is the target
-    re.compile(rf">\s*{_RAW}"),  # redirect into raw
-    re.compile(rf"\btee\b{_ARGS}\s{_RAW}"),
-]
+
+_SAME_COMMAND = r"[^;|&\n]*"
+_RAW_PATH = r"\S*data/raw\b"
+# Only commands that write *into* data/raw are blocked: reading raw files or copying them
+# elsewhere must keep working.
+WRITE_RULES = {
+    "modify or delete": re.compile(
+        rf"\b(rm|mv|unlink|truncate|chmod|touch|sed\s+-i){_SAME_COMMAND}{_RAW_PATH}"
+    ),
+    "copy into": re.compile(rf"\b(cp|rsync|ln){_SAME_COMMAND}\s{_RAW_PATH}\S*\s*($|[;|&])"),
+    "redirect into": re.compile(rf">\s*{_RAW_PATH}"),
+    "tee into": re.compile(rf"\btee\b{_SAME_COMMAND}\s{_RAW_PATH}"),
+}
 
 
 def block(reason: str) -> None:
@@ -34,11 +38,12 @@ def main() -> None:
 
     if tool == "Bash":
         command = tool_input.get("command", "")
-        if any(p.search(command) for p in WRITE_PATTERNS):
-            block(
-                f"Command would modify {RAW}/, which is read-only. "
-                "Raw files are copied there by hand; write outputs elsewhere."
-            )
+        for rule, pattern in WRITE_RULES.items():
+            if pattern.search(command):
+                block(
+                    f"Command would {rule} {RAW}/, which is read-only. "
+                    "Raw files are copied there by hand; write outputs elsewhere."
+                )
 
 
 if __name__ == "__main__":

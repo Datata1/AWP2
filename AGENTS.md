@@ -68,6 +68,32 @@ Always commit `pyproject.toml` and `uv.lock` together.
   `clone`/`get_params` conventions break with pydantic).
 - Keep it simple: small functions, no premature abstractions.
 
+## Comments
+
+Code says **what** happens; comments only say **why** – a reason, constraint, trade-off or
+non-obvious domain fact that the code cannot express.
+
+- Never describe what the code does. If it seems necessary, refactor instead: clearer names,
+  a well-named variable or a small extracted function.
+- Never refer to the past or to changes ("previously", "now uses", "changed from", "new",
+  "fixed", "instead of the old …"). Describe only the current state; history lives in git.
+- No section banners, no commented-out code, no comments restating a name or type.
+- A TODO needs an issue: `# TODO(#30): …`.
+- Docstrings describe the contract (inputs, outputs, guarantees) of public functions, not the
+  implementation steps.
+- When editing a file, remove comments in the touched code that break these rules.
+- Notebook markdown cells may narrate the analysis – they are documentation, not code comments.
+
+```python
+# bad: says what, refers to the past
+# Transpose the frame, previously we used the column median here
+filled = spectra.T.interpolate(method="index").T
+
+# good: says why
+# "_" occurs in crop and stage names, so it cannot separate them
+LABEL_SEP = "|"
+```
+
 ## Git workflow
 
 - Never commit directly to `main`; branch, push, open a pull request, merge after review.
