@@ -5,7 +5,7 @@ Jede:r ergänzt die Begriffe aus der eigenen Seite.
 
 | Begriff | Erklärung | Mehr |
 | --- | --- | --- |
-| AEZ (agroökologische Zone) | | [Daten](../daten/index.md#herkunft-aez) |
+| AEZ (agroökologische Zone) | Gruppe von Gebieten mit ähnlichem Klima, Böden und ähnlicher Vegetationsperiode; sie beschreibt keine genaue Position. | [Daten](../daten/index.md#herkunft-aez) |
 | Atmosphärische Korrektur | Rechenschritt, der Einflüsse der Atmosphäre aus einem Satellitensignal möglichst entfernt. | [Fernerkundung](fernerkundung.md#atmosphare-toa-und-oberflachenreflektanz) |
 | Balanced Accuracy | | [ML-Aufgabe](ml-aufgabe.md#bewertungsmetriken) |
 | BBCH-Skala | | [Kulturpflanzen](kulturpflanzen.md#phanologie-entwicklungsstadien) |

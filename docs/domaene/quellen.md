@@ -9,6 +9,10 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     - Originalpublikation des Datensatzes (vermutlich USGS GHISA, Thenkabail / Aneece)
     - Offizielle Beschreibung EO-1 Hyperion (USGS / NASA)
 
+- Domänenprojekt 2 (2026): *Domaeneprojekt Kickoff Teil Aufgabenbeschreibung*, Folie 7.
+    Lokales Projektmaterial unter `data/assets/`. - Karte zum Untersuchungsgebiet Nordamerika
+    sowie Erklärung der AEZ als Gruppierung nach Klima, Böden und Vegetationsperiode.
+
 ## Fernerkundung & Vegetation
 
 !!! todo
@@ -39,7 +43,17 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 ## Kulturpflanzen & Phänologie
 
 !!! todo
-    - BBCH-Monografie, kulturspezifische Stadien-Skalen
+    - kulturspezifische Stadien-Skalen für Mais, Soja und Winterweizen
+
+- Allen, R. G., Pereira, L. S., Raes, D. & Smith, M. (1998): *Crop evapotranspiration -
+    Guidelines for computing crop water requirements*. FAO Irrigation and Drainage Paper 56.
+    https://www.fao.org/4/x0490e/x0490e0a.htm. - Veränderungen von Bodenbedeckung,
+    Pflanzenhöhe und Blattfläche während der Kulturentwicklung.
+
+- Meier, U. (Hrsg.) (2018): *Growth stages of mono- and dicotyledonous plants: BBCH
+  Monograph*. Julius Kühn-Institut.
+  https://doi.org/10.5073/20180906-074619. - Standardisierte Skala für beobachtbare
+  Entwicklungsstadien.
 
 ## Machine Learning & Metriken
 

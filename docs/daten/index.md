@@ -17,6 +17,12 @@ Hyperspektral-Signaturen landwirtschaftlicher Kulturpflanzen, aufgenommen vom
 - 30 m räumliche Auflösung, 16-Tage-Wiederholzyklus
 - Harmonisierter Datensatz aus weltweiten Quellen, verschiedene agroökologische Zonen (AEZ)
 
+!!! info "Hinweis aus den Kickoff-Folien"
+  Die Karte auf Folie 7 ordnet das Untersuchungsgebiet Nordamerika zu. Die Folie erklärt,
+  dass AEZ Gebiete mit ähnlichem Klima, Böden und Vegetationsperiode gruppieren.[^1] Ob die
+  Angabe „weltweite Quellen" die Herkunft der gesamten Bibliothek oder auch der hier
+  verwendeten Beobachtungen beschreibt, bleibt bis zur Klärung der Originalquelle offen.
+
 ## Datengrundlage
 Für die Aufgabe liegen hyperspektrale Beobachtungen landwirtschaftlicher Flächen vor, die dem Sensor EO-1 Hyperion zugeordnet sind. Der Trainingsdatensatz enthält 5.591 Zeilen, der Testdatensatz 1.397 Zeilen. Jede Zeile enthält eine Beobachtung mit einer spektralen Reflexionskurve sowie Kontextinformationen zur agroökologischen Zone (AEZ) und zum Aufnahmemonat (Month).
 
@@ -37,6 +43,8 @@ Im Trainingsdatensatz sind zusätzlich die Zielvariablen `Crop` und `Stage` enth
     - **AEZ:** Welche Einteilung wird verwendet (FAO/GAEZ, USGS)? Was bedeuten die Zonen
       2 und 5–10 (Klima, Region)? Warum könnte die AEZ bei der Klassifikation helfen?
     - Bekannte Schwächen oder Einschränkungen laut Quelle?
+
+  [^1]: Domänenprojekt 2 (2026), siehe [Quellen](../domaene/quellen.md).
 
 ## Dateien in `data/raw/`
 
