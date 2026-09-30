@@ -19,7 +19,7 @@ flowchart TD
 ## 2. Ansatz bauen
 
 Das Modell muss **Crop und Stage** vorhersagen – wie, ist genau der Ansatz (getrennt,
-kombiniert, hierarchisch …, siehe [Ansätze](ansaetze.md)). Wiederverwendbarer Code gehört nach
+kombiniert, hierarchisch …, siehe [Ansätze](ansaetze/index.md)). Wiederverwendbarer Code gehört nach
 `src/awp2/models/<ansatz>.py`, das Notebook ruft ihn nur auf. Zusätzliche Vorverarbeitung wird
 ein Feld in `PreprocessingConfig`, nicht Code im Notebook.
 
@@ -84,8 +84,11 @@ Die Confusion Matrix verrät, welche Klassen verwechselt werden – Stoff für d
 
 - Zeile im [Experiment-Log](experimente.md): Scores des Bewertungslaufs und die ersten 8 Zeichen
   der Run-ID
-- Erkenntnisse und Begründung im Abschnitt des Ansatzes in [Ansätze](ansaetze.md), Status in der
+- Erkenntnisse und Begründung im Abschnitt des Ansatzes in [Ansätze](ansaetze/index.md), Status in der
   Übersichtstabelle aktualisieren
+- jede Erkenntnis mit einem Plot belegen: im Notebook direkt darunter, die wichtigsten mit
+  `save_doc_figure(fig, "<ansatz>_<was>", MODEL_DOCS_FIGURES_DIR)` speichern und auf der Seite
+  des Ansatzes einbinden (Vorbild: [Baseline](ansaetze/baseline.md))
 - committen, `/pr`
 
 ## Was am Ende eines Ansatzes steht
@@ -94,7 +97,7 @@ Die Confusion Matrix verrät, welche Klassen verwechselt werden – Stoff für d
 | --- | --- | --- |
 | MLflow (lokal) | Tuning-Lauf mit allen Kandidaten, Bewertungslauf mit Metriken, Confusion Matrix, Datasets, Git-Stand und Modell | nur du |
 | [Experiment-Log](experimente.md) | eine Zeile mit Scores und Run-ID | alle (git) |
-| [Ansätze](ansaetze.md) | Idee, Vor-/Nachteile, Ergebnis, Status | alle, Grundlage für den Bericht |
+| [Ansätze](ansaetze/index.md) | Idee, Vor-/Nachteile, Ergebnis, Status | alle, Grundlage für den Bericht |
 | `src/awp2/models/` | der Ansatz als wiederverwendbarer Baustein | alle |
 
 ## Ansätze vergleichen
@@ -108,7 +111,7 @@ und `run()`.
   die besten Läufe je Ansatz anhaken → **Compare**.
 - **Im Team – im Experiment-Log:** Jede:r sieht in MLflow nur die eigenen Läufe; die Tabelle in
   [Experimente](experimente.md) ist die gemeinsame Rangliste, die Übersicht in
-  [Ansätze](ansaetze.md) hält fest, welcher Ansatz führt und warum. Einen fremden Lauf
+  [Ansätze](ansaetze/index.md) hält fest, welcher Ansatz führt und warum. Einen fremden Lauf
   nachvollziehen: den Commit aus dem Log auschecken und erneut ausführen – dank festem Split
   und Seed mit gleichem Ergebnis.
 - **Am Ende:** Der beste Bewertungslauf liefert über `model_uri` das Modell für die Vorhersagen

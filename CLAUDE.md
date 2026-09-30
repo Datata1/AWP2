@@ -4,7 +4,7 @@
 
 - **Skills** (`.claude/skills/`):
   - `/experiment <idea>` — develop an approach the standard way: `tune()` → `run()` (MLflow),
-    experiment log, `ansaetze.md`. Use it for any new model or preprocessing variant.
+    experiment log, approach page in `docs/modelle/ansaetze/`. Use it for any new model or preprocessing variant.
   - `/notebook <initials> <topic>` — create a new notebook following the conventions.
   - `/protokoll <notes>` — turn meeting notes into a protocol in `docs/protokolle/`.
   - `/status [since]` — prepare the weekly status meeting summary (git + GitHub board).

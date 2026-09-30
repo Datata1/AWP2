@@ -6,12 +6,17 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 | Seite | Inhalt |
 | --- | --- |
 | [Einen Ansatz entwickeln](ansatz-entwickeln.md) | Der Ablauf: bauen → `tune()` → `run()` → festhalten → vergleichen |
-| [Ansätze](ansaetze.md) | Welche Strategien wir verfolgen – mit Begründung, Status und Entscheidung |
+| [Ansätze](ansaetze/index.md) | Welche Strategien wir verfolgen – mit Begründung, Status und Entscheidung |
 | [Experimente](experimente.md) | Log aller Läufe mit Scores |
 
 ## Aktueller Stand
 
-!!! todo "Wird mit dem ersten Experiment gefüllt"
-    - Bestes Modell (Experiment-ID, Ansatz) und seine Scores:
-      BAcc Crop / Stage / kombiniert, Macro-F1, Samples-F1
-    - Wichtigste Erkenntnis bisher, nächster geplanter Schritt
+| | |
+| --- | --- |
+| Bestes Modell | `rf_baseline` (Baseline, MLflow-Run `9641f6a8`) |
+| BAcc Crop / Stage / kombiniert | 0.890 / 0.870 / **0.743** |
+| Macro-F1 kombiniert · Samples-F1 | 0.708 · 0.878 |
+
+Wichtigste Erkenntnis: Die Kultur ist gut trennbar, Fehler entstehen vor allem zwischen Mais und
+Soja und zwischen benachbarten Stadien. Nächster Schritt (M2): begründete Ansätze gegen diese
+Baseline vergleichen – siehe [Ansätze](ansaetze/index.md).
