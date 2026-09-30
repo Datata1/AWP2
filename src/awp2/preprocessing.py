@@ -34,7 +34,14 @@ class _BandTransformer(TransformerMixin, BaseEstimator):
         self.n_features_in_ = X.shape[1]
 
     def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
-        """Names of the output columns."""
+        """Names of the output columns (sklearn API).
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            Column names after the transformation.
+        """
         return np.asarray(self.feature_names_out_, dtype=object)
 
 
@@ -42,7 +49,15 @@ class DropEmptyBands(_BandTransformer):
     """Drop bands that contain no values at all in the training data."""
 
     def fit(self, X: pd.DataFrame, y: object = None) -> Self:
-        """Learn which bands are completely empty."""
+        """Learn which bands are completely empty.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
         X = self._check(X)
         self._set_input(X)
         self.empty_bands_ = [c for c in X.columns if X[c].isna().all()]
@@ -50,7 +65,14 @@ class DropEmptyBands(_BandTransformer):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Return ``X`` without the empty bands."""
+        """Remove the bands that were empty during ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` without the empty bands.
+        """
         return self._check(X)[self.feature_names_out_]
 
 
@@ -65,7 +87,15 @@ class InterpolateBands(_BandTransformer):
     """
 
     def fit(self, X: pd.DataFrame, y: object = None) -> Self:
-        """Store the training medians as last-resort fallback."""
+        """Store the training medians as last-resort fallback.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
         X = self._check(X)
         self._set_input(X)
         self.medians_ = X.median()
@@ -73,7 +103,14 @@ class InterpolateBands(_BandTransformer):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Return ``X`` without missing values."""
+        """Fill all missing band values.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` without missing values.
+        """
         X = self._check(X)
         if not X.isna().any().any():
             return X
@@ -87,7 +124,11 @@ def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
 
 
 class PreprocessingConfig(BaseModel):
-    """Options of the standard preprocessing; new steps get a field here, not ad-hoc code."""
+    """Options of the standard preprocessing.
+
+    New preprocessing steps get a field here (and a transformer in this module) instead of
+    ad-hoc code in notebooks.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
@@ -102,7 +143,25 @@ class PreprocessingConfig(BaseModel):
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
-    """Build the standard preprocessing described by ``config`` (defaults if omitted)."""
+    """Build the standard preprocessing as one sklearn transformer.
+
+    Put it as first step into the model pipeline, so it is fitted on the training part only.
+
+    Args:
+        config: Options; the defaults of ``PreprocessingConfig`` if omitted.
+
+    Returns:
+        Transformer that turns ``X`` (metadata + bands) into model-ready features as a
+            DataFrame with named columns.
+
+    Example:
+        ```python
+        model = Pipeline([
+            ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+            ("model", SVC()),
+        ])
+        ```
+    """
     config = config or PreprocessingConfig()
     spectra: list[tuple[str, BaseEstimator]] = [
         ("drop_empty", DropEmptyBands()),

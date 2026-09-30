@@ -26,7 +26,17 @@ line-length = 100
 extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "ANN"]
+select = ["E", "F", "I", "UP", "B", "ANN", "D", "DOC201", "DOC501"]
+# DOC* (returns/raises documented) are preview rules; enable only the ones selected explicitly.
+preview = true
+explicit-preview-rules = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Docstrings are only required for the package API that the reference is generated from.
+"!src/**" = ["D", "DOC201", "DOC501"]
 
 [dependency-groups]
 dev = [
@@ -41,4 +51,5 @@ docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-awesome-nav>=3.3.0",
     "mkdocs-material>=9.7.7",
+    "mkdocstrings[python]>=1.0.6",
 ]

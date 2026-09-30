@@ -1,7 +1,7 @@
 nav:
   - index.md
-  - eda.md
-  - pipeline.md
-  - pipeline-entscheidungen.md
+  - data.md
+  - preprocessing.md
+  - evaluation.md
   - glob: "*"
     ignore_no_matches: true

@@ -31,8 +31,10 @@ class StaleArtifactsError(RuntimeError):
 
 
 def build_artifacts() -> None:
-    """Write the cleaned dataset (``data/interim``) and the split assignment (``data/processed``).
+    """Write the cleaned dataset and the split assignment to ``data/`` (run via ``make data``).
 
+    Creates ``data/interim/train_clean.parquet`` (validated, deduplicated training data) and
+    ``data/processed/split.csv`` (per ``id``: ``subset`` train/val and ``cv_fold``).
     Deterministic: rebuilding from the same raw data gives identical files.
     """
     dataset = prepare_dataset(load_train())
@@ -51,7 +53,14 @@ def build_artifacts() -> None:
 
 
 def load_dataset() -> Dataset:
-    """The cleaned, deduplicated labelled data from ``data/interim``."""
+    """Load the cleaned, deduplicated labelled data, e.g. for the EDA.
+
+    Returns:
+        Features and targets of all labelled rows.
+
+    Raises:
+        StaleArtifactsError: If the artifacts are missing or do not match – run ``make data``.
+    """
     if not CLEAN_TRAIN_FILE.exists():
         raise StaleArtifactsError(f"{CLEAN_TRAIN_FILE} missing – run `make data`.")
     df = pd.read_parquet(CLEAN_TRAIN_FILE)
@@ -68,7 +77,14 @@ def _load_assignment(dataset: Dataset) -> pd.DataFrame:
 
 
 def load_split() -> TrainValSplit:
-    """The shared 70/30 holdout split, read from the artifacts."""
+    """Load the shared 70/30 holdout split – the same for everyone.
+
+    Returns:
+        Training and validation part, read from ``data/processed/split.csv``.
+
+    Raises:
+        StaleArtifactsError: If the artifacts are missing or do not match – run ``make data``.
+    """
     dataset = load_dataset()
     is_train = _load_assignment(dataset)[SUBSET_COL].eq(TRAIN_SUBSET).to_numpy()
     return TrainValSplit(
@@ -80,7 +96,15 @@ def load_split() -> TrainValSplit:
 
 
 def load_folds() -> list[Fold]:
-    """Cross-validation folds of the training part, as row positions within ``X_train``."""
+    """Load the cross-validation folds of the training part (for tuning).
+
+    Returns:
+        ``CV_FOLDS`` folds as row positions within ``load_split().X_train``; pass them as
+            ``cv=`` to ``GridSearchCV`` or ``cross_validate``.
+
+    Raises:
+        StaleArtifactsError: If the artifacts are missing or do not match – run ``make data``.
+    """
     dataset = load_dataset()
     assignment = _load_assignment(dataset)
     fold_ids = assignment.loc[assignment[SUBSET_COL].eq(TRAIN_SUBSET), FOLD_COL].to_numpy()

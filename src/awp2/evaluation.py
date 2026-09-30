@@ -18,7 +18,11 @@ Score = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class Metrics(BaseModel):
-    """Scores of one evaluation. BAcc = balanced accuracy (primary grading metric)."""
+    """Scores of one evaluation, each between 0 and 1.
+
+    Balanced accuracy (``bacc_*``) is the primary grading metric; ``*_combined`` treats each
+    crop/stage pair as one class.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
@@ -47,16 +51,31 @@ MetricName = Literal[
 
 
 def as_target_frame(pred: pd.DataFrame | np.ndarray, index: pd.Index) -> pd.DataFrame:
-    """Bring predictions (array of shape (n, 2) or DataFrame) into ``Crop``/``Stage`` form."""
+    """Bring model predictions into the ``Crop``/``Stage`` form that ``evaluate`` expects.
+
+    Args:
+        pred: Output of ``predict`` – an array of shape ``(n, 2)`` or a two-column DataFrame.
+        index: Index of the true labels, so rows line up.
+
+    Returns:
+        Predictions with the columns ``Crop`` and ``Stage``.
+    """
     if isinstance(pred, pd.DataFrame):
         return pred.set_axis(list(TARGET_COLS), axis=1).set_axis(index)
     return pd.DataFrame(np.asarray(pred), columns=list(TARGET_COLS), index=index)
 
 
 def scorer(metric: MetricName = "bacc_combined") -> Callable[..., float]:
-    """sklearn scorer for ``GridSearchCV`` / ``cross_validate`` based on :func:`evaluate`.
+    """Create an sklearn scorer from one of the ``Metrics`` fields.
 
-    Needed because sklearn's default ``score()`` cannot handle two target columns.
+    Needed for ``GridSearchCV``/``cross_validate`` because sklearn's default ``score()`` cannot
+    handle two target columns.
+
+    Args:
+        metric: Name of the metric to optimise.
+
+    Returns:
+        Scorer to pass as ``scoring=``.
     """
 
     def _score(y_true: pd.DataFrame, y_pred: pd.DataFrame | np.ndarray) -> float:
@@ -70,10 +89,16 @@ def evaluate(
     y_pred: pd.DataFrame,
     valid_combinations: frozenset[CropStage] | None = None,
 ) -> Metrics:
-    """Balanced accuracy and macro-F1 for crop, stage and their combination, plus samples-F1.
+    """Compute all grading metrics for crop, stage and their combination.
 
-    Both frames need the columns ``Crop`` and ``Stage`` and the same row order. Pass the
-    crop/stage pairs seen in training to also get ``invalid_combinations``.
+    Args:
+        y_true: True labels with the columns ``Crop`` and ``Stage``.
+        y_pred: Predicted labels, same columns and row order as ``y_true``.
+        valid_combinations: Crop/stage pairs seen in training; if given, the share of predicted
+            pairs outside this set is reported as ``invalid_combinations``.
+
+    Returns:
+        All metrics, rounded to ``SCORE_DECIMALS``.
     """
     y_true = y_true.reset_index(drop=True)
     y_pred = y_pred.reset_index(drop=True)
@@ -117,7 +142,16 @@ def _invalid_share(y_pred: pd.DataFrame, valid: frozenset[CropStage]) -> float:
 def plot_confusion_matrices(
     y_true: pd.DataFrame, y_pred: pd.DataFrame, save_path: Path | None = None
 ) -> plt.Figure:
-    """Plot row-normalized confusion matrices for crop and stage side by side."""
+    """Plot row-normalised confusion matrices for crop and stage side by side.
+
+    Args:
+        y_true: True labels with the columns ``Crop`` and ``Stage``.
+        y_pred: Predicted labels, same columns and row order as ``y_true``.
+        save_path: Also save the figure there if given.
+
+    Returns:
+        The figure with one confusion matrix per target.
+    """
     fig, axes = plt.subplots(1, len(TARGET_COLS), figsize=(14, 6))
     for ax, col in zip(axes, TARGET_COLS, strict=True):
         ConfusionMatrixDisplay.from_predictions(
