@@ -1,47 +1,57 @@
 ---
 name: experiment
-description: Run a model or preprocessing experiment the standard way for this project (stratified split, sklearn pipeline, standard evaluation, saved model, experiment log entry). Use whenever a new model, feature set or preprocessing variant is trained and evaluated.
-argument-hint: "<short experiment idea, e.g. 'svm on 131 valid bands'>"
+description: Develop and evaluate a modelling approach the project's way – tune() with cross-validation on the training part, run() once on the validation part, both tracked in MLflow, then record the result in the experiment log and ansaetze.md. Use whenever a model, feature set or preprocessing variant is trained and evaluated.
+argument-hint: "<approach and idea, e.g. 'hierarchical: RF for crop, then stage per crop'>"
 ---
 
 # Experiment: $ARGUMENTS
 
-Follow these steps. Code and comments in English, documentation in German.
+Follow `docs/modelle/ansatz-entwickeln.md`. Code and comments in English, documentation German.
 
 ## 1. Prepare
-- If on `main`, create a branch `exp/<kebab-name>` (derive the name from the idea).
-- Read `docs/modelle/experimente.md` to know the current best results and avoid duplicates.
-- Pick a short experiment id: `<kebab-name>` (used for files below).
+- If on `main`, create a branch `exp/<issue-nr>-<kebab-name>` (use `/start` if there is an issue).
+- Make sure the artifacts exist (`data/processed/split.csv`), otherwise run `make data`.
+- Read `docs/modelle/experimente.md` (current best scores) and the approach's section in
+  `docs/modelle/ansaetze.md` to avoid repeating what was tried.
+- Decide `approach` (slug, e.g. `baseline`, `hierarchical`, `combined`) and a run `name`.
 
-## 2. Implement
-- Reusable parts (preprocessing steps, feature functions, model builders) go into `src/awp2/`
-  (e.g. `src/awp2/features.py`, `src/awp2/models/`). Reuse existing functions first.
-- Run the experiment in a notebook (`/notebook` conventions) or a script under `notebooks/`.
-- Load data with `awp2.data.load_train()`; bands via `band_columns()`.
-- Split with `train_test_split(..., stratify=<Crop+Stage combination>, random_state=SEED)`
-  from `awp2.config`, or `StratifiedKFold` with the same seed for cross-validation.
-- Put **all** preprocessing (imputation, scaling, band selection, PCA, resampling) and the model
-  into one sklearn `Pipeline` so nothing is fit on validation data.
-- Handle class imbalance explicitly (e.g. `class_weight="balanced"`) and note what you did.
-- Make sure predicted crop/stage combinations are valid ones seen in training.
+## 2. Build the approach
+- The model must predict `Crop` **and** `Stage` (natively multi-output, `MultiOutputClassifier`
+  or a wrapper). Reusable code goes into `src/awp2/models/<approach>.py`; reuse what exists.
+- Extra preprocessing becomes a transformer in `awp2.preprocessing` plus a field in
+  `PreprocessingConfig` – never ad-hoc preprocessing in a notebook.
+- Handle class imbalance: `class_weight="balanced"` or `balance_samples=True`.
+- Do not load or split data yourself – `tune()` and `run()` use the shared artifacts.
 
-## 3. Evaluate
-- `from awp2.evaluation import evaluate, plot_confusion_matrices`
-- `scores = evaluate(y_val, y_pred)` — report all returned metrics.
-- `plot_confusion_matrices(y_val, y_pred, FIGURES_DIR / "<id>_confusion.png")`
-- Name the most confused classes and give a hypothesis why (spectral similarity, stage overlap).
+## 3. Tune on the training part
+```python
+tuned = tune(model, TuneConfig(name="<name>_search", approach="<approach>",
+                               description="<what is searched and why>",
+                               param_grid={...}, preprocessing=PreprocessingConfig(...)))
+```
+Keep grids small and meaningful. Decide only by the CV score (`tuned.best_score`).
 
-## 4. Persist
-- Save the fitted pipeline: `joblib.dump(pipeline, MODELS_DIR / "<id>.joblib")`.
-- Append one row to the table in `docs/modelle/experimente.md`
-  (Datum, ID, Autor (git user.name), Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert,
-  Macro-F1 kombiniert, Samples-F1, Notiz).
-- Add findings (German, 2–5 bullets) to the matching approach section in
-  `docs/modelle/ansaetze.md` and update its row in the overview table (status, best experiment).
-  If it beats the current best, update "Aktueller Stand" in `docs/modelle/index.md`.
-  Preprocessing decisions → `docs/daten/index.md`.
+## 4. Evaluate once on the validation part
+```python
+result = run(tuned.best_model, RunConfig(name="<name>", approach="<approach>",
+                                         description="<one sentence>", tuning_run=tuned.run_id,
+                                         preprocessing=<same as in tune>))
+```
+Never tune further because of the validation score – new ideas go back to step 3.
 
-## 5. Report back
-Summarize in chat: what was tried, the scores vs. the previous best, the main confusion, and a
-concrete suggestion for the next experiment. Offer to run the `ml-reviewer` agent and to commit
-with an `exp:` message.
+## 5. Analyse
+- Report all of `result.metrics` (`model_dump()`), and `invalid_combinations` if > 0.
+- Name the most confused classes (`plot_confusion_matrices(result.y_val, result.y_pred)`) and a
+  hypothesis why (spectral similarity, stage overlap, few samples).
+
+## 6. Record
+- One row in `docs/modelle/experimente.md`: Datum, ID (= run name), Autor (git user.name),
+  Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert, Macro-F1 kombiniert, Samples-F1,
+  MLflow-Run (first 8 chars of `result.run_id`), Notiz.
+- 2–5 German bullets in the approach's section of `docs/modelle/ansaetze.md`; update its row in
+  the overview table (status, best experiment). New overall best → "Aktueller Stand" in
+  `docs/modelle/index.md`. Preprocessing decisions → `docs/daten/`.
+
+## 7. Report back
+In chat: what was tried, CV score vs. validation score, comparison with the current best, main
+confusion, one concrete next step. Offer the `ml-reviewer` agent and a commit with `exp:`.

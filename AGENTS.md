@@ -31,8 +31,9 @@ Always commit `pyproject.toml` and `uv.lock` together.
   Notebooks in `notebooks/` are for exploration and reporting and **import** from `awp2`.
   If notebook code is needed twice, move it to `src/awp2/`.
 - Paths and constants come from `awp2.config` — never hardcode paths, labels or seeds.
-- Load raw data only via `awp2.data.load_train()` / `load_test()` (validated by the pandera
-  schema in `src/awp2/data/schema.py`). Use `band_columns()` / `wavelengths()` for bands.
+- For modelling use the shared artifacts: `awp2.data.load_split()` / `load_folds()` (built by
+  `make data`). Raw data only via `awp2.data.load_train()` / `load_test()` (validated by the
+  pandera schema in `src/awp2/data/schema.py`). Use `band_columns()` / `wavelengths()` for bands.
 - `data/raw/` is **read-only**. Derived data → `data/interim/` or `data/processed/`
   (must be reproducible from raw), trained models → `models/`, figures → `reports/figures/`
   (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` (`docs/daten/img/`).
@@ -41,16 +42,22 @@ Always commit `pyproject.toml` and `uv.lock` together.
 
 ## ML rules
 
-- Use `SEED` from `awp2.config` for every split, model and sampler.
-- Split stratified on the crop+stage combination.
+- Develop approaches as described in `docs/modelle/ansatz-entwickeln.md` (skill `/experiment`):
+  search hyperparameters with `awp2.experiment.tune()` (cross-validation on the training part),
+  then evaluate **once** with `awp2.experiment.run()` on the validation part. Both are tracked in
+  MLflow; set `approach` and a `description`. Never tune on the validation score.
+- Data only via the shared artifacts (`make data`, `awp2.data.load_split()`/`load_folds()`) –
+  no own splits. Preprocessing only via `build_preprocessor(PreprocessingConfig(...))`.
+- Use `SEED` from `awp2.config` for every model and sampler.
 - Fit every transformation (imputer, scaler, PCA, band selection, resampling) on the training
-  split only — wrap preprocessing and model in an sklearn `Pipeline`.
-- Evaluate with `awp2.evaluation.evaluate()`; always report crop **and** stage metrics.
-  Never report plain accuracy alone.
+  split only — it lives in the sklearn `Pipeline` that `tune()`/`run()` build.
+- Evaluate with `awp2.evaluation.evaluate()` (done by `run()`); always report crop **and** stage
+  metrics. Never report plain accuracy alone.
 - Account for class imbalance (class weights, balanced sampling, appropriate metrics).
 - Predictions must be valid crop/stage combinations.
 - Document preprocessing decisions (e.g. dropped bands) with a reason in `docs/daten/`,
-  experiment results in `docs/modelle/experimente.md`.
+  experiment results in `docs/modelle/experimente.md` (with the MLflow run id) and the
+  reasoning per approach in `docs/modelle/ansaetze.md`.
 
 ## Style
 
