@@ -1,4 +1,4 @@
-.PHONY: help setup lab docs docs-build lint format stunden clean
+.PHONY: help setup data lab docs docs-build lint format stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -6,6 +6,9 @@ help: ## Diese Hilfe anzeigen
 setup: ## Umgebung installieren + nbstripout-Git-Filter aktivieren
 	uv sync
 	uv run nbstripout --install
+
+data: ## Pipeline-Artefakte erzeugen (bereinigter Datensatz + Split in data/)
+	uv run python -m awp2.data.artifacts
 
 lab: ## Jupyter Lab starten
 	uv run jupyter lab

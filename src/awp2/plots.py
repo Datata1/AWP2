@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from awp2.config import DOCS_FIGURES_DIR
+from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI
 from awp2.data import band_columns, wavelengths
 
 
@@ -56,4 +56,4 @@ def plot_spectra(
 def save_doc_figure(fig: plt.Figure, name: str) -> None:
     """Save a figure as PNG to ``docs/daten/img/<name>.png`` for use in the documentation."""
     DOCS_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(DOCS_FIGURES_DIR / f"{name}.png", dpi=120, bbox_inches="tight")
+    fig.savefig(DOCS_FIGURES_DIR / f"{name}.png", dpi=FIGURE_DPI, bbox_inches="tight")

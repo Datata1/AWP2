@@ -1,11 +1,12 @@
-"""Load the raw data as validated DataFrames (index = id)."""
+"""Load the raw data as validated DataFrames and access their band columns."""
 
+import re
 from pathlib import Path
 
 import pandas as pd
 import pandera.pandas as pa
 
-from awp2.config import BAND_PREFIX, ID_COL, TEST_FILE, TRAIN_FILE
+from awp2.config import BAND_PATTERN, BAND_PREFIX, ID_COL, TEST_FILE, TRAIN_FILE
 from awp2.data.schema import feature_schema, train_schema
 
 
@@ -49,16 +50,33 @@ def band_columns(df: pd.DataFrame) -> list[str]:
     Returns:
         Band column names in wavelength order.
     """
-    return [c for c in df.columns if c.startswith(BAND_PREFIX) and c[1:].isdigit()]
+    return [c for c in df.columns if re.fullmatch(BAND_PATTERN, str(c))]
 
 
 def wavelengths(df: pd.DataFrame) -> list[int]:
-    """Wavelengths of the band columns.
+    """Wavelengths of all band columns.
 
     Args:
         df: Any frame that contains band columns (``X<nm>``).
 
     Returns:
-        Wavelengths in nm, e.g. ``X427`` becomes ``427``.
+        Wavelengths in nm, in column order.
     """
-    return [int(c[1:]) for c in band_columns(df)]
+    return [wavelength(c) for c in band_columns(df)]
+
+
+def wavelength(band: str) -> int:
+    """Wavelength of one band column.
+
+    Args:
+        band: Band column name, e.g. ``"X427"``.
+
+    Returns:
+        The wavelength in nm, e.g. ``427``.
+
+    Raises:
+        ValueError: If ``band`` is not a band column name.
+    """
+    if not re.fullmatch(BAND_PATTERN, band):
+        raise ValueError(f"Not a band column: {band!r}")
+    return int(band.removeprefix(BAND_PREFIX))

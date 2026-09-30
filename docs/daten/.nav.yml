@@ -1,5 +1,7 @@
 nav:
   - index.md
   - eda.md
+  - pipeline.md
+  - pipeline-entscheidungen.md
   - glob: "*"
     ignore_no_matches: true
