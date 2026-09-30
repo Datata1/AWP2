@@ -34,6 +34,23 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 - **Englisch**: Variablen- und Funktionsnamen, Docstrings, Kommentare, Commit-Messages
 - **Deutsch**: alles in `docs/`, Berichte, Präsentationen
 
+## Kommentare
+
+Der Code zeigt, **was** passiert – Kommentare erklären nur, **warum** (Grund, Einschränkung,
+Abwägung, nicht offensichtliches Domänenwissen).
+
+- Nie beschreiben, was der Code tut. Scheint das nötig, ist der Code zu kompliziert → besser
+  benennen oder eine kleine Funktion herausziehen.
+- Nie auf Vergangenes verweisen („früher“, „jetzt“, „geändert von“, „neu“, „statt des alten …“).
+  Für spätere Leser:innen zählt nur der aktuelle Stand; die Historie steht in git.
+- Keine Abschnitts-Banner, kein auskommentierter Code, keine Kommentare, die nur den Namen
+  wiederholen. TODOs nur mit Issue: `# TODO(#30): …`.
+- Docstrings beschreiben die Schnittstelle (Eingaben, Rückgabe, Zusicherungen), nicht die
+  Umsetzung.
+- Markdown-Zellen in Notebooks dürfen die Analyse erzählen – das ist Doku, kein Code-Kommentar.
+
+Claude hält sich über `AGENTS.md` daran, der `ml-reviewer` prüft es vor jedem PR.
+
 ## Git-Workflow
 
 Der Ablauf (Issue → Branch → PR → Merge) steht unter [Arbeitsablauf](workflow.md). Hier nur
