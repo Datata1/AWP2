@@ -42,6 +42,24 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 - **Typen überall:** Alle Argumente und der Rückgabetyp jeder Funktion sind annotiert (ruff-Regeln
   `ANN` prüfen das), `ty` prüft die Typen in `make lint`. Statt namenloser Tupel/Sets benannte
   Typen zurückgeben (`NamedTuple`, pydantic-Modell), damit sofort klar ist, was zurückkommt.
+- **Docstrings im Google-Stil** für alle öffentlichen Funktionen und Klassen in `src/` (`Args:`,
+  `Returns:`, `Raises:`). Daraus entsteht die [API-Referenz](../referenz/index.md) automatisch;
+  ruff prüft Form, Rückgabe und Exceptions. Mehrzeilige Beschreibungen: Folgezeilen 4 Leerzeichen
+  weiter einrücken.
+
+    ```python
+    def load_split() -> TrainValSplit:
+        """Load the shared holdout split.
+
+        Returns:
+            Train and validation part, identical for everyone because it is read from
+                ``data/processed/split.csv``.
+
+        Raises:
+            StaleArtifactsError: If the artifacts are missing – run ``make data``.
+        """
+    ```
+
 - Konfigurationen und Ergebnisse an Schnittstellen sind pydantic-Modelle (streng validiert,
   unveränderlich); sklearn-Klassen bleiben normale Klassen.
 

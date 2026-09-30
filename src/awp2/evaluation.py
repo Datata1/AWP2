@@ -15,10 +15,15 @@ def _combined(df: pd.DataFrame) -> pd.Series:
 
 
 def evaluate(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> dict[str, float]:
-    """Compute balanced accuracy and macro-F1 for crop, stage and their combination,
-    plus samples-F1 (mean share of correctly predicted labels per sample).
+    """Compute the grading metrics for crop, stage and their combination.
 
-    Both frames need the columns ``Crop`` and ``Stage`` and the same row order.
+    Args:
+        y_true: True labels with the columns ``Crop`` and ``Stage``.
+        y_pred: Predicted labels, same columns and row order as ``y_true``.
+
+    Returns:
+        Balanced accuracy and macro-F1 for crop, stage and the combined label, plus samples-F1
+            (mean share of correctly predicted labels per sample), each rounded to 4 decimals.
     """
     y_true = y_true.reset_index(drop=True)
     y_pred = y_pred.reset_index(drop=True)
@@ -42,7 +47,16 @@ def evaluate(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> dict[str, float]:
 def plot_confusion_matrices(
     y_true: pd.DataFrame, y_pred: pd.DataFrame, save_path: Path | None = None
 ) -> plt.Figure:
-    """Plot row-normalized confusion matrices for crop and stage side by side."""
+    """Plot row-normalised confusion matrices for crop and stage side by side.
+
+    Args:
+        y_true: True labels with the columns ``Crop`` and ``Stage``.
+        y_pred: Predicted labels, same columns and row order as ``y_true``.
+        save_path: Also save the figure there if given.
+
+    Returns:
+        The figure with one confusion matrix per target.
+    """
     fig, axes = plt.subplots(1, len(TARGET_COLS), figsize=(14, 6))
     for ax, col in zip(axes, TARGET_COLS, strict=True):
         ConfusionMatrixDisplay.from_predictions(

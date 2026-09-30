@@ -24,6 +24,9 @@ def plot_spectra(
         std: Draw a shaded ± one standard deviation band.
         ax: Axes to draw on; a new figure is created if omitted.
         title: Optional plot title.
+
+    Returns:
+        The axes the spectra were drawn on.
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(12, 5))
