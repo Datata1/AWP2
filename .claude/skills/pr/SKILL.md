@@ -26,5 +26,12 @@ disable-model-invocation: true
      only for experiments: `BAcc Crop x.xx / Stage x.xx / kombiniert x.xx (bisher x.xx)` ·
      `## Review-Hinweis` only if there is something specific to check.
    - `gh pr create --base main --title … --body … [--reviewer <arg>] --assignee @me`
-6. `python3 .claude/scripts/board.py <issue-nr> Review` (if there is an issue).
-7. Reply with one line: `PR #<nr> → <url>`.
+6. If the PR targets `main` and has an issue, check that GitHub linked it (the link is what
+   closes the issue on merge; GitHub sometimes silently skips `Closes #nr`):
+   `gh pr view <pr> --json closingIssuesReferences --jq '[.closingIssuesReferences[].number]'`
+   If the issue is missing, re-save the body once (`gh pr edit <pr> --body "$(gh pr view <pr> --json body --jq .body)"`)
+   and check again. Still missing → tell the user in one line and link it manually in the PR
+   sidebar under "Development" (or close the issue by hand after the merge). Stacked PRs (base is
+   not `main`) are never linked by GitHub – skip the check for them.
+7. `python3 .claude/scripts/board.py <issue-nr> Review` (if there is an issue).
+8. Reply with one line: `PR #<nr> → <url>`.

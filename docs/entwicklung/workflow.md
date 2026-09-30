@@ -25,6 +25,11 @@ Stundendoku anlegen: `/stunden init` (siehe [Stundendoku](#stundendoku)).
 | 3 | **Arbeiten** – Code in `src/`, Notebooks in `notebooks/`, oft committen | `/experiment …`, `/notebook …` | normal arbeiten, `git commit` | |
 | 4 | **Abgeben** – PR öffnen, eine andere Person reviewt | `/pr` | `gh pr create` (Vorlage ausfüllen) | Review |
 | 5 | **Mergen** – Reviewer:in klickt *Squash and merge*, Issue schließt sich | | | Done |
+
+!!! note "Issue bleibt nach dem Merge offen?"
+    GitHub verknüpft `Closes #nr` gelegentlich nicht. Dann steht im PR rechts unter
+    *Development* kein Issue. Issue dort verknüpfen oder nach dem Merge von Hand schließen –
+    `/pr` prüft das automatisch, `/status` findet vergessene Fälle.
 | 6 | **Aufräumen** | | `git switch main && git pull` | |
 
 Das Board wird zum Teil automatisch gepflegt: Neue Issues landen auf *Todo*, geschlossene auf
