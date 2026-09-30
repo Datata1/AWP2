@@ -1,6 +1,7 @@
 """Preprocessing steps as sklearn transformers – always fitted on the training split only."""
 
 import re
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from awp2.config import BAND_PATTERN, BAND_PREFIX
+from awp2.config import AEZ_COL, BAND_PATTERN, BAND_PREFIX, MONTH_COL
 from awp2.data import wavelengths
 
 
@@ -32,7 +33,7 @@ class _BandTransformer(TransformerMixin, BaseEstimator):
         self.feature_names_in_ = np.asarray(X.columns, dtype=object)
         self.n_features_in_ = X.shape[1]
 
-    def get_feature_names_out(self, input_features=None) -> np.ndarray:
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
         """Names of the output columns."""
         return np.asarray(self.feature_names_out_, dtype=object)
 
@@ -40,7 +41,7 @@ class _BandTransformer(TransformerMixin, BaseEstimator):
 class DropEmptyBands(_BandTransformer):
     """Drop bands that contain no values at all in the training data."""
 
-    def fit(self, X: pd.DataFrame, y=None) -> "DropEmptyBands":
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
         """Learn which bands are completely empty."""
         X = self._check(X)
         self._set_input(X)
@@ -63,7 +64,7 @@ class InterpolateBands(_BandTransformer):
     - Spectrum without any value: training median per band.
     """
 
-    def fit(self, X: pd.DataFrame, y=None) -> "InterpolateBands":
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
         """Store the training medians as last-resort fallback."""
         X = self._check(X)
         self._set_input(X)
@@ -115,8 +116,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     ]
     if config.use_meta:
         transformers += [
-            ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["AEZ"]),
-            ("month", StandardScaler() if config.scale else "passthrough", ["Month"]),
+            ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [AEZ_COL]),
+            ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL]),
         ]
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")

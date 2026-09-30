@@ -1,5 +1,6 @@
 """Standard evaluation for crop and growth-stage predictions (matches the grading metrics)."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -9,8 +10,8 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, f1_score, make_scorer
 
-from awp2.config import TARGET_COLS
-from awp2.data.split import combined_label
+from awp2.config import CROP_COL, FIGURE_DPI, SCORE_DECIMALS, STAGE_COL, TARGET_COLS
+from awp2.data.split import CropStage, combined_label
 
 Score = Annotated[float, Field(ge=0.0, le=1.0)]
 """A score between 0 and 1."""
@@ -52,7 +53,7 @@ def as_target_frame(pred: pd.DataFrame | np.ndarray, index: pd.Index) -> pd.Data
     return pd.DataFrame(np.asarray(pred), columns=list(TARGET_COLS), index=index)
 
 
-def scorer(metric: MetricName = "bacc_combined"):
+def scorer(metric: MetricName = "bacc_combined") -> Callable[..., float]:
     """sklearn scorer for ``GridSearchCV`` / ``cross_validate`` based on :func:`evaluate`.
 
     Needed because sklearn's default ``score()`` cannot handle two target columns.
@@ -67,7 +68,7 @@ def scorer(metric: MetricName = "bacc_combined"):
 def evaluate(
     y_true: pd.DataFrame,
     y_pred: pd.DataFrame,
-    valid_combinations: set[tuple[str, str]] | None = None,
+    valid_combinations: frozenset[CropStage] | None = None,
 ) -> Metrics:
     """Balanced accuracy and macro-F1 for crop, stage and their combination, plus samples-F1.
 
@@ -76,27 +77,41 @@ def evaluate(
     """
     y_true = y_true.reset_index(drop=True)
     y_pred = y_pred.reset_index(drop=True)
-    scores: dict[str, float] = {}
-    for col in TARGET_COLS:
-        name = col.lower()
-        scores[f"bacc_{name}"] = balanced_accuracy_score(y_true[col], y_pred[col])
-        scores[f"f1_macro_{name}"] = f1_score(y_true[col], y_pred[col], average="macro")
-
-    true_comb, pred_comb = combined_label(y_true), combined_label(y_pred)
-    scores["bacc_combined"] = balanced_accuracy_score(true_comb, pred_comb)
-    scores["f1_macro_combined"] = f1_score(true_comb, pred_comb, average="macro")
-
+    true_pair, pred_pair = combined_label(y_true), combined_label(y_pred)
     # Each sample has exactly one crop and one stage label, so the per-sample F1 equals
     # the fraction of the two labels that were predicted correctly.
     correct = np.column_stack([y_true[col] == y_pred[col] for col in TARGET_COLS])
-    scores["f1_samples"] = float(correct.mean())
 
-    if valid_combinations is not None:
-        pairs = y_pred.itertuples(index=False, name=None)
-        scores["invalid_combinations"] = float(
-            np.mean([pair not in valid_combinations for pair in pairs])
-        )
-    return Metrics(**{k: round(float(v), 4) for k, v in scores.items()})
+    return Metrics(
+        bacc_crop=_bacc(y_true[CROP_COL], y_pred[CROP_COL]),
+        f1_macro_crop=_f1_macro(y_true[CROP_COL], y_pred[CROP_COL]),
+        bacc_stage=_bacc(y_true[STAGE_COL], y_pred[STAGE_COL]),
+        f1_macro_stage=_f1_macro(y_true[STAGE_COL], y_pred[STAGE_COL]),
+        bacc_combined=_bacc(true_pair, pred_pair),
+        f1_macro_combined=_f1_macro(true_pair, pred_pair),
+        f1_samples=_rounded(correct.mean()),
+        invalid_combinations=(
+            None if valid_combinations is None else _invalid_share(y_pred, valid_combinations)
+        ),
+    )
+
+
+def _rounded(value: float) -> float:
+    return round(float(value), SCORE_DECIMALS)
+
+
+def _bacc(y_true: pd.Series, y_pred: pd.Series) -> float:
+    return _rounded(balanced_accuracy_score(y_true, y_pred))
+
+
+def _f1_macro(y_true: pd.Series, y_pred: pd.Series) -> float:
+    return _rounded(f1_score(y_true, y_pred, average="macro"))
+
+
+def _invalid_share(y_pred: pd.DataFrame, valid: frozenset[CropStage]) -> float:
+    valid_pairs = {(pair.crop, pair.stage) for pair in valid}
+    predicted = y_pred[[CROP_COL, STAGE_COL]].itertuples(index=False, name=None)
+    return _rounded(np.mean([pair not in valid_pairs for pair in predicted]))
 
 
 def plot_confusion_matrices(
@@ -112,5 +127,5 @@ def plot_confusion_matrices(
         ax.tick_params(axis="x", rotation=45)
     fig.tight_layout()
     if save_path is not None:
-        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        fig.savefig(save_path, dpi=FIGURE_DPI, bbox_inches="tight")
     return fig

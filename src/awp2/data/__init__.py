@@ -2,6 +2,10 @@
 
 from awp2.data.load import band_columns, load_test, load_train, wavelengths
 from awp2.data.split import (
+    CropStage,
+    Dataset,
+    Fold,
+    TrainValSplit,
     balanced_sample_weight,
     combined_label,
     cv_splits,
@@ -12,6 +16,10 @@ from awp2.data.split import (
 )
 
 __all__ = [
+    "CropStage",
+    "Dataset",
+    "Fold",
+    "TrainValSplit",
     "balanced_sample_weight",
     "band_columns",
     "combined_label",

@@ -2,6 +2,7 @@
 
 import warnings
 from dataclasses import dataclass
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
+from awp2.config import RUN_NAME_PATTERN
 from awp2.data import (
     balanced_sample_weight,
     combined_label,
@@ -31,10 +33,10 @@ class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
     ``score()`` returns the combined balanced accuracy, so ``GridSearchCV`` works out of the box.
     """
 
-    def __init__(self, estimator: BaseEstimator):
+    def __init__(self, estimator: BaseEstimator) -> None:
         self.estimator = estimator
 
-    def fit(self, X: pd.DataFrame, y: pd.DataFrame, **fit_params) -> "CombinedLabelClassifier":
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame, **fit_params: object) -> Self:
         """Fit on the combined label; ``fit_params`` (e.g. ``sample_weight``) are forwarded."""
         self.encoder_ = LabelEncoder().fit(combined_label(y))
         self.classes_ = self.encoder_.classes_
@@ -64,7 +66,7 @@ class RunConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     name: str = Field(
-        pattern=r"^[a-z0-9][a-z0-9_-]*$",
+        pattern=RUN_NAME_PATTERN,
         description="Short run name, lowercase, e.g. 'rf_combined'.",
     )
     preprocessing: PreprocessingConfig = Field(

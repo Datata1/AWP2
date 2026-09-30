@@ -10,11 +10,15 @@ from awp2.config import SEED
 from awp2.experiment import CombinedLabelClassifier, RunConfig, run
 from awp2.preprocessing import PreprocessingConfig
 
-model = CombinedLabelClassifier(RandomForestClassifier(class_weight="balanced", random_state=SEED))
-config = RunConfig(name="rf_combined", preprocessing=PreprocessingConfig(use_meta=True, scale=False))
+forest = RandomForestClassifier(class_weight="balanced", random_state=SEED)
+model = CombinedLabelClassifier(forest)
+config = RunConfig(
+    name="rf_combined",
+    preprocessing=PreprocessingConfig(use_meta=True, scale=False),
+)
 
 result = run(model, config)
-result.metrics.bacc_combined   # alle Metriken als Felder: bacc_crop, bacc_stage, f1_samples, …
+result.metrics.bacc_combined  # alle Metriken als Felder: bacc_crop, f1_samples, …
 ```
 
 ## Konfiguration
@@ -34,10 +38,14 @@ Neue Vorverarbeitungsschritte bekommen ein Feld in `PreprocessingConfig` und ein
 
 ## Ablauf
 
-```text
-train.csv ─ load_train() ─ prepare_dataset() ─ train_val_split() ─┬─ Train (70 %) ─ fit ─┐
-            Schema-Prüfung  Duplikate raus      stratifiziert, SEED  └─ Val (30 %) ─ predict ─ evaluate()
-                                                          Pipeline = build_preprocessor(PreprocessingConfig) + Modell
+```mermaid
+flowchart TD
+    A[train.csv] -->|load_train + prepare_dataset| B[Validierte Daten ohne Duplikate]
+    B -->|train_val_split| C[Train 70 %]
+    B -->|train_val_split| D[Validierung 30 %]
+    C -->|fit| P[Pipeline: Vorverarbeitung + Modell]
+    D -->|predict| P
+    P -->|evaluate| M[Metrics]
 ```
 
 | Schritt | Code | Was | Warum |
@@ -52,6 +60,15 @@ train.csv ─ load_train() ─ prepare_dataset() ─ train_val_split() ─┬─
 
 Alle Schritte stecken in einer sklearn-`Pipeline` und werden **nur auf dem Train-Split gefittet**.
 
+### Warum stratifiziert?
+
+Ein zufälliger Split kann seltene Klassen ungleich verteilen: Von den 11 Zeilen `cotton|Harvest`
+könnten zufällig alle im Training landen – dann lässt sich diese Klasse gar nicht bewerten, und
+die Balanced Accuracy schwankt je nach Zufall stark. **Stratifiziert** heißt: Der Split behält den
+Anteil jeder Klasse in beiden Teilen bei (hier je Crop/Stage-Paar, 70 % / 30 %). Weil
+`train_test_split` und `StratifiedKFold` dafür nur *eine* Klasse pro Zeile akzeptieren, bilden wir
+dafür den Schlüssel `Crop|Stage` (`combined_label`).
+
 ## Zwei Ziele vorhersagen
 
 `run()` erwartet ein Modell, das Crop **und** Stage liefert:
@@ -60,6 +77,13 @@ Alle Schritte stecken in einer sklearn-`Pipeline` und werden **nur auf dem Train
 | --- | --- | --- |
 | Multi-Output | Modell direkt, z. B. `RandomForestClassifier` (kann nativ mehrere Ziele) oder `MultiOutputClassifier(...)` | Kann unmögliche Kombinationen vorhersagen |
 | Kombiniertes Label | `CombinedLabelClassifier(modell)` – trainiert auf `Crop|Stage` | Sagt nur Kombinationen aus dem Training vorher |
+
+!!! warning "Werkzeug, keine Entscheidung"
+    Beide Varianten sind nur Bausteine, damit jeder Ansatz über dieselbe Schnittstelle läuft.
+    Welcher Ansatz fachlich sinnvoll ist, wird in [Ansätze](../modelle/ansaetze.md) recherchiert
+    und begründet. Das kombinierte Label modelliert die gemeinsame Verteilung von Kultur und
+    Stadium als 23 unabhängige Klassen: Es nutzt nicht, dass das Stadium von der Kultur abhängt,
+    und teilt kein Wissen zwischen z. B. `corn|Late` und `soybean|Late`.
 
 Die Kennzahl `invalid_combinations` zeigt den Anteil unmöglicher Vorhersagen; `run()` warnt,
 wenn er über 0 liegt. Weitere Ansätze

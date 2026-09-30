@@ -25,7 +25,7 @@ line-length = 100
 extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "ANN"]
 
 [dependency-groups]
 dev = [
