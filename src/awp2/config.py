@@ -1,5 +1,6 @@
 """Central paths and constants – always import from here, never hardcode them."""
 
+import os
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -48,3 +49,14 @@ SEED = 42
 VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+RUN_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: usable as file/run id
+
+# Local MLflow store, not in git; the env vars allow a shared server or a throwaway test store.
+MLFLOW_TRACKING_URI = os.environ.get(
+    "MLFLOW_TRACKING_URI", f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
+)
+MLFLOW_ARTIFACTS_DIR = Path(
+    os.environ.get("MLFLOW_ARTIFACTS_DIR", PROJECT_ROOT / "mlruns")
+).resolve()
+MLFLOW_EXPERIMENT = "awp2"
+MLFLOW_PARAM_MAX_CHARS = 250  # keeps logged parameter values short and readable in the UI

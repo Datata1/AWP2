@@ -2,6 +2,7 @@ nav:
   - index.md
   - workflow.md
   - konventionen.md
+  - tracking.md
   - ai.md
   - glob: "*"
     ignore_no_matches: true
