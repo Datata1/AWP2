@@ -5,6 +5,7 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 
 | Seite | Inhalt |
 | --- | --- |
+| [Einen Ansatz entwickeln](ansatz-entwickeln.md) | Der Ablauf: bauen → `tune()` → `run()` → festhalten → vergleichen |
 | [Ansätze](ansaetze.md) | Welche Strategien wir verfolgen – mit Begründung, Status und Entscheidung |
 | [Experimente](experimente.md) | Log aller Läufe mit Scores |
 

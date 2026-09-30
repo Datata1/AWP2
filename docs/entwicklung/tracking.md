@@ -52,9 +52,16 @@ result.model_uri               # gespeichertes Modell, z. B. für Vorhersagen
 | `balance_samples` | `False` | Ausgleichsgewichte für Modelle ohne `class_weight` |
 | `log_model` | `True` | Modell speichern (Tab *Models*); für schnelle Tests `False` |
 | `system_metrics` | `False` | CPU-/Speicherverlauf aufzeichnen – lohnt sich bei längeren Trainings |
+| `tuning_run` | – | Run-ID aus `tune()` – verknüpft den Lauf mit der Suche, aus der seine Einstellungen stammen |
 | `track` | `True` | `False` = gar nichts speichern |
 
 Das Modell muss **Crop und Stage** vorhersagen – wie, entscheidet der [Ansatz](../modelle/ansaetze.md).
+
+### Hyperparameter suchen
+
+`tune(model, TuneConfig(..., param_grid={...}))` sucht per Cross-Validation auf dem Train-Teil und
+legt in MLflow einen Tuning-Lauf mit einem Unterlauf je Kandidat an; `tuned.best_model` geht
+dann in `run()`. Der komplette Ablauf mit Beispiel: [Einen Ansatz entwickeln](../modelle/ansatz-entwickeln.md).
 
 ### Läufe vergleichen
 

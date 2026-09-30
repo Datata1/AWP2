@@ -1,34 +1,50 @@
-"""Run a model on the shared split, evaluate it and track the run in MLflow."""
+"""Tune and evaluate models on the shared split and track both steps in MLflow."""
 
 import warnings
 from dataclasses import dataclass
+from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, clone
+from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
 from awp2.config import MLFLOW_EXPERIMENT, SLUG_PATTERN
-from awp2.data import TrainValSplit, balanced_sample_weight, load_split, valid_combinations
-from awp2.evaluation import Metrics, as_target_frame, evaluate, plot_confusion_matrices
+from awp2.data import (
+    TrainValSplit,
+    balanced_sample_weight,
+    load_folds,
+    load_split,
+    valid_combinations,
+)
+from awp2.evaluation import (
+    MetricName,
+    Metrics,
+    as_target_frame,
+    evaluate,
+    plot_confusion_matrices,
+    scorer,
+)
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
-from awp2.tracking import TrackedRun, estimator_params, log_run
+from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
+
+_MODEL_STEP = "model"
 
 
-class RunConfig(BaseModel):
-    """Everything that defines a run besides the model itself."""
-
+class _ExperimentConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     name: str = Field(
         pattern=SLUG_PATTERN,
-        description="Short run name, lowercase without spaces, e.g. 'rf_baseline'.",
+        description="Short name, lowercase without spaces, e.g. 'rf_baseline'.",
     )
     approach: str = Field(
         pattern=SLUG_PATTERN,
-        description="Modelling approach the run belongs to, e.g. 'baseline' or 'hierarchical' – "
-        "used to filter and group runs in MLflow.",
+        description="Modelling approach, e.g. 'baseline' or 'hierarchical' – used to filter and "
+        "group runs in MLflow.",
     )
     description: str = Field(default="", description="What was tried and why (free text).")
     experiment: str = Field(
@@ -47,12 +63,35 @@ class RunConfig(BaseModel):
         "a class_weight option (XGBoost, HistGradientBoosting, MLP).",
     )
     track: bool = Field(default=True, description="Record the run in MLflow.")
+    system_metrics: bool = Field(
+        default=False, description="Record CPU/memory usage – worthwhile for long trainings."
+    )
+
+
+class RunConfig(_ExperimentConfig):
+    """Everything that defines an evaluation run besides the model itself."""
+
     log_model: bool = Field(
         default=True,
         description="Store the fitted pipeline in MLflow (Models tab); switch off for quick tests.",
     )
-    system_metrics: bool = Field(
-        default=False, description="Record CPU/memory usage – worthwhile for long trainings."
+    tuning_run: str | None = Field(
+        default=None,
+        description="Run id of the tuning run the hyperparameters came from (from `tune()`).",
+    )
+
+
+class TuneConfig(_ExperimentConfig):
+    """Everything that defines a hyperparameter search besides the model itself."""
+
+    param_grid: dict[str, list[Any]] = Field(
+        min_length=1,
+        description="Hyperparameters of the model and the values to try, e.g. "
+        "{'max_depth': [10, 20, None]}; for wrapped models use sklearn's names "
+        "('estimator__max_depth').",
+    )
+    metric: MetricName = Field(
+        default="bacc_combined", description="Cross-validation score used to rank candidates."
     )
 
 
@@ -80,12 +119,128 @@ class RunResult:
     model_uri: str | None
 
 
+@dataclass(frozen=True)
+class TuneResult:
+    """Outcome of :func:`tune`.
+
+    Attributes:
+        config: The configuration the search was started with.
+        best_params: Hyperparameters of the best candidate.
+        best_score: Its mean cross-validation score.
+        best_model: Unfitted copy of the model with ``best_params`` – pass it to :func:`run`.
+        candidates: One row per candidate: ``params``, ``mean``, ``std``, ``rank``, ``fold_<i>``.
+        run_id: MLflow run id of the tuning run, ``None`` if it was not tracked.
+    """
+
+    config: TuneConfig
+    best_params: dict[str, Any]
+    best_score: float
+    best_model: BaseEstimator
+    candidates: pd.DataFrame
+    run_id: str | None
+
+
+def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
+    return Pipeline(
+        [("preprocess", build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
+    )
+
+
+def _fit_params(config: _ExperimentConfig, y_train: pd.DataFrame) -> dict[str, np.ndarray]:
+    if not config.balance_samples:
+        return {}
+    return {f"{_MODEL_STEP}__sample_weight": balanced_sample_weight(y_train)}
+
+
+def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool]:
+    return {
+        **{
+            f"preprocessing.{key}": value
+            for key, value in config.preprocessing.model_dump().items()
+        },
+        "balance_samples": config.balance_samples,
+    }
+
+
+def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
+    """Search hyperparameters by cross-validation on the training part.
+
+    Uses the shared folds (``load_folds()``) and never touches the validation part, so the
+    subsequent :func:`run` on the validation part stays an honest estimate. If
+    ``config.track``, MLflow gets one tuning run with a nested run per candidate.
+
+    Args:
+        model: Unfitted estimator that predicts ``Crop`` **and** ``Stage``; it is cloned.
+        config: Name, grid and options of the search.
+
+    Returns:
+        Best hyperparameters and score, an unfitted best model and all candidates.
+
+    Raises:
+        ValueError: If ``param_grid`` names a hyperparameter the model does not have.
+
+    Example:
+        ```python
+        tuned = tune(
+            RandomForestClassifier(class_weight="balanced", random_state=SEED),
+            TuneConfig(name="rf_depth", approach="baseline", param_grid={"max_depth": [10, None]}),
+        )
+        result = run(
+            tuned.best_model,
+            RunConfig(name="rf_tuned", approach="baseline", tuning_run=tuned.run_id),
+        )
+        ```
+    """
+    unknown = set(config.param_grid) - set(model.get_params(deep=True))
+    if unknown:
+        raise ValueError(f"{type(model).__name__} has no hyperparameter(s) {sorted(unknown)}.")
+
+    split = load_split()
+    search = GridSearchCV(
+        _pipeline(model, config.preprocessing),
+        {f"{_MODEL_STEP}__{key}": values for key, values in config.param_grid.items()},
+        scoring=scorer(config.metric),
+        cv=load_folds(),
+        refit=False,
+    )
+    search.fit(split.X_train, split.y_train, **_fit_params(config, split.y_train))
+
+    results = search.cv_results_
+    fold_scores = {
+        key.removeprefix("split").removesuffix("_test_score"): results[key]
+        for key in results
+        if key.startswith("split") and key.endswith("_test_score")
+    }
+    candidates = pd.DataFrame(
+        {
+            "params": [
+                {key.removeprefix(f"{_MODEL_STEP}__"): value for key, value in params.items()}
+                for params in results["params"]
+            ],
+            "mean": results["mean_test_score"],
+            "std": results["std_test_score"],
+            "rank": results["rank_test_score"],
+            **{f"fold_{number}": scores for number, scores in fold_scores.items()},
+        }
+    )
+    best = candidates.loc[candidates["rank"].idxmin()]
+    run_id = _track_tuning(config, model, candidates, split) if config.track else None
+    return TuneResult(
+        config=config,
+        best_params=best["params"],
+        best_score=float(best["mean"]),
+        best_model=clone(model).set_params(**best["params"]),
+        candidates=candidates,
+        run_id=run_id,
+    )
+
+
 def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     """Fit standard preprocessing + ``model`` on the shared split and evaluate it.
 
     Trains on the training part of ``load_split()``, evaluates on the validation part and – if
     ``config.track`` – records parameters, metrics, confusion matrices and git state in MLflow.
-    Use it to compare finished models; tune hyperparameters with ``load_folds()`` instead.
+    Use it to evaluate a finished model once; search hyperparameters with :func:`tune` first.
 
     Args:
         model: Unfitted estimator that predicts ``Crop`` **and** ``Stage`` (natively
@@ -105,15 +260,8 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
         ```
     """
     split = load_split()
-    pipeline = Pipeline(
-        [("preprocess", build_preprocessor(config.preprocessing)), ("model", clone(model))]
-    )
-    fit_params = (
-        {"model__sample_weight": balanced_sample_weight(split.y_train)}
-        if config.balance_samples
-        else {}
-    )
-    pipeline.fit(split.X_train, split.y_train, **fit_params)
+    pipeline = _pipeline(model, config.preprocessing)
+    pipeline.fit(split.X_train, split.y_train, **_fit_params(config, split.y_train))
     y_pred = as_target_frame(pipeline.predict(split.X_val), split.y_val.index)
     metrics = evaluate(split.y_val, y_pred, valid_combinations(split.y_train))
 
@@ -124,7 +272,7 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
             stacklevel=2,
         )
 
-    tracked = _track(config, model, metrics, pipeline, split, y_pred) if config.track else None
+    tracked = _track_run(config, model, metrics, pipeline, split, y_pred) if config.track else None
     return RunResult(
         config,
         metrics,
@@ -136,7 +284,7 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     )
 
 
-def _track(
+def _track_run(
     config: RunConfig,
     model: BaseEstimator,
     metrics: Metrics,
@@ -144,14 +292,6 @@ def _track(
     split: TrainValSplit,
     y_pred: pd.DataFrame,
 ) -> TrackedRun | None:
-    params: dict[str, str | bool] = {
-        **{
-            f"preprocessing.{key}": value
-            for key, value in config.preprocessing.model_dump().items()
-        },
-        "balance_samples": config.balance_samples,
-        **estimator_params(model, "model"),
-    }
     scores = {name: value for name, value in metrics.model_dump().items() if value is not None}
     figure = plot_confusion_matrices(split.y_val, y_pred)
     try:
@@ -160,12 +300,13 @@ def _track(
             name=config.name,
             approach=config.approach,
             description=config.description,
-            params=params,
+            params={**_shared_params(config), **estimator_params(model, "model")},
             metrics=scores,
             train=pd.concat([split.X_train, split.y_train], axis=1),
             validation=pd.concat([split.X_val, split.y_val], axis=1),
             model=pipeline if config.log_model else None,
             figures={"confusion_matrices.png": figure},
+            tags={"tuning_run": config.tuning_run} if config.tuning_run else None,
             system_metrics=config.system_metrics,
         )
     except Exception as error:  # noqa: BLE001 – a tracking problem must not discard the trained run
@@ -173,3 +314,23 @@ def _track(
         return None
     finally:
         plt.close(figure)
+
+
+def _track_tuning(
+    config: TuneConfig, model: BaseEstimator, candidates: pd.DataFrame, split: TrainValSplit
+) -> str | None:
+    try:
+        return log_tuning(
+            experiment=config.experiment,
+            name=config.name,
+            approach=config.approach,
+            description=config.description,
+            params={**_shared_params(config), **estimator_params(model, "model")},
+            metric=config.metric,
+            candidates=candidates,
+            train=pd.concat([split.X_train, split.y_train], axis=1),
+            system_metrics=config.system_metrics,
+        )
+    except Exception as error:  # noqa: BLE001 – a tracking problem must not discard the search
+        warnings.warn(f"{config.name}: tuning could not be tracked ({error}).", stacklevel=3)
+        return None

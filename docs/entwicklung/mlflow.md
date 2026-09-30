@@ -44,11 +44,11 @@ zurückführen.
 | Begriff | Bedeutung | Bei uns |
 | --- | --- | --- |
 | **Experiment** | Sammelmappe für Läufe, die dieselbe Frage beantworten | `crop-stage` für die Hauptaufgabe; eigene Experimente nur für andere Fragen (z. B. die Bandstudie in M3) |
-| **Run** (Lauf) | Ein Training mit Bewertung | Ein Aufruf von `run()`, z. B. `rf_baseline` |
+| **Run** (Lauf) | Ein Training mit Bewertung | Bewertungslauf: ein Aufruf von `run()`, z. B. `rf_tuned`; Tuning-Lauf: ein Aufruf von `tune()` mit einem **Unterlauf** (nested run) je ausprobierter Einstellung |
 | **Beschreibung** | Freitext am Lauf | Was probiert wurde und warum (`description`) |
 | **Parameter** | Einstellungen eines Laufs | `preprocessing.scale`, `balance_samples`, `model.max_depth` … |
 | **Metrik** | Gemessene Zahl | `bacc_combined`, `bacc_crop`, `f1_samples` … |
-| **Tag** | Zusatzinformation | `approach` (Ansatz), `git.commit`, `git.branch`, `git.dirty`, `author` |
+| **Tag** | Zusatzinformation | `approach` (Ansatz), `run.kind` (`evaluation`, `tuning`, `tuning-candidate`), `tuning_run`, `git.commit`, `git.branch`, `git.dirty`, `author` |
 | **Dataset** | Welche Daten ein Lauf nutzte – nur Name, Hash, Schema und Quelle, nicht die Daten | `training` und `validation` aus `data/processed/split.csv` |
 | **Logged Model** | Gespeichertes Modell eines Laufs, mit seinen Metriken | Jeder Lauf speichert sein Modell (Tab *Models*) |
 | **Artefakt** | Datei am Lauf | `confusion_matrices.png` |
