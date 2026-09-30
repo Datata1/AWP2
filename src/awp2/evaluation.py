@@ -5,13 +5,29 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, f1_score
+from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, f1_score, make_scorer
 
 from awp2.config import TARGET_COLS
+from awp2.data.split import combined_label
 
 
-def _combined(df: pd.DataFrame) -> pd.Series:
-    return df[TARGET_COLS[0]].astype(str) + "_" + df[TARGET_COLS[1]].astype(str)
+def as_target_frame(pred: pd.DataFrame | np.ndarray, index: pd.Index) -> pd.DataFrame:
+    """Bring predictions (array of shape (n, 2) or DataFrame) into ``Crop``/``Stage`` form."""
+    if isinstance(pred, pd.DataFrame):
+        return pred.set_axis(list(TARGET_COLS), axis=1).set_axis(index)
+    return pd.DataFrame(np.asarray(pred), columns=list(TARGET_COLS), index=index)
+
+
+def scorer(metric: str = "bacc_combined"):
+    """sklearn scorer for ``GridSearchCV`` / ``cross_validate`` based on :func:`evaluate`.
+
+    Needed because sklearn's default ``score()`` cannot handle two target columns.
+    """
+
+    def _score(y_true: pd.DataFrame, y_pred) -> float:
+        return evaluate(y_true, as_target_frame(y_pred, y_true.index))[metric]
+
+    return make_scorer(_score)
 
 
 def evaluate(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> dict[str, float]:
@@ -28,7 +44,7 @@ def evaluate(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> dict[str, float]:
         scores[f"bacc_{name}"] = balanced_accuracy_score(y_true[col], y_pred[col])
         scores[f"f1_macro_{name}"] = f1_score(y_true[col], y_pred[col], average="macro")
 
-    true_comb, pred_comb = _combined(y_true), _combined(y_pred)
+    true_comb, pred_comb = combined_label(y_true), combined_label(y_pred)
     scores["bacc_combined"] = balanced_accuracy_score(true_comb, pred_comb)
     scores["f1_macro_combined"] = f1_score(true_comb, pred_comb, average="macro")
 

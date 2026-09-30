@@ -41,8 +41,11 @@ Always commit `pyproject.toml` and `uv.lock` together.
 
 ## ML rules
 
+- Train and compare models via the shared pipeline (`docs/daten/pipeline.md`):
+  `awp2.experiment.run()` with `awp2.preprocessing.build_preprocessor()` – same deduplicated
+  data, fixed 70/30 split (`awp2.data.train_val_split`) and metrics for everyone.
 - Use `SEED` from `awp2.config` for every split, model and sampler.
-- Split stratified on the crop+stage combination.
+- Split stratified on the crop+stage combination (`train_val_split`, `cv_splits`).
 - Fit every transformation (imputer, scaler, PCA, band selection, resampling) on the training
   split only — wrap preprocessing and model in an sklearn `Pipeline`.
 - Evaluate with `awp2.evaluation.evaluate()`; always report crop **and** stage metrics.
