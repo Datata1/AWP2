@@ -42,7 +42,7 @@ Always commit `pyproject.toml` and `uv.lock` together.
 ## ML rules
 
 - Train and compare models via the shared pipeline (`docs/daten/pipeline.md`):
-  `awp2.experiment.run()` with `awp2.preprocessing.build_preprocessor()` – same deduplicated
+  `awp2.experiment.run(model, RunConfig(...))` – same deduplicated
   data, fixed 70/30 split (`awp2.data.train_val_split`) and metrics for everyone.
 - Use `SEED` from `awp2.config` for every split, model and sampler.
 - Split stratified on the crop+stage combination (`train_val_split`, `cv_splits`).
@@ -60,7 +60,12 @@ Always commit `pyproject.toml` and `uv.lock` together.
 - **English** for identifiers, docstrings, comments and commit messages.
   **German** for everything in `docs/` and reports.
 - ruff (line length 100) — `make format` before committing.
-- Type hints and a short docstring for public functions in `src/`.
+- Type hints and a short docstring for public functions in `src/`; `make lint` type-checks
+  `src/` with **ty** (pinned version – update deliberately).
+- Configs and results at API boundaries are frozen **pydantic** models with field descriptions
+  (`PreprocessingConfig`, `RunConfig`, `Metrics`). New options become a field there, not a
+  loose function argument. sklearn estimators/transformers stay plain classes (sklearn's
+  `clone`/`get_params` conventions break with pydantic).
 - Keep it simple: small functions, no premature abstractions.
 
 ## Git workflow

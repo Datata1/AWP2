@@ -7,23 +7,37 @@ vergleichbar.
 ```python
 from sklearn.ensemble import RandomForestClassifier
 from awp2.config import SEED
-from awp2.experiment import CombinedLabelClassifier, run
-from awp2.preprocessing import build_preprocessor
+from awp2.experiment import CombinedLabelClassifier, RunConfig, run
+from awp2.preprocessing import PreprocessingConfig
 
-result = run(
-    CombinedLabelClassifier(RandomForestClassifier(class_weight="balanced", random_state=SEED)),
-    name="rf_combined",
-    preprocessor=build_preprocessor(use_meta=True, scale=False),
-)
-result.metrics   # bacc_crop, bacc_stage, bacc_combined, f1_…, invalid_combinations
+model = CombinedLabelClassifier(RandomForestClassifier(class_weight="balanced", random_state=SEED))
+config = RunConfig(name="rf_combined", preprocessing=PreprocessingConfig(use_meta=True, scale=False))
+
+result = run(model, config)
+result.metrics.bacc_combined   # alle Metriken als Felder: bacc_crop, bacc_stage, f1_samples, …
 ```
+
+## Konfiguration
+
+Alles außer dem Modell selbst wird über typisierte Konfigurationsobjekte (pydantic) festgelegt.
+Sie prüfen Eingaben sofort und streng – ein Tippfehler im Feldnamen oder `scale="yes"` statt
+`scale=True` führt zu einem Fehler statt zu stillem Fehlverhalten – und sind unveränderlich.
+
+| Objekt | Felder | Standard |
+| --- | --- | --- |
+| `PreprocessingConfig` | `use_meta` – AEZ/Month als Features · `scale` – Standardisierung | `True` · `False` |
+| `RunConfig` | `name` (klein, z. B. `svm_combined`) · `preprocessing` · `balance_samples` | – · Standard · `False` |
+| `Metrics` (Ergebnis) | `bacc_crop/stage/combined`, `f1_macro_crop/stage/combined`, `f1_samples`, `invalid_combinations` | – |
+
+Neue Vorverarbeitungsschritte bekommen ein Feld in `PreprocessingConfig` und einen Transformer in
+`awp2.preprocessing` – nicht eigenen Code im Notebook.
 
 ## Ablauf
 
 ```text
 train.csv ─ load_train() ─ prepare_dataset() ─ train_val_split() ─┬─ Train (70 %) ─ fit ─┐
             Schema-Prüfung  Duplikate raus      stratifiziert, SEED  └─ Val (30 %) ─ predict ─ evaluate()
-                                                                  Pipeline = build_preprocessor() + Modell
+                                                          Pipeline = build_preprocessor(PreprocessingConfig) + Modell
 ```
 
 | Schritt | Code | Was | Warum |
@@ -33,8 +47,8 @@ train.csv ─ load_train() ─ prepare_dataset() ─ train_val_split() ─┬─
 | Split | `train_val_split()` | Fixer 70/30-Holdout, stratifiziert auf Crop+Stage, `SEED` | Vorgabe M1; alle vergleichen auf denselben Daten; seltene Kombis (z. B. `cotton|Harvest`, 11 Zeilen) in beiden Teilen |
 | Leere Bänder | `DropEmptyBands` | 67 Bänder ohne jeden Wert entfernen → 131 Bänder | Keine Information (Wasserabsorption/Randbänder, siehe [EDA](eda.md)) |
 | Lücken | `InterpolateBands` | Fehlende Werte je Spektrum füllen: zwischen zwei Bändern linear nach Wellenlänge, am Rand mit dem nächsten gemessenen Band, ohne jeden Wert mit dem Trainings-Median | Nachbarbänder sind stark korreliert, Spektren unterschiedlich hell (Nachbar schätzt besser als globaler Median); 43 Zeilen train und **11 Zeilen test** betroffen – muss auch bei der Vorhersage greifen |
-| Metadaten | `build_preprocessor(use_meta=True)` | `AEZ` One-Hot, `Month` numerisch | Laut Aufgabe erlaubt; abschaltbar, um den Nutzen zu messen |
-| Skalierung | `build_preprocessor(scale=True)` | StandardScaler | Für SVM, logistische Regression, MLP; bei Baum-Modellen unnötig |
+| Metadaten | `PreprocessingConfig(use_meta=True)` | `AEZ` One-Hot, `Month` numerisch | Laut Aufgabe erlaubt; abschaltbar, um den Nutzen zu messen |
+| Skalierung | `PreprocessingConfig(scale=True)` | StandardScaler | Für SVM, logistische Regression, MLP; bei Baum-Modellen unnötig |
 
 Alle Schritte stecken in einer sklearn-`Pipeline` und werden **nur auf dem Train-Split gefittet**.
 
@@ -54,7 +68,7 @@ wenn er über 0 liegt. Weitere Ansätze
 ## Klassenungleichgewicht
 
 - Modelle mit `class_weight` (Random Forest, logistische Regression, SVM): `class_weight="balanced"`.
-- Modelle ohne (XGBoost, HistGradientBoosting, MLP): `run(..., balance_samples=True)` übergibt
+- Modelle ohne (XGBoost, HistGradientBoosting, MLP): `RunConfig(..., balance_samples=True)` übergibt
   ausgeglichene `sample_weight` je Crop+Stage-Kombination.
 
 ## Tuning & Cross-Validation
@@ -65,15 +79,24 @@ wenn er über 0 liegt. Weitere Ansätze
     **nur auf dem Train-Teil**.
 
 ```python
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
 from awp2.data import cv_splits, load_train, prepare_dataset, train_val_split
 from awp2.evaluation import scorer
+from awp2.experiment import CombinedLabelClassifier
+from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 X, y = prepare_dataset(load_train())
 X_train, X_val, y_train, y_val = train_val_split(X, y)
-search = GridSearchCV(pipeline, param_grid, scoring=scorer("bacc_combined"),
-                      cv=list(cv_splits(X_train, y_train)))
+pipeline = Pipeline([
+    ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+    ("model", CombinedLabelClassifier(LogisticRegression(max_iter=2000))),
+])
+search = GridSearchCV(pipeline, {"model__estimator__C": [0.1, 1, 10]},
+                      scoring=scorer("bacc_combined"), cv=list(cv_splits(X_train, y_train)))
 search.fit(X_train, y_train)
+search.best_params_
 ```
 
 `scoring=scorer(...)` ist nötig, weil sklearns Standard-Score nicht mit zwei Zielspalten umgehen

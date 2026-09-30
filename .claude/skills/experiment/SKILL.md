@@ -18,17 +18,18 @@ Follow these steps. Code and comments in English, documentation in German.
   (e.g. `src/awp2/features.py`, `src/awp2/models/`). Reuse existing functions first.
 - Run the experiment in a notebook (`/notebook` conventions) or a script under `notebooks/`.
 - Use the shared pipeline (see `docs/daten/pipeline.md`):
-  `result = awp2.experiment.run(model, name, preprocessor=build_preprocessor(...))` – it loads,
+  `result = run(model, RunConfig(name=..., preprocessing=PreprocessingConfig(...)))` – it loads,
   deduplicates, uses the fixed 70/30 split and evaluates. Do not build your own split.
 - For cross-validation use `awp2.data.cv_splits()`; keep everything in one sklearn `Pipeline`.
-- New preprocessing steps: add a transformer to `awp2.preprocessing` and a flag to
-  `build_preprocessor()` instead of preprocessing in the notebook.
+- New preprocessing steps: add a transformer to `awp2.preprocessing` and a field to
+  `PreprocessingConfig` instead of preprocessing in the notebook.
 - Both targets: native multi-output model, `MultiOutputClassifier`, or
   `CombinedLabelClassifier` (only valid combinations). Check `invalid_combinations` in the metrics.
 - Handle class imbalance explicitly (e.g. `class_weight="balanced"`) and note what you did.
 
 ## 3. Evaluate
-- `result.metrics` holds all scores from `awp2.evaluation.evaluate()` – report all of them.
+- `result.metrics` (a `Metrics` model) holds all scores – report all of them
+  (`result.metrics.model_dump()`).
 - `plot_confusion_matrices(result.y_val, result.y_pred, FIGURES_DIR / "<id>_confusion.png")`
 - Name the most confused classes and give a hypothesis why (spectral similarity, stage overlap).
 

@@ -16,8 +16,9 @@ docs: ## Doku lokal mit Live-Reload servieren (http://127.0.0.1:8000)
 docs-build: ## Doku statisch nach site/ bauen
 	uv run mkdocs build --strict
 
-lint: ## Code prüfen (ruff)
+lint: ## Code prüfen (ruff + Typen mit ty)
 	uv run ruff check .
+	uv run ty check src
 
 format: ## Code formatieren (ruff)
 	uv run ruff format .

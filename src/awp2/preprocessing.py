@@ -4,6 +4,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
@@ -16,6 +17,8 @@ BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
     """Base for transformers that work on a DataFrame of band columns (``X<nm>``)."""
+
+    feature_names_out_: list[str]  # set in ``fit`` of the subclasses
 
     @staticmethod
     def _check(X: pd.DataFrame) -> pd.DataFrame:
@@ -81,23 +84,38 @@ class InterpolateBands(_BandTransformer):
         return filled.set_axis(X.columns, axis=1).fillna(self.medians_)
 
 
-def build_preprocessor(use_meta: bool = True, scale: bool = False) -> ColumnTransformer:
-    """Standard preprocessing for all models.
+class PreprocessingConfig(BaseModel):
+    """Options of the standard preprocessing; new steps get a field here, not ad-hoc code."""
 
-    Args:
-        use_meta: Use ``AEZ`` (one-hot) and ``Month`` as features next to the spectrum.
-        scale: Standardise spectra and month – on for distance/gradient based models
-            (SVM, logistic regression, MLP), off for tree ensembles.
-    """
-    spectra = [("drop_empty", DropEmptyBands()), ("interpolate", InterpolateBands())]
-    if scale:
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    use_meta: bool = Field(
+        default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
+    )
+    scale: bool = Field(
+        default=False,
+        description="Standardise spectra and month – on for SVM, logistic regression, MLP; "
+        "off for tree ensembles.",
+    )
+
+
+def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
+    """Build the standard preprocessing described by ``config`` (defaults if omitted)."""
+    config = config or PreprocessingConfig()
+    spectra: list[tuple[str, BaseEstimator]] = [
+        ("drop_empty", DropEmptyBands()),
+        ("interpolate", InterpolateBands()),
+    ]
+    if config.scale:
         spectra.append(("scale", StandardScaler()))
 
-    transformers = [("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN))]
-    if use_meta:
+    transformers: list[tuple[str, BaseEstimator | str, object]] = [
+        ("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN))
+    ]
+    if config.use_meta:
         transformers += [
             ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["AEZ"]),
-            ("month", StandardScaler() if scale else "passthrough", ["Month"]),
+            ("month", StandardScaler() if config.scale else "passthrough", ["Month"]),
         ]
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")

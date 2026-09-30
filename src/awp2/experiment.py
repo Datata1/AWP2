@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
@@ -18,8 +19,8 @@ from awp2.data import (
     train_val_split,
     valid_combinations,
 )
-from awp2.evaluation import as_target_frame, evaluate
-from awp2.preprocessing import build_preprocessor
+from awp2.evaluation import Metrics, as_target_frame, evaluate
+from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 
 class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
@@ -50,40 +51,50 @@ class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
         """Class probabilities, columns ordered like ``classes_``."""
         return self.estimator_.predict_proba(X)
 
-    def score(self, X: pd.DataFrame, y: pd.DataFrame, sample_weight=None) -> float:
-        """Balanced accuracy of the combined crop/stage label."""
-        return evaluate(y, self.predict(X))["bacc_combined"]
+    def score(
+        self, X: pd.DataFrame, y: pd.DataFrame, sample_weight: np.ndarray | None = None
+    ) -> float:
+        """Balanced accuracy of the combined crop/stage label (``sample_weight`` is ignored)."""
+        return evaluate(y, self.predict(X)).bacc_combined
 
 
-@dataclass
+class RunConfig(BaseModel):
+    """Everything that defines a run besides the model itself."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    name: str = Field(
+        pattern=r"^[a-z0-9][a-z0-9_-]*$",
+        description="Short run name, lowercase, e.g. 'rf_combined'.",
+    )
+    preprocessing: PreprocessingConfig = Field(
+        default_factory=PreprocessingConfig,
+        description="Preprocessing options – set scale=True for SVM, logistic regression, MLP.",
+    )
+    balance_samples: bool = Field(
+        default=False,
+        description="Pass balanced sample_weight (by crop+stage) to fit – for models without "
+        "a class_weight option (XGBoost, HistGradientBoosting, MLP).",
+    )
+
+
+@dataclass(frozen=True)
 class RunResult:
     """Outcome of :func:`run`: metrics, the fitted pipeline and the validation predictions."""
 
-    name: str
-    metrics: dict[str, float]
+    config: RunConfig
+    metrics: Metrics
     pipeline: Pipeline
     y_val: pd.DataFrame
     y_pred: pd.DataFrame
 
 
-def run(
-    model: BaseEstimator,
-    name: str,
-    preprocessor: BaseEstimator | None = None,
-    balance_samples: bool = False,
-) -> RunResult:
-    """Fit ``preprocessor + model`` on the shared training split and evaluate on validation.
+def run(model: BaseEstimator, config: RunConfig) -> RunResult:
+    """Fit standard preprocessing + ``model`` on the shared training split, evaluate on validation.
 
     The model must predict both targets: natively multi-output (e.g. random forest), wrapped in
-    ``MultiOutputClassifier``, or wrapped in :class:`CombinedLabelClassifier`.
-
-    Args:
-        model: Unfitted estimator (it is cloned, the passed object stays untouched).
-        name: Short run name, e.g. ``"rf_combined"``.
-        preprocessor: Defaults to ``build_preprocessor()`` **without scaling** – pass
-            ``build_preprocessor(scale=True)`` for SVM, logistic regression or MLP.
-        balance_samples: Pass balanced ``sample_weight`` (by crop+stage) to ``fit`` – for models
-            without a ``class_weight`` option.
+    ``MultiOutputClassifier``, or wrapped in :class:`CombinedLabelClassifier`. It is cloned, the
+    passed object stays untouched.
 
     The 30 % validation split is for comparing finished models. Tune hyperparameters with
     cross-validation on the training part (``awp2.data.cv_splits(X_train, y_train)``).
@@ -91,23 +102,20 @@ def run(
     X, y = prepare_dataset(load_train())
     X_train, X_val, y_train, y_val = train_val_split(X, y)
 
-    if preprocessor is None:
-        preprocessor = build_preprocessor()
-    pipeline = Pipeline([("preprocess", preprocessor), ("model", clone(model))])
+    pipeline = Pipeline(
+        [("preprocess", build_preprocessor(config.preprocessing)), ("model", clone(model))]
+    )
     fit_params = (
-        {"model__sample_weight": balanced_sample_weight(y_train)} if balance_samples else {}
+        {"model__sample_weight": balanced_sample_weight(y_train)} if config.balance_samples else {}
     )
     pipeline.fit(X_train, y_train, **fit_params)
     y_pred = as_target_frame(pipeline.predict(X_val), y_val.index)
 
-    metrics = evaluate(y_val, y_pred)
-    valid = valid_combinations(y_train)
-    invalid = sum(combo not in valid for combo in y_pred.itertuples(index=False, name=None))
-    metrics["invalid_combinations"] = round(invalid / len(y_pred), 4)
-    if invalid:
+    metrics = evaluate(y_val, y_pred, valid_combinations=valid_combinations(y_train))
+    if metrics.invalid_combinations:
         warnings.warn(
-            f"{name}: {invalid} predictions are impossible crop/stage combinations "
-            "– consider CombinedLabelClassifier.",
+            f"{config.name}: {metrics.invalid_combinations:.1%} of the predictions are impossible "
+            "crop/stage combinations – consider CombinedLabelClassifier.",
             stacklevel=2,
         )
-    return RunResult(name, metrics, pipeline, y_val, y_pred)
+    return RunResult(config, metrics, pipeline, y_val, y_pred)
