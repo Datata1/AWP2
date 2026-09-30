@@ -1,34 +1,7 @@
-# Experimente & MLflow
+# Experimente ausführen
 
-Wir probieren viele Modelle und Einstellungen aus. Damit Ergebnisse nicht in Notebooks oder im
-Kopf verloren gehen, zeichnet **MLflow** jeden Lauf automatisch auf – mit Einstellungen, Scores,
-Plots und dem Code-Stand – und stellt alle Läufe in einer Oberfläche zum Vergleichen dar.
-
-## Was nimmt uns MLflow ab?
-
-| Ohne MLflow | Mit MLflow |
-| --- | --- |
-| Scores von Hand in Tabellen kopieren | Jeder Lauf mit `run()` wird automatisch gespeichert |
-| „Welche Einstellungen hatte der gute Lauf von gestern?“ | Alle Parameter liegen beim Lauf |
-| „Mit welchem Code- und Datenstand war das?“ | Git-Commit, Branch, Autor:in und Datenversion als Tags; `git.dirty` zeigt uncommittete Änderungen in `src/` oder `notebooks/` |
-| Plots suchen oder neu erzeugen | Confusion Matrices hängen am Lauf |
-| Modell neu trainieren, um es wieder zu nutzen | Mit `log_model=True` gespeichert und jederzeit ladbar |
-| Läufe mühsam nebeneinanderlegen | UI: Läufe anhaken → **Compare** |
-
-## Begriffe
-
-| Begriff | Bei uns |
-| --- | --- |
-| **Experiment** | Sammelmappe für Läufe – wir haben eine: `awp2` |
-| **Run** (Lauf) | Ein Aufruf von `run()` mit Namen, z. B. `rf_baseline` |
-| **Parameter** | Einstellungen: `preprocessing.scale`, `balance_samples`, `model.max_depth` … – bei verschachtelten Modellen mit sklearn-Namen, z. B. `model.estimator__max_depth` |
-| **Metrik** | Scores aus `evaluate()`: `bacc_combined`, `bacc_crop`, `f1_samples` … |
-| **Tag** | Zusatzinfos: `git.commit`, `git.branch`, `git.dirty`, `author`, `data.version` (Hash von Datensatz + Split) |
-| **Artefakt** | Dateien am Lauf: `confusion_matrices.png`, optional das Modell |
-| **Tracking-Store** | Datenbank mit Runs, Parametern, Metriken: `mlflow.db` im Projekt-Root |
-| **Artefakt-Store** | Ordner für Dateien: `mlruns/` im Projekt-Root |
-
-Beides ist **gitignored** und liegt nur lokal auf deinem Rechner.
+So trainierst und bewertest du Modelle mit `run()` und vergleichst die Läufe in MLflow. Was
+MLflow ist und warum wir es nutzen: [MLflow – Überblick](mlflow.md).
 
 ## Wie es bei uns funktioniert
 
@@ -114,25 +87,21 @@ Lauf wiederfinden lässt. Vorher committen, damit `git.dirty` nicht `True` ist.
 
 `mlflow.db` und `mlruns/` löschen – beim nächsten `run()` entsteht ein leerer Store.
 
-## Was wir bewusst nicht nutzen
+## Schnelltest: funktioniert alles?
 
-| MLflow-Funktion | Warum nicht |
-| --- | --- |
-| Tracking-Server | Kein Betrieb eines Dienstes nötig; Teamvergleich über das Experiment-Log |
-| Model Registry | Wir liefern am Ende eine Vorhersage-CSV, kein Modell in Produktion |
-| Autologging | Loggt sehr viel Unwichtiges; wir loggen gezielt, was wir vergleichen |
-| Tracing | Für LLM-Anwendungen gedacht, nicht für unsere Modelle |
+Einmal nach dem Einrichten oder wenn du unsicher bist:
 
-## Entscheidung: MLflow lokal (#47)
+```bash
+make data            # falls data/interim und data/processed noch fehlen
+uv run python -c "
+from sklearn.dummy import DummyClassifier
+from awp2.experiment import RunConfig, run
+r = run(DummyClassifier(), RunConfig(name='smoke_test'))
+print(r.metrics.bacc_crop, r.run_id)
+"
+make mlflow          # http://127.0.0.1:5000
+```
 
-| Tool | Stärken | Schwächen |
-| --- | --- | --- |
-| **MLflow lokal** ✅ | Verbreitet, Open Source, UI zum Vergleichen, kein externer Dienst | Läufe nur lokal sichtbar |
-| MLflow + DagsHub | Gemeinsamer gehosteter Server | Externer Dienst, Accounts |
-| Weights & Biases | Sehr gute Team-Dashboards | Cloud-Dienst, Account je Person |
-| DVC Experiments | Läufe in git, kein Server | Mehr Konzepte, schwächere UI |
-| Nur Markdown-Log | Kein Tool | Kein interaktiver Vergleich |
-
-Wir wollten MLflow als verbreitetes Werkzeug kennenlernen und keinen externen Dienst einbinden.
-Der Nachteil – keine gemeinsame Ansicht – gleicht das Experiment-Log im Repo aus. Soll es später
-doch ein gemeinsamer Server sein, reicht `MLFLOW_TRACKING_URI` zu setzen.
+Erwartet: `0.2` (Zufallsniveau bei 5 Kulturen) und eine Run-ID; in der Oberfläche erscheint im
+Experiment **awp2** der Lauf `smoke_test` mit Parametern, Metriken, Tags und der Confusion Matrix
+unter *Artifacts*. Den Testlauf danach in der Oberfläche löschen (Lauf anhaken → *Delete*).

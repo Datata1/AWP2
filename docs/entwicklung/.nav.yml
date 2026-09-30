@@ -2,6 +2,7 @@ nav:
   - index.md
   - workflow.md
   - konventionen.md
+  - mlflow.md
   - tracking.md
   - ai.md
   - glob: "*"
