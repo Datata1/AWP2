@@ -25,6 +25,12 @@ Stundendoku anlegen: `/stunden init` (siehe [Stundendoku](#stundendoku)).
 | 3 | **Arbeiten** – Code in `src/`, Notebooks in `notebooks/`, oft committen | `/experiment …`, `/notebook …` | normal arbeiten, `git commit` | |
 | 4 | **Abgeben** – PR öffnen, eine andere Person reviewt | `/pr` | `gh pr create` (Vorlage ausfüllen) | Review |
 | 5 | **Mergen** – Reviewer:in klickt *Squash and merge*, Issue schließt sich | | | Done |
+
+!!! note "Wie sich das Issue schließt"
+    Beim *Squash and merge* wird die PR-Beschreibung zur Commit-Message auf `main` – die Zeile
+    `Closes #nr` darin schließt das Issue. Deshalb muss sie in jedem PR stehen. Dass GitHub das
+    Issue rechts unter *Development* manchmal nicht anzeigt, ist dafür egal. Nach dem Merge wird
+    der Branch automatisch gelöscht.
 | 6 | **Aufräumen** | | `git switch main && git pull` | |
 
 Das Board wird zum Teil automatisch gepflegt: Neue Issues landen auf *Todo*, geschlossene auf

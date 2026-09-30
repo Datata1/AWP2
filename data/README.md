@@ -8,8 +8,8 @@ prüfen das Format (pandera-Schema in `src/awp2/data/schema.py`). Pfade aus `awp
 | Ordner | Was gehört rein? | Wer schreibt? |
 | --- | --- | --- |
 | `raw/` | Originaldaten, genau so wie geliefert. **Nie verändern.** | Du, per Hand kopiert |
-| `interim/` | Zwischenstände der Pipeline (z. B. zugeschnittene/bereinigte Daten) | Pipeline-Code |
-| `processed/` | Finale Datensätze, direkt fürs Modelltraining nutzbar | Pipeline-Code |
+| `interim/` | Bereinigter Datensatz (`train_clean.parquet`) | `make data` |
+| `processed/` | Split-Zuordnung für alle (`split.csv`: train/val, CV-Fold) | `make data` |
 | `assets/` | Aufgabenstellung, Orga-Unterlagen (aus ILIAS) – nicht in git, da das Repo öffentlich ist | Du, per Hand |
 
 Fluss: `raw/` → Pipeline → `interim/` → Pipeline → `processed/` → Modelle

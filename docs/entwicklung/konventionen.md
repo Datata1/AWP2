@@ -34,6 +34,52 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 - **Englisch**: Variablen- und Funktionsnamen, Docstrings, Kommentare, Commit-Messages
 - **Deutsch**: alles in `docs/`, Berichte, Präsentationen
 
+## Code
+
+- **Keine fest verdrahteten Werte:** Spaltennamen, Labels, Größen, Schwellen, Seeds, Muster und
+  Pfade stehen als Konstanten in `awp2.config`. Ausnahme: reine Darstellungsdetails wie die
+  Größe eines Plots.
+- **Typen überall:** Alle Argumente und der Rückgabetyp jeder Funktion sind annotiert (ruff-Regeln
+  `ANN` prüfen das), `ty` prüft die Typen in `make lint`. Statt namenloser Tupel/Sets benannte
+  Typen zurückgeben (`NamedTuple`, pydantic-Modell), damit sofort klar ist, was zurückkommt.
+- **Docstrings im Google-Stil** für alle öffentlichen Funktionen und Klassen in `src/` (`Args:`,
+  `Returns:`, `Raises:`). Daraus entsteht die [API-Referenz](../referenz/index.md) automatisch;
+  ruff prüft Form, Rückgabe und Exceptions. Mehrzeilige Beschreibungen: Folgezeilen 4 Leerzeichen
+  weiter einrücken.
+
+    ```python
+    def load_split() -> TrainValSplit:
+        """Load the shared holdout split.
+
+        Returns:
+            Train and validation part, identical for everyone because it is read from
+                ``data/processed/split.csv``.
+
+        Raises:
+            StaleArtifactsError: If the artifacts are missing – run ``make data``.
+        """
+    ```
+
+- Konfigurationen und Ergebnisse an Schnittstellen sind pydantic-Modelle (streng validiert,
+  unveränderlich); sklearn-Klassen bleiben normale Klassen.
+
+## Kommentare
+
+Der Code zeigt, **was** passiert – Kommentare erklären nur, **warum** (Grund, Einschränkung,
+Abwägung, nicht offensichtliches Domänenwissen).
+
+- Nie beschreiben, was der Code tut. Scheint das nötig, ist der Code zu kompliziert → besser
+  benennen oder eine kleine Funktion herausziehen.
+- Nie auf Vergangenes verweisen („früher“, „jetzt“, „geändert von“, „neu“, „statt des alten …“).
+  Für spätere Leser:innen zählt nur der aktuelle Stand; die Historie steht in git.
+- Keine Abschnitts-Banner, kein auskommentierter Code, keine Kommentare, die nur den Namen
+  wiederholen. TODOs nur mit Issue: `# TODO(#30): …`.
+- Docstrings beschreiben die Schnittstelle (Eingaben, Rückgabe, Zusicherungen), nicht die
+  Umsetzung.
+- Markdown-Zellen in Notebooks dürfen die Analyse erzählen – das ist Doku, kein Code-Kommentar.
+
+Claude hält sich über `AGENTS.md` daran, der `ml-reviewer` prüft es vor jedem PR.
+
 ## Git-Workflow
 
 Der Ablauf (Issue → Branch → PR → Merge) steht unter [Arbeitsablauf](workflow.md). Hier nur
@@ -66,5 +112,9 @@ PR = `Closes #nr` + 1–4 Stichpunkte. Labels: ein Typ (`feat`, `exp`, `data`, `
 - Reihenfolge und Titel steuert die `.nav.yml` im jeweiligen Ordner; nicht aufgeführte Seiten
   landen an der Stelle von `"*"`.
 - Quellen als Fußnote: `Text[^1]` und am Seitenende `[^1]: Autor (Jahr): Titel.`
-- Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern (siehe [EDA](../daten/eda.md)).
+- Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern – Daten/EDA nach `docs/daten/img/`,
+  Modellergebnisse mit `MODEL_DOCS_FIGURES_DIR` nach `docs/modelle/img/` – und direkt beim
+  zugehörigen Befund einbinden. In Notebooks steht unter jeder Erkenntnis der Plot, der sie belegt.
+- Diagramme als **Mermaid** (` ```mermaid `), bewusst einfach: meist `flowchart TD`, höchstens
+  ~8 Knoten, kurze Beschriftungen. Wird es größer, lieber aufteilen oder als Tabelle darstellen.
 - Vorschau: `make docs` → <http://127.0.0.1:8000>

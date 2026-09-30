@@ -21,6 +21,9 @@ otherwise 7 days ago).
      "AWP2", see `gh project list --owner Datata1`) → items with Status "In Progress" / "Review".
    - Current milestone progress: `gh api repos/Datata1/AWP2/milestones --jq '.[] | "\(.title): \(.closed_issues)/\(.open_issues + .closed_issues) erledigt, fällig \(.due_on[:10])"'`
    - Blockers: `gh issue list --label blocked`; open issues without assignee in current milestone.
+   - Missed auto-close: merged PRs whose body says `Closes #nr` while that issue is still open
+     (`gh pr list --state merged --limit 50 --json number,body` → extract `#nr` → `gh issue view <nr> --json state`).
+     List them under "Blocker / Fragen" as "Issue #nr noch offen, PR #pr gemergt" and offer to close them.
 3. New rows in `docs/modelle/experimente.md` within the period → best scores so far.
 4. Open questions: items marked TODO / "Offen" in `docs/` and open action items in the latest
    protocol in `docs/protokolle/`.

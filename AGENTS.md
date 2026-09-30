@@ -31,34 +31,82 @@ Always commit `pyproject.toml` and `uv.lock` together.
   Notebooks in `notebooks/` are for exploration and reporting and **import** from `awp2`.
   If notebook code is needed twice, move it to `src/awp2/`.
 - Paths and constants come from `awp2.config` — never hardcode paths, labels or seeds.
-- Load raw data only via `awp2.data.load_train()` / `load_test()` (validated by the pandera
-  schema in `src/awp2/data/schema.py`). Use `band_columns()` / `wavelengths()` for bands.
+- For modelling use the shared artifacts: `awp2.data.load_split()` / `load_folds()` (built by
+  `make data`). Raw data only via `awp2.data.load_train()` / `load_test()` (validated by the
+  pandera schema in `src/awp2/data/schema.py`). Use `band_columns()` / `wavelengths()` for bands.
 - `data/raw/` is **read-only**. Derived data → `data/interim/` or `data/processed/`
   (must be reproducible from raw), trained models → `models/`, figures → `reports/figures/`
-  (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` (`docs/daten/img/`).
+  (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` into `docs/daten/img/`
+  (data, EDA) or `MODEL_DOCS_FIGURES_DIR` = `docs/modelle/img/` (model results).
 - Plots: use and extend `awp2.plots` (e.g. `plot_spectra()`) instead of ad-hoc plotting code.
 - Notebook names: `<nr>_<initials>_<topic>.ipynb`, e.g. `03_jd_baseline.ipynb`.
 
 ## ML rules
 
-- Use `SEED` from `awp2.config` for every split, model and sampler.
-- Split stratified on the crop+stage combination.
+- Develop approaches as described in `docs/modelle/ansatz-entwickeln.md` (skill `/experiment`):
+  search hyperparameters with `awp2.experiment.tune()` (cross-validation on the training part),
+  then evaluate **once** with `awp2.experiment.run()` on the validation part. Both are tracked in
+  MLflow; set `approach` and a `description`. Never tune on the validation score.
+- Data only via the shared artifacts (`make data`, `awp2.data.load_split()`/`load_folds()`) –
+  no own splits. Preprocessing only via `build_preprocessor(PreprocessingConfig(...))`.
+- Use `SEED` from `awp2.config` for every model and sampler.
 - Fit every transformation (imputer, scaler, PCA, band selection, resampling) on the training
-  split only — wrap preprocessing and model in an sklearn `Pipeline`.
-- Evaluate with `awp2.evaluation.evaluate()`; always report crop **and** stage metrics.
-  Never report plain accuracy alone.
+  split only — it lives in the sklearn `Pipeline` that `tune()`/`run()` build.
+- Evaluate with `awp2.evaluation.evaluate()` (done by `run()`); always report crop **and** stage
+  metrics. Never report plain accuracy alone.
 - Account for class imbalance (class weights, balanced sampling, appropriate metrics).
 - Predictions must be valid crop/stage combinations.
 - Document preprocessing decisions (e.g. dropped bands) with a reason in `docs/daten/`,
-  experiment results in `docs/modelle/experimente.md`.
+  experiment results in `docs/modelle/experimente.md` (with the MLflow run id) and the
+  reasoning per approach in `docs/modelle/ansaetze/<approach>.md` (one section per classifier).
 
 ## Style
 
 - **English** for identifiers, docstrings, comments and commit messages.
   **German** for everything in `docs/` and reports.
+- Diagrams in docs: simple **Mermaid** (` ```mermaid `, usually `flowchart TD`, ≤ ~8 nodes,
+  short labels); split or use a table when it grows.
 - ruff (line length 100) — `make format` before committing.
-- Type hints and a short docstring for public functions in `src/`.
+- Every function has type hints for all arguments **and the return type** (enforced by ruff
+  `ANN`). Public functions/classes in `src/` have **Google-style docstrings** (`Args:`,
+  `Returns:`, `Raises:`; continuation lines indented by 4 more spaces) – the API reference in
+  `docs/referenz/` is generated from them (mkdocstrings), ruff `D`/`DOC` checks them. `make lint` type-checks `src/` with **ty** (pinned
+  version – update deliberately). Return named types instead of bare tuples/sets
+  (`NamedTuple`, pydantic model) so the caller sees what comes back.
+- **No magic values** in code: column names, labels, sizes, thresholds, seeds, patterns and
+  paths are named constants in `awp2.config` (label sets as `Literal` types there). Only purely
+  local presentation details (e.g. a plot's `figsize`) may stay inline.
+- Configs and results at API boundaries are frozen, strict **pydantic** models with field
+  descriptions; new options become a field there, not a loose function argument. sklearn
+  estimators/transformers stay plain classes (sklearn's `clone`/`get_params` conventions break
+  with pydantic).
 - Keep it simple: small functions, no premature abstractions.
+
+## Comments
+
+Code says **what** happens; comments only say **why** – a reason, constraint, trade-off or
+non-obvious domain fact that the code cannot express.
+
+- Never describe what the code does. If it seems necessary, refactor instead: clearer names,
+  a well-named variable or a small extracted function.
+- Never refer to the past or to changes ("previously", "now uses", "changed from", "new",
+  "fixed", "instead of the old …"). Describe only the current state; history lives in git.
+- No section banners, no commented-out code, no comments restating a name or type.
+- A TODO needs an issue: `# TODO(#30): …`.
+- Docstrings describe the contract (inputs, outputs, guarantees) of public functions, not the
+  implementation steps.
+- When editing a file, remove comments in the touched code that break these rules.
+- Notebook markdown cells may narrate the analysis – they are documentation, not code comments.
+
+```python
+# bad: says what, refers to the past
+# Transpose the frame, previously we used the column median here
+filled = spectra.T.interpolate(method="index").T
+
+# good: says why
+# "_" occurs in crop and stage names, so it cannot separate them
+LABEL_SEP = "|"
+```
 
 ## Git workflow
 

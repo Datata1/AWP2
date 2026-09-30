@@ -27,9 +27,6 @@ CSV_DATE = "%m/%d/%Y"  # date format used by the template
 NAME_ROW, HEADER = 1, ["Datum", "Stunden", "Arbeitsgegenstand", "Kommentar"]
 
 
-# --- file handling ---------------------------------------------------------------------------
-
-
 def sheet_path() -> Path:
     files = sorted(SHEET_DIR.glob("Stundendokumentation_*.csv"))
     if len(files) != 1:
@@ -48,9 +45,6 @@ def read(path: Path) -> list[list[str]]:
 def write(path: Path, rows: list[list[str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         csv.writer(f).writerows(rows)
-
-
-# --- row helpers -----------------------------------------------------------------------------
 
 
 def parse_date(text: str) -> date:
@@ -98,9 +92,6 @@ def update_sum(rows: list[list[str]]) -> float:
     return total
 
 
-# --- commands --------------------------------------------------------------------------------
-
-
 def cmd_init(args: argparse.Namespace) -> None:
     if not TEMPLATE.exists():
         sys.exit(f"Template missing: {TEMPLATE} (download it from ILIAS).")
@@ -121,7 +112,7 @@ def cmd_set(args: argparse.Namespace) -> None:
     day = parse_date(args.date)
     key = day.strftime(CSV_DATE)
     idx = next((i for i, r in enumerate(rows) if r[0] == key), None)
-    if idx is None:  # outside the template range: insert in date order
+    if idx is None:
         later = [i for i, r in enumerate(rows) if row_date(r) and row_date(r) > day]
         idx = later[0] if later else sum_index(rows)
         rows.insert(idx, [key, "", "", ""])
@@ -168,7 +159,7 @@ def missing_days() -> list[date]:
 
 
 def cmd_missing(args: argparse.Namespace) -> None:
-    if args.hook:  # SessionStart hook: never fail, only print a reminder
+    if args.hook:
         try:
             if not list(SHEET_DIR.glob("Stundendokumentation_*.csv")):
                 message = "Stundendoku noch nicht eingerichtet – `/stunden init` ausführen."
