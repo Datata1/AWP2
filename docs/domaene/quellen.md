@@ -16,7 +16,31 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 ## Fernerkundung & Vegetation
 
 !!! todo
-    - Grundlagenliteratur Hyperspektral-Fernerkundung, Vegetationsspektroskopie, Indizes
+    - Literatur zu Hyperspektral-Fernerkundung und Vegetationsindizes
+
+- Daughtry, C. S. T., Hunt, E. R. & McMurtrey, J. E. (2004): *Assessing crop residue cover
+    using shortwave infrared reflectance*. Remote Sensing of Environment, 90(1), 126-134.
+    https://doi.org/10.1016/j.rse.2003.10.023. - Cellulose Absorption Index und trockene
+    Pflanzenbestandteile.
+
+- Gamon, J. A., Peñuelas, J. & Field, C. B. (1992): *A narrow-waveband spectral index that
+    tracks diurnal changes in photosynthetic efficiency*. Remote Sensing of Environment,
+    41(1), 35-44. https://doi.org/10.1016/0034-4257(92)90085-3. - Photochemical Reflectance
+    Index (PRI).
+
+- Gao, B.-C. (1996): *NDWI - A normalized difference water index for remote sensing of
+    vegetation liquid water from space*. Remote Sensing of Environment, 58(3), 257-266.
+    https://doi.org/10.1016/S0034-4257(96)00067-3. - NIR-SWIR-Wasserindex für Vegetation.
+
+- Huete, A., Didan, K., Miura, T., Rodriguez, E. P., Gao, X. & Ferreira, L. G. (2002):
+    *Overview of the radiometric and biophysical performance of the MODIS vegetation indices*.
+    Remote Sensing of Environment, 83(1-2), 195-213.
+    https://doi.org/10.1016/S0034-4257(02)00096-2. - Enhanced Vegetation Index (EVI).
+
+- Knipling, E. B. (1970): *Physical and physiological basis for the reflectance of visible
+    and near-infrared radiation from vegetation*. Remote Sensing of Environment, 1, 155-159.
+    https://doi.org/10.1016/0034-4257(70)90021-9. - Zusammenhang von Blattmerkmalen mit
+    der Reflexion im sichtbaren und nahen Infrarot.
 
 - Mulla, D. J. (2013): *Twenty five years of remote sensing in precision agriculture: Key
     advances and remaining knowledge gaps*. Biosystems Engineering, 114(4), 358-371.
@@ -35,6 +59,11 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 - NASA (2025): *Earth Observing-1*. NASA Earth Observatory.
     https://science.nasa.gov/earth/earth-observatory/earth-observing-1. - Start, Orbit und
     Zweck der EO-1-Mission sowie räumliche und spektrale Kenndaten von Hyperion.
+
+- Tucker, C. J. (1979): *Red and photographic infrared linear combinations for monitoring
+    vegetation*. Remote Sensing of Environment, 8(2), 127-150.
+    https://doi.org/10.1016/0034-4257(79)90013-0. - Normalized Difference Vegetation Index
+    (NDVI).
 
 - U.S. Geological Survey (o. J.): *Landsat Collection 2 Surface Reflectance*. USGS.
     https://www.usgs.gov/landsat-missions/landsat-collection-2-surface-reflectance. - Begriff
