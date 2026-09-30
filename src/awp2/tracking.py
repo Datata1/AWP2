@@ -4,9 +4,11 @@ Only this module talks to MLflow, so the tracking tool can be swapped without to
 rest of the code. Browse the runs with ``make mlflow``.
 """
 
+import logging
 import subprocess
 import warnings
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from typing import NamedTuple
 
 import matplotlib.pyplot as plt
@@ -31,6 +33,9 @@ _LOCAL_STORE_SCHEMES = ("sqlite:", "file:")
 # MLflow warns about a doubly registered local dataset source and about integer columns in the
 # inferred schema; we never use the dataset schema to validate inputs, so both are noise here.
 _IRRELEVANT_DATASET_WARNINGS = ("can be interpreted in multiple ways", "Hint: Inferred schema")
+# The pickle warning is covered by the reason at log_model; pip is missing in uv environments,
+# and the environment spec of a logged model is never used to recreate it.
+_IRRELEVANT_MODEL_LOGGERS = ("mlflow.sklearn", "mlflow.utils.environment")
 _UNKNOWN = "unknown"
 
 
@@ -124,6 +129,19 @@ def _log_datasets(frames: Mapping[str, pd.DataFrame]) -> dict[str, PandasDataset
     return datasets
 
 
+@contextmanager
+def _silenced(logger_names: tuple[str, ...]) -> Iterator[None]:
+    loggers = [logging.getLogger(name) for name in logger_names]
+    levels = [logger.level for logger in loggers]
+    for logger in loggers:
+        logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        for logger, level in zip(loggers, levels, strict=True):
+            logger.setLevel(level)
+
+
 def log_run(
     *,
     experiment: str,
@@ -177,11 +195,12 @@ def log_run(
             mlflow.log_figure(fig, file_name)
         model_id = model_uri = None
         if model is not None:
-            # skops cannot serialise our own transformers; the models are our own and stay
-            # local, so cloudpickle is safe here.
-            logged = mlflow.sklearn.log_model(
-                model, name=name, serialization_format="cloudpickle", params=dict(params)
-            )
+            # skops cannot serialise the pandas objects our fitted transformers hold; the models
+            # are our own and stay local, so cloudpickle is safe here.
+            with _silenced(_IRRELEVANT_MODEL_LOGGERS):
+                logged = mlflow.sklearn.log_model(
+                    model, name=name, serialization_format="cloudpickle", params=dict(params)
+                )
             model_id, model_uri = logged.model_id, logged.model_uri
         mlflow.log_metrics(dict(metrics), model_id=model_id, dataset=datasets["validation"])
     return TrackedRun(active.info.run_id, model_uri)
