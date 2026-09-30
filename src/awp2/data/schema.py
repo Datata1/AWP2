@@ -2,14 +2,14 @@
 
 import pandera.pandas as pa
 
-from awp2.config import BAND_PREFIX, CROPS, ID_COL, STAGES
+from awp2.config import BAND_PATTERN, CROPS, ID_COL, STAGES
 
 feature_schema = pa.DataFrameSchema(
     {
         ID_COL: pa.Column(str, unique=True),
         "AEZ": pa.Column(int, pa.Check.in_range(1, 20)),
         "Month": pa.Column(int, pa.Check.in_range(1, 12)),
-        rf"^{BAND_PREFIX}\d+$": pa.Column(float, pa.Check.ge(0), nullable=True, regex=True),
+        BAND_PATTERN: pa.Column(float, pa.Check.ge(0), nullable=True, regex=True),
     },
     strict=True,
 )

@@ -10,9 +10,8 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from awp2.config import BAND_PREFIX
-
-BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
+from awp2.config import BAND_PATTERN, BAND_PREFIX
+from awp2.data import wavelengths
 
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
@@ -77,11 +76,13 @@ class InterpolateBands(_BandTransformer):
         X = self._check(X)
         if not X.isna().any().any():
             return X
-        wavelengths = [int(c[len(BAND_PREFIX) :]) for c in X.columns]
-        # Transpose so the wavelengths are the index and interpolate along it.
-        spectra = X.set_axis(wavelengths, axis=1).T
-        filled = spectra.interpolate(method="index", limit_direction="both").T
-        return filled.set_axis(X.columns, axis=1).fillna(self.medians_)
+        return _interpolate_along_wavelength(X).fillna(self.medians_)
+
+
+def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
+    by_wavelength = spectra.set_axis(wavelengths(spectra), axis=1)
+    filled = by_wavelength.T.interpolate(method="index", limit_direction="both").T
+    return filled.set_axis(spectra.columns, axis=1)
 
 
 class PreprocessingConfig(BaseModel):

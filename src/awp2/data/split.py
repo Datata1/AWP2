@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold, train_test_split
 from sklearn.utils.class_weight import compute_sample_weight
 
-from awp2.config import META_COLS, SEED, TARGET_COLS
+from awp2.config import META_COLS, SEED, TARGET_COLS, VAL_SIZE
 from awp2.data.load import band_columns
 
 LABEL_SEP = "|"  # "_" is ambiguous: it occurs in crop and stage names
@@ -50,13 +50,14 @@ def balanced_sample_weight(y: pd.DataFrame) -> np.ndarray:
 
 
 def train_val_split(
-    X: pd.DataFrame, y: pd.DataFrame, val_size: float = 0.3
+    X: pd.DataFrame, y: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """The fixed holdout split everyone uses: stratified on crop+stage, seeded.
+    """The fixed holdout split everyone uses: ``VAL_SIZE`` of the data, stratified on crop+stage,
+    seeded. Deliberately not configurable, so all results stay comparable.
 
     Returns ``X_train, X_val, y_train, y_val``.
     """
-    return train_test_split(X, y, test_size=val_size, stratify=combined_label(y), random_state=SEED)
+    return train_test_split(X, y, test_size=VAL_SIZE, stratify=combined_label(y), random_state=SEED)
 
 
 def cv_splits(
