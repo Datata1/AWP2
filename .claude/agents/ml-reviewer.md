@@ -27,6 +27,9 @@ Check, in this order:
    paths instead of `awp2.config`; data not loaded via `awp2.data`; writes to `data/raw/`.
 6. **Structure** — reusable logic stuck in notebooks that should live in `src/awp2/`;
    duplicated code; missing type hints/docstrings on public functions in `src/`.
+7. **Comments** — comments that explain *what* instead of *why*, refer to past states or changes,
+   section banners, commented-out code, TODOs without issue number (rules in `AGENTS.md`).
+   Where a what-comment exists, suggest the refactoring that makes it unnecessary.
 
 Output: a prioritized list (🔴 must fix / 🟡 should fix / ⚪ nit), each with `file:line`, the
 problem in one sentence and a concrete fix. If nothing is wrong in a category, skip it. End

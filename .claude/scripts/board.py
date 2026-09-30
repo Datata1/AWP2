@@ -79,7 +79,7 @@ def main() -> None:
         parser.error("need an issue number and a status and/or --bereich")
 
     project, content = load(args.number)
-    # Validate before writing anything.
+    # Resolve all option ids first, so a typo fails before anything is written.
     values = {"status": args.status, "bereich": args.bereich}
     selected = {k: option_id(project, k, v) for k, v in values.items() if v}
 
@@ -87,7 +87,7 @@ def main() -> None:
              if n["project"]["number"] == PROJECT_NUMBER]  # fmt: skip
     if items:
         item_id = items[0]
-    else:  # not on the board yet: add it (one extra request)
+    else:
         added = graphql(
             f'mutation {{ add: addProjectV2ItemById(input: {{projectId: "{project["id"]}", '
             f'contentId: "{content["id"]}"}}) {{ item {{ id }} }} }}'
