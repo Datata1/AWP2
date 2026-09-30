@@ -55,7 +55,7 @@ result.model_uri               # gespeichertes Modell, z. B. für Vorhersagen
 | `tuning_run` | – | Run-ID aus `tune()` – verknüpft den Lauf mit der Suche, aus der seine Einstellungen stammen |
 | `track` | `True` | `False` = gar nichts speichern |
 
-Das Modell muss **Crop und Stage** vorhersagen – wie, entscheidet der [Ansatz](../modelle/ansaetze.md).
+Das Modell muss **Crop und Stage** vorhersagen – wie, entscheidet der [Ansatz](../modelle/ansaetze/index.md).
 
 ### Hyperparameter suchen
 

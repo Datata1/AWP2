@@ -1,6 +1,6 @@
 ---
 name: experiment
-description: Develop and evaluate a modelling approach the project's way – tune() with cross-validation on the training part, run() once on the validation part, both tracked in MLflow, then record the result in the experiment log and ansaetze.md. Use whenever a model, feature set or preprocessing variant is trained and evaluated.
+description: Develop and evaluate a modelling approach the project's way – tune() with cross-validation on the training part, run() once on the validation part, both tracked in MLflow, then record the result in the experiment log and the approach's page in docs/modelle/ansaetze/. Use whenever a model, feature set or preprocessing variant is trained and evaluated.
 argument-hint: "<approach and idea, e.g. 'hierarchical: RF for crop, then stage per crop'>"
 ---
 
@@ -11,8 +11,8 @@ Follow `docs/modelle/ansatz-entwickeln.md`. Code and comments in English, docume
 ## 1. Prepare
 - If on `main`, create a branch `exp/<issue-nr>-<kebab-name>` (use `/start` if there is an issue).
 - Make sure the artifacts exist (`data/processed/split.csv`), otherwise run `make data`.
-- Read `docs/modelle/experimente.md` (current best scores) and the approach's section in
-  `docs/modelle/ansaetze.md` to avoid repeating what was tried.
+- Read `docs/modelle/experimente.md` (current best scores) and the approach's page in
+  `docs/modelle/ansaetze/` to avoid repeating what was tried.
 - Decide `approach` (slug, e.g. `baseline`, `hierarchical`, `combined`) and a run `name`.
 
 ## 2. Build the approach
@@ -48,8 +48,10 @@ Never tune further because of the validation score – new ideas go back to step
 - One row in `docs/modelle/experimente.md`: Datum, ID (= run name), Autor (git user.name),
   Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert, Macro-F1 kombiniert, Samples-F1,
   MLflow-Run (first 8 chars of `result.run_id`), Notiz.
-- 2–5 German bullets in the approach's section of `docs/modelle/ansaetze.md`; update its row in
-  the overview table (status, best experiment). New overall best → "Aktueller Stand" in
+- On the approach's page `docs/modelle/ansaetze/<approach>.md` (create it from the template in
+  `ansaetze/index.md` if new): one `###` section per architecture with settings, results,
+  notebook/MLflow links and 2–5 German bullets; update the page's summary and the row in the
+  overview table in `ansaetze/index.md` (status, architectures, best experiment). New overall best → "Aktueller Stand" in
   `docs/modelle/index.md`. Preprocessing decisions → `docs/daten/`.
 
 ## 7. Report back

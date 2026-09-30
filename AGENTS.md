@@ -57,7 +57,7 @@ Always commit `pyproject.toml` and `uv.lock` together.
 - Predictions must be valid crop/stage combinations.
 - Document preprocessing decisions (e.g. dropped bands) with a reason in `docs/daten/`,
   experiment results in `docs/modelle/experimente.md` (with the MLflow run id) and the
-  reasoning per approach in `docs/modelle/ansaetze.md`.
+  reasoning per approach in `docs/modelle/ansaetze/<approach>.md` (one section per architecture).
 
 ## Style
 
