@@ -26,5 +26,9 @@ disable-model-invocation: true
      only for experiments: `BAcc Crop x.xx / Stage x.xx / kombiniert x.xx (bisher x.xx)` ·
      `## Review-Hinweis` only if there is something specific to check.
    - `gh pr create --base main --title … --body … [--reviewer <arg>] --assignee @me`
-6. `python3 .claude/scripts/board.py <issue-nr> Review` (if there is an issue).
-7. Reply with one line: `PR #<nr> → <url>`.
+6. Make sure the PR body contains `Closes #<issue-nr>` literally. The repo squash-merges with the
+   PR body as commit message, so this line in the commit on `main` closes the issue reliably –
+   even when GitHub does not show the link in the PR sidebar (it sometimes skips parsing it:
+   `gh pr view <pr> --json closingIssuesReferences` stays empty). No further action needed.
+7. `python3 .claude/scripts/board.py <issue-nr> Review` (if there is an issue).
+8. Reply with one line: `PR #<nr> → <url>`.
