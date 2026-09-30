@@ -10,9 +10,9 @@ Je ein Modell für Crop und für Stage, unabhängig voneinander trainiert.
     - Vorteil: einfach, jedes Modell auf seine Aufgabe zugeschnitten.
     - Nachteil: kann unmögliche Kombinationen vorhersagen; das Stadium-Modell ignoriert die Kultur.
 
-## Architekturen
+## Klassifikatoren
 
-_Noch keine._ Neue Architekturen als Unterkapitel nach der [Vorlage](index.md#aufbau-einer-ansatz-seite).
+_Noch keine._ Neue Klassifikatoren als Unterkapitel nach der [Vorlage](index.md#aufbau-einer-ansatz-seite).
 
 ## Fazit
 

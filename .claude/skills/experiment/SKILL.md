@@ -49,9 +49,10 @@ Never tune further because of the validation score – new ideas go back to step
   Ansatz, BAcc Crop, BAcc Stage, BAcc kombiniert, Macro-F1 kombiniert, Samples-F1,
   MLflow-Run (first 8 chars of `result.run_id`), Notiz.
 - On the approach's page `docs/modelle/ansaetze/<approach>.md` (create it from the template in
-  `ansaetze/index.md` if new): one `###` section per architecture with settings, results,
-  notebook/MLflow links and 2–5 German bullets; update the page's summary and the row in the
-  overview table in `ansaetze/index.md` (status, architectures, best experiment). New overall best → "Aktueller Stand" in
+  `ansaetze/index.md` if new): one `###` section per classifier (two-stage approaches: name the
+  combination, e.g. "Random Forest → SVM") with settings, results, notebook/MLflow links and
+  2–5 German bullets; update the page's summary, the row in the overview table and the cell in
+  the approach × classifier matrix in `ansaetze/index.md`. New overall best → "Aktueller Stand" in
   `docs/modelle/index.md`. Preprocessing decisions → `docs/daten/`.
 
 ## 7. Report back

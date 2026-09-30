@@ -20,9 +20,9 @@ Baustein und Recherche: #54, Entwurf #55.
     - Wie verhält er sich gegenüber hierarchischer Klassifikation bei so seltenen Klassen?
     - Quellen in [Quellen](../../domaene/quellen.md) eintragen.
 
-## Architekturen
+## Klassifikatoren
 
-_Noch keine._ Neue Architekturen als Unterkapitel nach der [Vorlage](index.md#aufbau-einer-ansatz-seite).
+_Noch keine._ Neue Klassifikatoren als Unterkapitel nach der [Vorlage](index.md#aufbau-einer-ansatz-seite).
 
 ## Fazit
 

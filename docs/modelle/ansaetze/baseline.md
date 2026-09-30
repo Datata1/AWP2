@@ -6,19 +6,19 @@ Referenzwerte für M1 (#27) – bewusst **kein** begründeter Ansatz, sondern di
 alle weiteren: eine Untergrenze ohne Lernen und ein einfaches Modell, das Crop und Stage ohne
 eigene Logik gemeinsam vorhersagt. Notebook: `notebooks/01_jd_baseline.ipynb`.
 
-| Architektur | BAcc Crop | BAcc Stage | BAcc kombiniert | Samples-F1 | MLflow-Run |
+| Klassifikator | BAcc Crop | BAcc Stage | BAcc kombiniert | Samples-F1 | MLflow-Run |
 | --- | --- | --- | --- | --- | --- |
 | [Dummy](#dummy) | 0.200 | 0.167 | 0.044 | 0.326 | `f8cf4ecc` |
 | [Random Forest](#random-forest) | 0.890 | 0.870 | **0.743** | 0.878 | `9641f6a8` |
 
-## Architekturen
+## Klassifikatoren
 
 ### Dummy
 
 Sagt immer die häufigste Kultur und das häufigste Stadium vorher (`strategy="most_frequent"`).
 
-- Liegt genau auf Zufallsniveau der Balanced Accuracy (1/5 Kulturen, 1/6 Stadien) – jede
-  ernsthafte Architektur muss deutlich darüber liegen.
+- Liegt genau auf Zufallsniveau der Balanced Accuracy (1/5 Kulturen, 1/6 Stadien) – jeder
+  ernsthafte Klassifikator muss deutlich darüber liegen.
 
 ### Random Forest
 
