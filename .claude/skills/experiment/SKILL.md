@@ -17,20 +17,18 @@ Follow these steps. Code and comments in English, documentation in German.
 - Reusable parts (preprocessing steps, feature functions, model builders) go into `src/awp2/`
   (e.g. `src/awp2/features.py`, `src/awp2/models/`). Reuse existing functions first.
 - Run the experiment in a notebook (`/notebook` conventions) or a script under `notebooks/`.
-- Use the shared pipeline (see `docs/daten/pipeline.md`):
-  `result = run(model, RunConfig(name=..., preprocessing=PreprocessingConfig(...)))` – it loads,
-  deduplicates, uses the fixed 70/30 split and evaluates. Do not build your own split.
-- For cross-validation use `awp2.data.cv_splits()`; keep everything in one sklearn `Pipeline`.
-- New preprocessing steps: add a transformer to `awp2.preprocessing` and a field to
-  `PreprocessingConfig` instead of preprocessing in the notebook.
-- Both targets: native multi-output model, `MultiOutputClassifier`, or
-  `CombinedLabelClassifier` (only valid combinations). Check `invalid_combinations` in the metrics.
+- Load data with `awp2.data.load_train()`; bands via `band_columns()`.
+- Split with `train_test_split(..., stratify=<Crop+Stage combination>, random_state=SEED)`
+  from `awp2.config`, or `StratifiedKFold` with the same seed for cross-validation.
+- Put **all** preprocessing (imputation, scaling, band selection, PCA, resampling) and the model
+  into one sklearn `Pipeline` so nothing is fit on validation data.
 - Handle class imbalance explicitly (e.g. `class_weight="balanced"`) and note what you did.
+- Make sure predicted crop/stage combinations are valid ones seen in training.
 
 ## 3. Evaluate
-- `result.metrics` (a `Metrics` model) holds all scores – report all of them
-  (`result.metrics.model_dump()`).
-- `plot_confusion_matrices(result.y_val, result.y_pred, FIGURES_DIR / "<id>_confusion.png")`
+- `from awp2.evaluation import evaluate, plot_confusion_matrices`
+- `scores = evaluate(y_val, y_pred)` — report all returned metrics.
+- `plot_confusion_matrices(y_val, y_pred, FIGURES_DIR / "<id>_confusion.png")`
 - Name the most confused classes and give a hypothesis why (spectral similarity, stage overlap).
 
 ## 4. Persist

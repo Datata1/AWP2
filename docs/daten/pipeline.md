@@ -1,99 +1,131 @@
 # Data Pipeline
 
-Gemeinsame Grundlage für alle Modelle: gleiche Daten, gleicher Split, gleiche Vorverarbeitung,
-gleiche Metriken. Nur so sind Ergebnisse im [Experiment-Log](../modelle/experimente.md)
-vergleichbar.
+Die Pipeline ist die gemeinsame Grundlage für **alle** Modellansätze: gleiche bereinigte Daten,
+gleicher Split, gleiche Vorverarbeitung, gleiche Metriken. Sie enthält bewusst **kein Modell** –
+wie Kultur und Stadium vorhergesagt werden, entscheidet jeder Ansatz selbst
+([Ansätze](../modelle/ansaetze.md)).
 
-```python
-from sklearn.ensemble import RandomForestClassifier
-from awp2.config import SEED
-from awp2.experiment import CombinedLabelClassifier, RunConfig, run
-from awp2.preprocessing import PreprocessingConfig
-
-forest = RandomForestClassifier(class_weight="balanced", random_state=SEED)
-model = CombinedLabelClassifier(forest)
-config = RunConfig(
-    name="rf_combined",
-    preprocessing=PreprocessingConfig(use_meta=True, scale=False),
-)
-
-result = run(model, config)
-result.metrics.bacc_combined  # alle Metriken als Felder: bacc_crop, f1_samples, …
-```
-
-## Konfiguration
-
-Alles außer dem Modell selbst wird über typisierte Konfigurationsobjekte (pydantic) festgelegt.
-Sie prüfen Eingaben sofort und streng – ein Tippfehler im Feldnamen oder `scale="yes"` statt
-`scale=True` führt zu einem Fehler statt zu stillem Fehlverhalten – und sind unveränderlich.
-
-| Objekt | Felder | Standard |
-| --- | --- | --- |
-| `PreprocessingConfig` | `use_meta` – AEZ/Month als Features · `scale` – Standardisierung | `True` · `False` |
-| `RunConfig` | `name` (klein, z. B. `svm_combined`) · `preprocessing` · `balance_samples` | – · Standard · `False` |
-| `Metrics` (Ergebnis) | `bacc_crop/stage/combined`, `f1_macro_crop/stage/combined`, `f1_samples`, `invalid_combinations` | – |
-
-Neue Vorverarbeitungsschritte bekommen ein Feld in `PreprocessingConfig` und einen Transformer in
-`awp2.preprocessing` – nicht eigenen Code im Notebook.
-
-## Ablauf
+## Überblick
 
 ```mermaid
 flowchart TD
-    A[train.csv] -->|load_train + prepare_dataset| B[Validierte Daten ohne Duplikate]
-    B -->|train_val_split| C[Train 70 %]
-    B -->|train_val_split| D[Validierung 30 %]
-    C -->|fit| P[Pipeline: Vorverarbeitung + Modell]
-    D -->|predict| P
-    P -->|evaluate| M[Metrics]
+    R[data/raw/train.csv] -->|make data| I[data/interim: bereinigter Datensatz]
+    I -->|make data| P[data/processed: Split-Zuordnung]
+    P -->|load_split| S[Train 70 % / Validierung 30 %]
+    S --> A[Ansatz: Vorverarbeitung + eigenes Modell]
+    A -->|evaluate| M[Metrics]
 ```
 
-| Schritt | Code | Was | Warum |
-| --- | --- | --- | --- |
-| Laden | `awp2.data.load_train()` | CSV lesen, pandera-Schema prüfen, Index = `id` | Formatfehler sofort sehen |
-| Duplikate | `prepare_dataset()` | 2 exakt doppelte Zeilen entfernen | Sonst kann dieselbe Messung in Train **und** Val landen (Leakage) |
-| Split | `train_val_split()` | Fixer 70/30-Holdout, stratifiziert auf Crop+Stage, `SEED` | Vorgabe M1; alle vergleichen auf denselben Daten; seltene Kombis (z. B. `cotton|Harvest`, 11 Zeilen) in beiden Teilen |
-| Leere Bänder | `DropEmptyBands` | 67 Bänder ohne jeden Wert entfernen → 131 Bänder | Keine Information (Wasserabsorption/Randbänder, siehe [EDA](eda.md)) |
-| Lücken | `InterpolateBands` | Fehlende Werte je Spektrum füllen: zwischen zwei Bändern linear nach Wellenlänge, am Rand mit dem nächsten gemessenen Band, ohne jeden Wert mit dem Trainings-Median | Nachbarbänder sind stark korreliert, Spektren unterschiedlich hell (Nachbar schätzt besser als globaler Median); 43 Zeilen train und **11 Zeilen test** betroffen – muss auch bei der Vorhersage greifen |
-| Metadaten | `PreprocessingConfig(use_meta=True)` | `AEZ` One-Hot, `Month` numerisch | Laut Aufgabe erlaubt; abschaltbar, um den Nutzen zu messen |
-| Skalierung | `PreprocessingConfig(scale=True)` | StandardScaler | Für SVM, logistische Regression, MLP; bei Baum-Modellen unnötig |
+```bash
+make data   # einmal nach dem Kopieren der Rohdaten, und wenn sich die Pipeline ändert
+```
 
-Alle Schritte stecken in einer sklearn-`Pipeline` und werden **nur auf dem Train-Split gefittet**.
+## Artefakte in `data/`
+
+| Datei | Inhalt | Erzeugt von | In git |
+| --- | --- | --- | --- |
+| `data/raw/train.csv`, `test.csv` | Rohdaten, nie verändert | per Hand kopiert | nein |
+| `data/interim/train_clean.parquet` | Validierte Trainingsdaten ohne Duplikate (Index `id`, Datentypen erhalten) | `make data` | nein |
+| `data/processed/split.csv` | Je `id`: `subset` (`train`/`val`) und `cv_fold` (0–4, nur Train-Zeilen) | `make data` | nein |
+
+Beide Artefakte sind **deterministisch** (fester Seed): Wer `make data` ausführt, bekommt
+byte-identische Dateien – alle arbeiten auf demselben Split. Passen Datensatz und Split nicht
+zusammen oder fehlen sie, melden `load_split()`/`load_folds()` einen Fehler mit dem Hinweis auf
+`make data`.
+
+Die **Vorverarbeitung wird nicht gespeichert**: Sie wird in jedem Modell nur auf dem Train-Teil
+gefittet (sonst würden Informationen aus der Validierung in das Training gelangen).
+
+## Was die Pipeline bereitstellt – was jeder Ansatz selbst baut
+
+| Die Pipeline stellt bereit | Jeder Ansatz implementiert selbst |
+| --- | --- |
+| Bereinigte Daten, fixer Split, CV-Folds (`load_split`, `load_folds`) | Das Modell und wie es Crop **und** Stage vorhersagt (getrennt, kombiniert, hierarchisch …) |
+| Vorverarbeitung als sklearn-Transformer (`build_preprocessor`) | Eigene zusätzliche Features oder Schritte (→ als neues Feld in `PreprocessingConfig`) |
+| Einheitliche Bewertung (`evaluate` → `Metrics`, `scorer` für CV) | Hyperparameter-Tuning auf den CV-Folds |
+| Hilfen: `balanced_sample_weight`, `valid_combinations` | Begründung und Ergebnisse in [Ansätze](../modelle/ansaetze.md) und im [Experiment-Log](../modelle/experimente.md) |
+
+### Beispiel: einen Ansatz aufsetzen
+
+Mit einem `DummyClassifier` als Platzhalter – ihn ersetzt ihr durch euren Ansatz.
+
+```python
+from sklearn.dummy import DummyClassifier
+from sklearn.pipeline import Pipeline
+
+from awp2.data import load_split, valid_combinations
+from awp2.evaluation import as_target_frame, evaluate
+from awp2.preprocessing import PreprocessingConfig, build_preprocessor
+
+split = load_split()
+model = Pipeline([
+    ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+    ("model", DummyClassifier(strategy="most_frequent")),  # ← euer Ansatz
+])
+model.fit(split.X_train, split.y_train)
+y_pred = as_target_frame(model.predict(split.X_val), split.y_val.index)
+
+metrics = evaluate(split.y_val, y_pred, valid_combinations(split.y_train))
+metrics.bacc_combined
+```
+
+## Bausteine
+
+| Funktion | Liefert | Wofür |
+| --- | --- | --- |
+| `load_split()` | `TrainValSplit` (`X_train`, `X_val`, `y_train`, `y_val`) | Der gemeinsame 70/30-Holdout |
+| `load_folds()` | `list[Fold]` (`train`, `val` = Zeilenpositionen in `X_train`) | Cross-Validation fürs Tuning |
+| `load_dataset()` | `Dataset` (`X`, `y`) | Alle bereinigten Trainingsdaten, z. B. für die EDA |
+| `build_preprocessor(config)` | sklearn-`ColumnTransformer` | Standard-Vorverarbeitung, siehe unten |
+| `evaluate(y_true, y_pred, valid)` | `Metrics` | Alle Bewertungsmetriken auf einmal |
+| `scorer(metric)` | sklearn-Scorer | `scoring=` in `GridSearchCV`/`cross_validate` |
+| `valid_combinations(y)` | `frozenset[CropStage]` | Welche Crop/Stage-Paare es gibt |
+| `balanced_sample_weight(y)` | Gewichte je Zeile | Ungleichgewicht bei Modellen ohne `class_weight` |
+
+## Datenaufbereitung (`make data`)
+
+| Schritt | Was | Warum |
+| --- | --- | --- |
+| Laden | CSV lesen, pandera-Schema prüfen | Formatfehler sofort sehen |
+| Duplikate | 2 exakt doppelte Zeilen entfernen | Sonst kann dieselbe Messung in Train **und** Validierung landen |
+| Split | 70/30, stratifiziert auf Crop+Stage, `SEED` | Vorgabe M1; alle vergleichen auf denselben Daten |
+| CV-Folds | 5 stratifizierte Folds im Train-Teil | Tuning ohne den Holdout anzufassen |
 
 ### Warum stratifiziert?
 
 Ein zufälliger Split kann seltene Klassen ungleich verteilen: Von den 11 Zeilen `cotton|Harvest`
 könnten zufällig alle im Training landen – dann lässt sich diese Klasse gar nicht bewerten, und
 die Balanced Accuracy schwankt je nach Zufall stark. **Stratifiziert** heißt: Der Split behält den
-Anteil jeder Klasse in beiden Teilen bei (hier je Crop/Stage-Paar, 70 % / 30 %). Weil
-`train_test_split` und `StratifiedKFold` dafür nur *eine* Klasse pro Zeile akzeptieren, bilden wir
-dafür den Schlüssel `Crop|Stage` (`combined_label`).
+Anteil jeder Klasse in beiden Teilen bei (hier je Crop/Stage-Paar). Weil `train_test_split` und
+`StratifiedKFold` dafür nur *eine* Klasse pro Zeile akzeptieren, bilden wir dafür den Schlüssel
+`Crop|Stage` (`combined_label`). Die Anteile in Train und Validierung weichen dadurch um höchstens
+0,05 Prozentpunkte voneinander ab.
 
-## Zwei Ziele vorhersagen
+## Vorverarbeitung (`build_preprocessor`)
 
-`run()` erwartet ein Modell, das Crop **und** Stage liefert:
-
-| Variante | Wie | Hinweis |
+| Option in `PreprocessingConfig` | Standard | Wirkung |
 | --- | --- | --- |
-| Multi-Output | Modell direkt, z. B. `RandomForestClassifier` (kann nativ mehrere Ziele) oder `MultiOutputClassifier(...)` | Kann unmögliche Kombinationen vorhersagen |
-| Kombiniertes Label | `CombinedLabelClassifier(modell)` – trainiert auf `Crop|Stage` | Sagt nur Kombinationen aus dem Training vorher |
+| `use_meta` | `True` | `AEZ` One-Hot und `Month` als Features neben dem Spektrum |
+| `scale` | `False` | Standardisierung – für SVM, logistische Regression, MLP; bei Baum-Modellen unnötig |
 
-!!! warning "Werkzeug, keine Entscheidung"
-    Beide Varianten sind nur Bausteine, damit jeder Ansatz über dieselbe Schnittstelle läuft.
-    Welcher Ansatz fachlich sinnvoll ist, wird in [Ansätze](../modelle/ansaetze.md) recherchiert
-    und begründet. Das kombinierte Label modelliert die gemeinsame Verteilung von Kultur und
-    Stadium als 23 unabhängige Klassen: Es nutzt nicht, dass das Stadium von der Kultur abhängt,
-    und teilt kein Wissen zwischen z. B. `corn|Late` und `soybean|Late`.
+Die Konfiguration ist ein pydantic-Modell: Tippfehler im Feldnamen oder `scale="yes"` statt
+`scale=True` führen sofort zu einem Fehler. Neue Schritte bekommen ein Feld hier und einen
+Transformer in `awp2.preprocessing`.
 
-Die Kennzahl `invalid_combinations` zeigt den Anteil unmöglicher Vorhersagen; `run()` warnt,
-wenn er über 0 liegt. Weitere Ansätze
-(hierarchisch, Multi-Task): [Ansätze](../modelle/ansaetze.md).
+| Schritt | Was | Warum |
+| --- | --- | --- |
+| `DropEmptyBands` | 67 Bänder ohne jeden Wert entfernen → 131 Bänder | Keine Information (Wasserabsorption/Randbänder, siehe [EDA](eda.md)) |
+| `InterpolateBands` | Fehlende Werte je Spektrum füllen: zwischen zwei Bändern linear nach Wellenlänge, am Rand mit dem nächsten gemessenen Band, ohne jeden Wert mit dem Trainings-Median | Nachbarbänder sind stark korreliert, Spektren unterschiedlich hell; 43 Zeilen train und **11 Zeilen test** betroffen – muss auch bei der Vorhersage greifen |
+| Metadaten | `AEZ` One-Hot, `Month` numerisch | Laut Aufgabe erlaubt; abschaltbar, um den Nutzen zu messen |
+| Skalierung | StandardScaler | Nur wenn `scale=True` |
 
-## Klassenungleichgewicht
+## Bewertung (`evaluate`)
 
-- Modelle mit `class_weight` (Random Forest, logistische Regression, SVM): `class_weight="balanced"`.
-- Modelle ohne (XGBoost, HistGradientBoosting, MLP): `RunConfig(..., balance_samples=True)` übergibt
-  ausgeglichene `sample_weight` je Crop+Stage-Kombination.
+`evaluate()` liefert ein `Metrics`-Objekt mit allen Metriken der Bewertung als Feldern:
+`bacc_crop`, `bacc_stage`, `bacc_combined`, `f1_macro_crop`, `f1_macro_stage`,
+`f1_macro_combined`, `f1_samples` und – wenn die gültigen Paare übergeben werden –
+`invalid_combinations` (Anteil vorhergesagter Crop/Stage-Paare, die es nicht gibt).
+Formeln: [Bewertung & Abgabe](../projekt/bewertung.md).
 
 ## Tuning & Cross-Validation
 
@@ -103,35 +135,35 @@ wenn er über 0 liegt. Weitere Ansätze
     **nur auf dem Train-Teil**.
 
 ```python
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
-from awp2.data import cv_splits, load_train, prepare_dataset, train_val_split
-from awp2.evaluation import scorer
-from awp2.experiment import CombinedLabelClassifier
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
-X, y = prepare_dataset(load_train())
-X_train, X_val, y_train, y_val = train_val_split(X, y)
-pipeline = Pipeline([
-    ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
-    ("model", CombinedLabelClassifier(LogisticRegression(max_iter=2000))),
-])
-search = GridSearchCV(pipeline, {"model__estimator__C": [0.1, 1, 10]},
-                      scoring=scorer("bacc_combined"), cv=list(cv_splits(X_train, y_train)))
-search.fit(X_train, y_train)
-search.best_params_
+from awp2.data import load_folds, load_split
+from awp2.evaluation import scorer
+from awp2.preprocessing import build_preprocessor
+
+split = load_split()
+model = Pipeline([("preprocess", build_preprocessor()), ("model", RandomForestClassifier())])
+search = GridSearchCV(model, {"model__max_depth": [10, None]},
+                      scoring=scorer("bacc_combined"), cv=load_folds())
+search.fit(split.X_train, split.y_train)
 ```
 
 `scoring=scorer(...)` ist nötig, weil sklearns Standard-Score nicht mit zwei Zielspalten umgehen
-kann. Findet die EDA Gruppen zusammengehöriger Spektren (z. B. dasselbe Feld), `groups=` an
-`cv_splits` übergeben → jede Gruppe bleibt in einem Fold.
+kann. Das Modell im Beispiel ist nur ein Platzhalter.
+
+## Klassenungleichgewicht
+
+- Modelle mit `class_weight` (Random Forest, logistische Regression, SVM): `class_weight="balanced"`.
+- Modelle ohne (XGBoost, HistGradientBoosting, MLP): `sample_weight=balanced_sample_weight(y_train)`
+  an `fit` übergeben – gewichtet je Crop/Stage-Paar.
 
 ## Offen – kommt nach der EDA (#20, #30)
 
 - Glättung der Spektren (z. B. Savitzky-Golay)
 - Umgang mit Ausreißern
 - Bandauswahl, Vegetationsindizes als Features
-- Split-Strategie, falls räumliche Cluster gefunden werden
+- Split-Strategie, falls räumliche Cluster gefunden werden (dann Gruppen in `cv_splits`)
 - 2 Spektren in `test.csv` sind identisch mit Trainingszeilen – für die EDA (#15) notiert
 - `Month` ist zyklisch; ggf. als sin/cos kodieren und den Nutzen der Metadaten messen

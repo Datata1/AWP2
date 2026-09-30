@@ -76,15 +76,6 @@ def combined_label(y: pd.DataFrame) -> pd.Series:
     return y[CROP_COL].astype(str) + LABEL_SEP + y[STAGE_COL].astype(str)
 
 
-def split_combined_label(
-    labels: pd.Series | np.ndarray, index: pd.Index | None = None
-) -> pd.DataFrame:
-    """Inverse of :func:`combined_label`: back to the columns ``Crop`` and ``Stage``."""
-    parts = pd.Series(labels, index=index).str.split(LABEL_SEP, n=1, expand=True)
-    parts.columns = list(TARGET_COLS)
-    return parts
-
-
 def valid_combinations(y: pd.DataFrame) -> frozenset[CropStage]:
     """All crop/stage pairs that occur in ``y``."""
     pairs = y[[CROP_COL, STAGE_COL]].drop_duplicates().itertuples(index=False)

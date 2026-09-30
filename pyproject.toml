@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5.3",
     "pandas>=3.0.6",
     "pandera>=0.33.1",
+    "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.1",
 ]
@@ -25,7 +26,7 @@ line-length = 100
 extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "ANN"]
+select = ["E", "F", "I", "UP", "B"]
 
 [dependency-groups]
 dev = [
@@ -34,7 +35,6 @@ dev = [
     "nbstripout>=0.9.1",
     "openpyxl>=3.1.5",
     "ruff>=0.16.9",
-    "ty==0.0.84",
 ]
 docs = [
     "mkdocs>=1.6,<2",

@@ -18,8 +18,12 @@ FIGURE_DPI = 150
 
 TRAIN_FILE = RAW_DATA_DIR / "train.csv"
 TEST_FILE = RAW_DATA_DIR / "test.csv"
+CLEAN_TRAIN_FILE = INTERIM_DATA_DIR / "train_clean.parquet"
+SPLIT_FILE = PROCESSED_DATA_DIR / "split.csv"
 
 ID_COL = "id"
+SUBSET_COL = "subset"
+FOLD_COL = "cv_fold"
 CROP_COL = "Crop"
 STAGE_COL = "Stage"
 AEZ_COL = "AEZ"
@@ -36,10 +40,11 @@ Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
 CROPS: tuple[str, ...] = get_args(Crop)
 STAGES: tuple[str, ...] = get_args(Stage)
+Subset = Literal["train", "val"]
+TRAIN_SUBSET, VAL_SUBSET = get_args(Subset)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
 VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
-RUN_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: usable as file/run id
