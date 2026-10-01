@@ -87,5 +87,17 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 ## Machine Learning & Metriken
 
 !!! todo
-    - scikit-learn-Doku zu Metriken, Literatur zu hierarchischer Klassifikation und
-      räumlicher Kreuzvalidierung
+    - Literatur zu hierarchischer Klassifikation und räumlicher Kreuzvalidierung
+
+- scikit-learn Developers (2026a): *Metrics and scoring: quantifying the quality of
+    predictions*. scikit-learn User Guide.
+    https://scikit-learn.org/stable/modules/model_evaluation.html. - Confusion Matrix,
+    Precision, Recall, F1, Mittelungen und Balanced Accuracy.
+
+- scikit-learn Developers (2026b): *Cross-validation: evaluating estimator performance*.
+    scikit-learn User Guide. https://scikit-learn.org/stable/modules/cross_validation.html.
+    - Train-/Validierungsaufteilung, stratifizierte und gruppierte Cross-Validation.
+
+- scikit-learn Developers (2026c): *Pipelines and composite estimators*. scikit-learn User
+    Guide. https://scikit-learn.org/stable/modules/compose.html. - Pipelines als Schutz vor
+    Leakage bei Vorverarbeitung und Parameterwahl.
