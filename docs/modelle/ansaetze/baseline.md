@@ -29,6 +29,22 @@ Vorverarbeitung mit AEZ/Month. Per `tune()` gesucht (8 Kandidaten, Lauf `rf_sear
 beste Einstellung `max_depth=20`, `max_features=0.3`, `min_samples_leaf=1` – CV-Score
 0.750 ± 0.019, Validierung 0.743.
 
+#### EDA-Merkmalsablage
+
+Notebook: `notebooks/02_duac1011_eda-baseline.ipynb`. Dieselbe Random-Forest-Architektur
+verglich drei durch die EDA motivierte Eingabevarianten; die Auswahl erfolgte nur per CV.
+
+![Tuning der EDA-Merkmalsablage](../img/spectral_baseline_tuning.png)
+
+- Rohspektren allein erreichen 0.570, Rohspektren mit den vier Indizes 0.590 und Spektren mit
+  AEZ/Month 0.750 kombinierte BAcc in der CV.
+- Die Kontextvariante gewinnt damit klar, reproduziert aber inhaltlich die bestehende
+  Random-Forest-Baseline statt sie zu verbessern.
+- Der einmalige Holdout-Lauf `rf_eda_baseline` (MLflow `6c2a119c`, Tuning `7834b168`) erreicht
+  BAcc 0.890 für Crop, 0.870 für Stage und 0.743 kombiniert.
+- 0,3 % der Vorhersagen bilden ungültige Crop/Stage-Paare. Der unbeschränkte Random Forest
+  bleibt daher eine Diagnose- und Referenzvariante, keine abgabefertige Vorhersage.
+
 #### Mehr Bänder pro Entscheidung helfen – und die CV schätzt ehrlich
 
 ![Tuning-Kandidaten](../img/baseline_tuning.png)
