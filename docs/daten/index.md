@@ -10,18 +10,22 @@ train = load_train()  # validiert per pandera-Schema, Index = id
 
 ## Quelle
 
-Hyperspektral-Signaturen landwirtschaftlicher Kulturpflanzen, aufgenommen vom
-**EO-1 Hyperion**-Sensor (NASA, außer Betrieb seit 2017):
+!!! info "Herkunft der Challenge-Dateien"
+  Die Labels, sieben AEZ, EO-1-Hyperion-Daten und die Gesamtzahl von knapp 7.000
+  Spektren stimmen mit **GHISACONUS V001** (*Global Hyperspectral Imaging
+  Spectral-library of Agricultural crops for Conterminous United States*) überein.
+  Die Challenge-Dateien sind daher mit hoher Sicherheit ein abgeleiteter Export dieses
+  Datensatzes.[^1][^2]
 
 - 220 Bänder im Bereich 0,4–2,5 µm (VNIR bis SWIR), ca. 10 nm spektrale Auflösung
 - 30 m räumliche Auflösung, 16-Tage-Wiederholzyklus
-- Harmonisierter Datensatz aus weltweiten Quellen, verschiedene agroökologische Zonen (AEZ)
+- 99 Hyperion-Bilder aus den Jahren 2008–2015, sieben AEZ der zusammenhängenden USA
+- Die fünf Kulturarten und sechs Stadien stimmen mit GHISACONUS überein.
 
 !!! info "Hinweis aus den Kickoff-Folien"
-  Die Karte auf Folie 7 ordnet das Untersuchungsgebiet Nordamerika zu. Die Folie erklärt,
-  dass AEZ Gebiete mit ähnlichem Klima, Böden und Vegetationsperiode gruppieren.[^1] Ob die
-  Angabe „weltweite Quellen" die Herkunft der gesamten Bibliothek oder auch der hier
-  verwendeten Beobachtungen beschreibt, bleibt bis zur Klärung der Originalquelle offen.
+  Die Karte auf Folie 7 ordnet das Untersuchungsgebiet Nordamerika zu. Das passt zum
+  offiziellen GHISACONUS-Produkt für die zusammenhängenden USA. Die Folie erklärt, dass
+  AEZ Gebiete mit ähnlichem Klima, Böden und Vegetationsperiode gruppieren.[^3]
 
 ## Datengrundlage
 Für die Aufgabe liegen hyperspektrale Beobachtungen landwirtschaftlicher Flächen vor, die dem Sensor EO-1 Hyperion zugeordnet sind. Der Trainingsdatensatz enthält 5.591 Zeilen, der Testdatensatz 1.397 Zeilen. Jede Zeile enthält eine Beobachtung mit einer spektralen Reflexionskurve sowie Kontextinformationen zur agroökologischen Zone (AEZ) und zum Aufnahmemonat (Month).
@@ -32,19 +36,20 @@ Im Trainingsdatensatz sind zusätzlich die Zielvariablen `Crop` und `Stage` enth
 
 ## Herkunft & AEZ
 
-!!! todo "Leitfragen"
-    - Stammt der Datensatz aus der USGS **GHISA** (Global Hyperspectral Imaging Spectral-library
-      of Agricultural crops, Thenkabail / Aneece)? Originalpublikation finden und lesen.
-    - Was ist eine Zeile: ein einzelnes Pixel, ein gemitteltes Feldspektrum? Aus welchen Jahren
-      und Regionen stammen die Aufnahmen?
-    - Welche Vorverarbeitung haben die Autor:innen schon gemacht (atmosphärische Korrektur,
-      Bandauswahl, Glättung)?
-    - Wie definiert die Quelle die Stadien-Labels? (→ [Kulturpflanzen](../domaene/kulturpflanzen.md))
-    - **AEZ:** Welche Einteilung wird verwendet (FAO/GAEZ, USGS)? Was bedeuten die Zonen
-      2 und 5–10 (Klima, Region)? Warum könnte die AEZ bei der Klassifikation helfen?
-    - Bekannte Schwächen oder Einschränkungen laut Quelle?
+Das veröffentlichte GHISACONUS enthält rund 7.000 Spektren einzelner 30-m-Pixel inklusive
+Koordinaten, Bildinformationen, AEZ, Kulturart und Entwicklungsstadium. Die Challenge-Dateien
+enthalten zusammen 6.988 Zeilen, aber keine Koordinaten oder Bildinformationen. Damit ist die
+Herkunft gut belegt, während die genaue Auswahl der Zeilen und die Umformung auf 198
+Bandspalten ohne die Erstellungsdokumentation der Challenge offen bleiben.
 
-  [^1]: Domänenprojekt 2 (2026), siehe [Quellen](../domaene/quellen.md).
+Die sechs Stage-Labels entsprechen den GHISACONUS-Gruppen von sehr früher Vegetation bis zur
+Ernte. Die sieben beobachteten AEZ-Codes in den Challenge-Dateien passen zur Anzahl der Zonen
+im Originalprodukt. Die Bedeutung der einzelnen Codes und die genaue Vorverarbeitung vor dem
+Challenge-Export sind weiterhin zu klären.
+
+[^1]: Thenkabail & Aneece (2019), siehe [Quellen](../domaene/quellen.md).
+[^2]: Aneece & Thenkabail (2018), siehe [Quellen](../domaene/quellen.md).
+[^3]: Domänenprojekt 2 (2026), siehe [Quellen](../domaene/quellen.md).
 
 ## Dateien in `data/raw/`
 
