@@ -54,52 +54,79 @@ Abgabeformat; sie sind nicht mit einer Analyse von `train.csv` oder `test.csv` b
 
 ## Zusammenfassung
 
-!!! todo "#20 – Synthese & Cleaning-Empfehlung"
-    - Die wichtigsten Befunde in 5–10 Stichpunkten, fachlich eingeordnet (→ [Domäne](../domaene/index.md))
-    - Textbaustein „Data Understanding" für den M1-Kurzreport
+!!! info "Data Understanding"
+    - Train enthält 5.591 und Test 1.397 Beobachtungen mit jeweils 198 Bandspalten. Von diesen Bändern sind in beiden Dateien 67 vollständig leer; 131 enthalten mindestens eine Messung.
+    - Die Labels sind unausgewogen: `rice` hat 93 Beobachtungen, `Harvest` 180 und das seltenste beobachtete Crop-Stage-Paar `cotton|Harvest` 11.
+    - `AEZ` und `Month` sind mit den Labels assoziiert. Sie können hilfreichen Kontext liefern, aber auch Shortcut-Lernen fördern.
+    - Die mittleren Spektren unterscheiden sich nach Kultur und teils nach Stadium innerhalb einer Kultur. Die Gruppen überlappen jedoch sichtbar.
+    - Verfügbare Nachbarbänder sind stark redundant; eine PCA mit zwei Komponenten erklärt bereits mehr als 90 % der spektralen Varianz.
+    - Das Ausreißer-Screening und die Near-Duplicate-Analyse zeigen Prüf-Kandidaten, aber keinen gesicherten Messfehler und keine belegte Feldzugehörigkeit.
+
+Diese Befunde beschreiben nur die vorliegende Stichprobe. Sie sind kein Leistungsnachweis für ein Modell und ersetzen keine Validierung mit Balanced Accuracy und Macro-F1.
 
 ## Datenqualität
 
-!!! todo "#15"
-    - Fehlende Werte je Band (Muster, train vs. test), Zeilen mit einzelnen NaNs
-    - Exakte und Beinahe-Duplikate, Wertebereiche, Verteilungen je Band
-    - Vergleich train vs. test (AEZ, Month, Spektren)
+- In Train und Test sind jeweils 67 von 198 Bändern vollständig leer; damit bleiben 131 Bänder mit mindestens einer Messung.
+- Zusätzlich fehlen in Train Werte in sechs und in Test in drei verfügbaren Bändern. Das betrifft 44 von 5.591 Trainings- und 11 von 1.397 Testzeilen.
+- Die verfügbaren Bänder sind nicht konstant. Die gemessenen Reflektanzen liegen in beiden Dateien im positiven Bereich von etwa 0,25 % bis 93,53 %.
+- Zwei Gruppen mit jeweils zwei Trainingszeilen haben exakt gleiche Eingaben einschließlich `AEZ` und `Month`. Zwischen Train und Test findet das Notebook weder identische vollständige Eingaben noch identische Spektren.
+- Die Ursache der leeren Bänder bleibt ohne technische Metadaten offen. Sie darf nicht allein aus der Lage auf der Spektralachse abgeleitet werden.
+
+![Fehlende Werte pro Band in Train und Test](img/fehlende_werte_baender.png)
+
+!!! warning "Abgleich erforderlich"
+    Die Pipeline-Dokumentation enthält einen abweichenden Hinweis zu Train-Test-Duplikaten. Vor einer endgültigen Cleaning-Entscheidung muss dieser mit dem reproduzierbaren Nullbefund des Notebooks abgeglichen werden.
 
 ## Labels & Metadaten
 
-!!! todo "#16"
-    - Verteilung Crop und Stage, Kreuztabelle Crop × Stage
-    - AEZ × Crop, Month × Stage je Kultur
-    - Folgerungen für Stratifizierung und Klassenungleichgewicht
+- `corn` (2.097 Zeilen) und `soybean` (1.669) dominieren die Crop-Labels; `rice` ist mit 93 Zeilen die seltenste Kultur.
+- `Harvest` ist mit 180 Zeilen das seltenste Stadium. Das kleinste beobachtete Crop-Stage-Paar ist `cotton|Harvest` mit 11 Zeilen; mehrere Paare kommen in der Trainingsstichprobe nicht vor.
+- Train und Test enthalten dieselben sieben AEZ-Werte und dieselben Monate 5 bis 10. Die Häufigkeiten unterscheiden sich, die Kategorien überlappen aber vollständig.
+- Crop-Anteile unterscheiden sich deutlich zwischen AEZ. Innerhalb einzelner Kulturen konzentrieren sich Stage-Labels auf wenige Monate; bei Mais besteht Monat 8 in Train ausschließlich aus `Critical`.
+- Für spätere Splits ist daher die Stratifizierung nach `Crop|Stage` erforderlich. Seltene Paare begrenzen die Verlässlichkeit der Validierung; Balanced Accuracy und Macro-F1 sind wichtiger als eine ungewichtete Accuracy.
+
+![Häufigkeiten von Crop und Stage](img/klassenverteilungen.png)
+
+![Stage-Häufigkeiten nach Monat innerhalb jeder Kultur](img/stadien_monat_crop.png)
 
 ## Spektrale Signaturen je Klasse
 
-!!! todo "#17"
-    - Mittlere Spektren je Kultur, je Stadium innerhalb jeder Kultur, je AEZ
-    - Trennkraft je Band (z. B. ANOVA-F), Bereiche mit den größten Unterschieden
+- Die mittleren Spektren unterscheiden sich zwischen den Kulturen in mehreren Bereichen der Spektralachse. Auch innerhalb von Mais und Soja liegen mittlere Stadien-Spektren im NIR und SWIR auseinander.
+- Die Streuungsbereiche überlappen teilweise deutlich. Eine Klasse kann deshalb nicht aus einem einzelnen Band oder einer einzelnen Kurve abgeleitet werden.
+- Die sieben AEZ haben unterschiedliche mittlere Spektren, besonders im NIR und SWIR. Da sich zugleich ihre Crop-Anteile unterscheiden, ist dies kein Nachweis eines eigenständigen Klima- oder Bodeneffekts.
+- Die Mediane von NDVI, NDRE und NDWI unterscheiden sich zwischen Kulturen und Stadien; PRI trennt die Gruppen weniger klar. Die Indizes bleiben Kandidaten für einen späteren Pipeline-Vergleich.
+
+![Mittlere Spektren nach Kultur](img/spektren_nach_kultur.png)
+
+![Mittlere Stadien-Spektren innerhalb jeder Kultur](img/stadien_spektren_crop.png)
 
 ## Korrelation & Dimensionalität
 
-!!! todo "#18"
-    - Korrelationsmatrix der Bänder
-    - PCA: erklärte Varianz, 2D-Projektion nach Crop/Stage
-    - Hinweise für die Bandreduktion (M3)
+- Benachbarte verfügbare Bänder sind meist nahezu perfekt korreliert (Median: 0,999). Niedrigere Werte entstehen hauptsächlich an größeren Lücken der Spektralachse.
+- Die größten univariaten Crop-Unterschiede liegen im sichtbaren Bereich um 600 bis 700 nm. Für Stage liegen die größten F-Werte am Übergang zum NIR um 760 bis 875 nm sowie im SWIR.
+- Nach Standardisierung erklären bereits zwei Hauptkomponenten mehr als 90 % der spektralen Varianz. In der zweidimensionalen Projektion überlappen Crop- und Stage-Gruppen jedoch sichtbar.
+- Diese Ergebnisse begründen Varianten mit PCA oder Bandauswahl, aber keine Auswahl außerhalb einer Pipeline: PCA und jede Auswahl müssen ausschließlich auf dem jeweiligen Trainingsanteil gelernt werden.
+
+![Erklärte Varianz und zweidimensionale PCA-Projektionen](img/pca_projektion.png)
 
 ## Ausreißer & Auffälligkeiten
 
-!!! todo "#19"
-    - Auffällige Spektren je Klasse, Spitzen/Sprünge, verrauschte Bänder
-    - Überlappung X912–X925
-    - Gruppen fast identischer Spektren (gleiches Feld?) als Leakage-Risiko
+- Das Sprung-Screening markiert einzelne Spektren mit großen lokalen Änderungen, besonders bei Bandpaaren um 1.000 bis 1.700 nm. Die Kandidaten weichen vom mittleren Verlauf ab, belegen aber keinen Messfehler.
+- `X912`, `X915` und `X923` sind in Train und Test vollständig belegt. Von `X925` bis `X973` fehlen sechs aufeinanderfolgende Bänder in beiden Dateien vollständig. Bis `X923` zeigt sich kein sichtbarer Einzelbandsprung in den mittleren Crop-Kurven.
+- Nach Ausschluss exakter Duplikate liegen die ähnlichsten Spektralpaare bei standardisierten Distanzen von etwa 0,54 bis 0,64. Die Verteilung ist kontinuierlich und liefert keinen natürlichen Schwellenwert für dieselbe Fläche.
+- Ohne Koordinaten, Feld-IDs oder Bild-IDs belegen ähnliche Spektren weder eine Feldwiederholung noch eine räumliche Nähe.
+
+![Spektren und fehlende Werte in der Region um 900 nm](img/spektren_900nm.png)
 
 ## Cleaning-Empfehlungen
 
-!!! todo "#20"
-    | Thema | Befund | Empfehlung | Begründung |
-    | --- | --- | --- | --- |
-    | Leere Bänder | | | |
-    | Einzelne NaNs | | | |
-    | Duplikate | | | |
-    | Ausreißer | | | |
-    | Glättung / Rauschen | | | |
-    | Split-Strategie | | | |
+| Thema | Befund | Empfehlung | Begründung |
+| --- | --- | --- | --- |
+| Leere Bänder | 67 Bänder sind in Train und Test vollständig leer. | Im jeweiligen Trainingsanteil entfernen. | Vollständig leere Bänder enthalten keine Messinformation. |
+| Einzelne NaNs | Sechs verfügbare Bänder in Train und drei in Test haben einzelne Lücken. | Nach Entfernen leerer Bänder je Spektrum entlang der Wellenlänge interpolieren; vollständig leere Spektren nur mit einem im Training gelernten Median behandeln. | Benachbarte Bänder sind stark korreliert; der Verlauf desselben Spektrums nutzt lokale Information. |
+| Duplikate | Zwei Paare von Trainingszeilen sind exakt gleich. | Vor dem gemeinsamen Split entfernen; den abweichenden Train-Test-Hinweis in der Pipeline-Dokumentation prüfen. | Exakte Wiederholungen können einen zufälligen Split optimistisch machen. |
+| Ausreißer | Sprung-Screening und Near-Duplicates liefern Kandidaten, aber keinen belegten Messfehler. | Keine automatische Zeilenentfernung. Eine spätere Regel nur im Trainingsanteil festlegen und gegen die Variante ohne Entfernung validieren. | Die EDA liefert keinen fachlich begründeten Schwellenwert. |
+| Glättung / Rauschen | Es gibt keinen EDA-Beleg für eine pauschale Glättung. | Keine Standardglättung; Savitzky-Golay nur als vorab festgelegte Pipeline-Variante vergleichen. | Glättung kann Rauschen reduzieren, aber schmale relevante Strukturen verwischen. |
+| Split-Strategie | Labels und Crop-Stage-Paare sind unausgewogen; räumliche Gruppen sind nicht verfügbar. | Nach `Crop|Stage` stratifizieren; Balanced Accuracy und Macro-F1 für Crop und Stage berichten. | Seltene Paare sollen in Training und Validierung vertreten bleiben. Eine räumliche Gruppenvalidierung ist ohne Feld- oder Bild-IDs nicht ableitbar. |
+
+Alle lernbaren Schritte gehören in eine sklearn-`Pipeline` und werden pro Trainingsfold angepasst. `AEZ`, `Month`, Indizes, PCA und eine mögliche Bandauswahl werden jeweils als getrennte Varianten mit und ohne Metadaten verglichen.
