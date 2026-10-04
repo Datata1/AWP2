@@ -112,7 +112,9 @@ PR = `Closes #nr` + 1–4 Stichpunkte. Labels: ein Typ (`feat`, `exp`, `data`, `
 - Reihenfolge und Titel steuert die `.nav.yml` im jeweiligen Ordner; nicht aufgeführte Seiten
   landen an der Stelle von `"*"`.
 - Quellen als Fußnote: `Text[^1]` und am Seitenende `[^1]: Autor (Jahr): Titel.`
-- Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern (siehe [EDA](../daten/eda.md)).
+- Plots für die Doku mit `awp2.plots.save_doc_figure()` speichern – Daten/EDA nach `docs/daten/img/`,
+  Modellergebnisse mit `MODEL_DOCS_FIGURES_DIR` nach `docs/modelle/img/` – und direkt beim
+  zugehörigen Befund einbinden. In Notebooks steht unter jeder Erkenntnis der Plot, der sie belegt.
 - Diagramme als **Mermaid** (` ```mermaid `), bewusst einfach: meist `flowchart TD`, höchstens
   ~8 Knoten, kurze Beschriftungen. Wird es größer, lieber aufteilen oder als Tabelle darstellen.
 - Vorschau: `make docs` → <http://127.0.0.1:8000>

@@ -1,5 +1,6 @@
 """Standard evaluation for crop and growth-stage predictions (matches the grading metrics)."""
 
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
@@ -12,6 +13,11 @@ from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, f1_
 
 from awp2.config import CROP_COL, FIGURE_DPI, SCORE_DECIMALS, STAGE_COL, TARGET_COLS
 from awp2.data.split import CropStage, combined_label
+
+# Predicting a class that has no true sample (e.g. an impossible crop/stage pair) counts as an
+# error for the true class; sklearn only drops the empty class from the average and warns.
+# Such predictions are reported as ``invalid_combinations`` instead.
+_UNSEEN_PREDICTED_CLASS_WARNING = "y_pred contains classes not in y_true"
 
 Score = Annotated[float, Field(ge=0.0, le=1.0)]
 """A score between 0 and 1."""
@@ -48,6 +54,17 @@ MetricName = Literal[
     "f1_macro_combined",
     "f1_samples",
 ]
+
+METRIC_LABELS: dict[str, str] = {
+    "bacc_crop": "BAcc Kultur",
+    "bacc_stage": "BAcc Stadium",
+    "bacc_combined": "BAcc kombiniert",
+    "f1_macro_crop": "Macro-F1 Kultur",
+    "f1_macro_stage": "Macro-F1 Stadium",
+    "f1_macro_combined": "Macro-F1 kombiniert",
+    "f1_samples": "Samples-F1",
+}
+"""Readable (German) names of the metrics for plots and tables."""
 
 
 def as_target_frame(pred: pd.DataFrame | np.ndarray, index: pd.Index) -> pd.DataFrame:
@@ -126,7 +143,9 @@ def _rounded(value: float) -> float:
 
 
 def _bacc(y_true: pd.Series, y_pred: pd.Series) -> float:
-    return _rounded(balanced_accuracy_score(y_true, y_pred))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=_UNSEEN_PREDICTED_CLASS_WARNING)
+        return _rounded(balanced_accuracy_score(y_true, y_pred))
 
 
 def _f1_macro(y_true: pd.Series, y_pred: pd.Series) -> float:

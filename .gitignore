@@ -24,7 +24,11 @@ stundendoku/*
 
 # Claude Code (persönliche Einstellungen)
 CLAUDE.local.md
-.claude/settings.local.json
+.claude/settings.local.json*
+
+# MLflow (lokaler Tracking-Store)
+mlflow.db
+mlruns/
 
 # Docs-Build
 site/

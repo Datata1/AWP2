@@ -17,6 +17,19 @@ Hyperspektral-Signaturen landwirtschaftlicher Kulturpflanzen, aufgenommen vom
 - 30 m räumliche Auflösung, 16-Tage-Wiederholzyklus
 - Harmonisierter Datensatz aus weltweiten Quellen, verschiedene agroökologische Zonen (AEZ)
 
+!!! info "Hinweis aus den Kickoff-Folien"
+  Die Karte auf Folie 7 ordnet das Untersuchungsgebiet Nordamerika zu. Die Folie erklärt,
+  dass AEZ Gebiete mit ähnlichem Klima, Böden und Vegetationsperiode gruppieren.[^1] Ob die
+  Angabe „weltweite Quellen" die Herkunft der gesamten Bibliothek oder auch der hier
+  verwendeten Beobachtungen beschreibt, bleibt bis zur Klärung der Originalquelle offen.
+
+## Datengrundlage
+Für die Aufgabe liegen hyperspektrale Beobachtungen landwirtschaftlicher Flächen vor, die dem Sensor EO-1 Hyperion zugeordnet sind. Der Trainingsdatensatz enthält 5.591 Zeilen, der Testdatensatz 1.397 Zeilen. Jede Zeile enthält eine Beobachtung mit einer spektralen Reflexionskurve sowie Kontextinformationen zur agroökologischen Zone (AEZ) und zum Aufnahmemonat (Month).
+
+Das Spektrum besteht aus 198 geordneten Reflexionswerten (X427 bis X2395). Die Zahl im Spaltennamen bezeichnet die Wellenlänge in Nanometern. Damit beschreibt eine Zeile, wie stark die beobachtete Fläche Licht über den Wellenlängenbereich von ungefähr 427 bis 2.395 nm reflektiert.
+
+Im Trainingsdatensatz sind zusätzlich die Zielvariablen `Crop` und `Stage` enthalten. Crop umfasst die fünf Kulturarten Mais, Soja, Winterweizen, Baumwolle und Reis. Stage beschreibt sechs allgemeine Entwicklungsstadien. Der Testdatensatz enthält dieselben Eingabemerkmale, aber keine dieser Zielvariablen.
+
 ## Herkunft & AEZ
 
 !!! todo "Leitfragen"
@@ -30,6 +43,8 @@ Hyperspektral-Signaturen landwirtschaftlicher Kulturpflanzen, aufgenommen vom
     - **AEZ:** Welche Einteilung wird verwendet (FAO/GAEZ, USGS)? Was bedeuten die Zonen
       2 und 5–10 (Klima, Region)? Warum könnte die AEZ bei der Klassifikation helfen?
     - Bekannte Schwächen oder Einschränkungen laut Quelle?
+
+  [^1]: Domänenprojekt 2 (2026), siehe [Quellen](../domaene/quellen.md).
 
 ## Dateien in `data/raw/`
 

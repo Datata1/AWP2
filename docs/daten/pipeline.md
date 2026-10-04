@@ -2,7 +2,7 @@
 
 Die Pipeline liefert allen Ansätzen dieselben bereinigten Daten, denselben Split, dieselbe
 Vorverarbeitung und dieselben Metriken. Ein Modell enthält sie bewusst nicht – das baut jeder
-[Ansatz](../modelle/ansaetze.md) selbst. Warum sie so gebaut ist: [Warum so?](pipeline-entscheidungen.md) ·
+[Ansatz](../modelle/ansaetze/index.md) selbst. Warum sie so gebaut ist: [Warum so?](pipeline-entscheidungen.md) ·
 alle Funktionen im Detail: [API-Referenz](../referenz/data.md).
 
 ```mermaid
@@ -51,7 +51,7 @@ metrics.bacc_combined
 | --- | --- |
 | Daten und Split: [`load_split`][awp2.data.artifacts.load_split] | Das Modell und wie es Crop **und** Stage vorhersagt |
 | Vorverarbeitung: [`build_preprocessor`][awp2.preprocessing.build_preprocessor] | Zusätzliche Schritte → neues Feld in [`PreprocessingConfig`][awp2.preprocessing.PreprocessingConfig] |
-| Bewertung: [`evaluate`][awp2.evaluation.evaluate] → [`Metrics`][awp2.evaluation.Metrics] | Tuning, Begründung in [Ansätze](../modelle/ansaetze.md), Zeile im [Experiment-Log](../modelle/experimente.md) |
+| Bewertung: [`evaluate`][awp2.evaluation.evaluate] → [`Metrics`][awp2.evaluation.Metrics] | Tuning, Begründung in [Ansätze](../modelle/ansaetze/index.md), Zeile im [Experiment-Log](../modelle/experimente.md) |
 
 ## 3. Tunen
 
@@ -68,6 +68,8 @@ search = GridSearchCV(model, {"model__strategy": ["most_frequent", "stratified"]
                       scoring=scorer("bacc_combined"), cv=load_folds())
 search.fit(split.X_train, split.y_train)
 ```
+
+Modelle einheitlich ausführen und in MLflow vergleichen: [Experimente & MLflow](../entwicklung/tracking.md).
 
 `scoring=scorer(...)` ist nötig, weil sklearns Standard-Score keine zwei Zielspalten kennt.
 Für Modelle ohne `class_weight` gegen das Klassenungleichgewicht:

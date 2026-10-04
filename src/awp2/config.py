@@ -1,5 +1,6 @@
 """Central paths and constants – always import from here, never hardcode them."""
 
+import os
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -14,6 +15,7 @@ MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"  # scratch figures, not in git
 DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "daten" / "img"  # figures shown in the docs, in git
+MODEL_DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "modelle" / "img"  # model results, in git
 FIGURE_DPI = 150
 
 TRAIN_FILE = RAW_DATA_DIR / "train.csv"
@@ -48,3 +50,21 @@ SEED = 42
 VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+SLUG_PATTERN = (
+    r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: names of runs, approaches, experiments
+)
+
+# Local MLflow store, not in git; the env vars allow a shared server or a throwaway test store.
+MLFLOW_TRACKING_URI = os.environ.get(
+    "MLFLOW_TRACKING_URI", f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
+)
+MLFLOW_ARTIFACTS_DIR = Path(
+    os.environ.get("MLFLOW_ARTIFACTS_DIR", PROJECT_ROOT / "mlruns")
+).resolve()
+MLFLOW_EXPERIMENT = "crop-stage"  # main question: which approach predicts crop and stage best
+# Marks the experiment as classic ML so the MLflow UI opens the "Model training" view.
+MLFLOW_EXPERIMENT_KIND_TAG = ("mlflow.experimentKind", "custom_model_development")
+MLFLOW_SYSTEM_METRICS_INTERVAL_S = (
+    1  # our runs take seconds; MLflow's default of 10 s records nothing
+)
+MLFLOW_PARAM_MAX_CHARS = 250  # keeps logged parameter values short and readable in the UI

@@ -5,6 +5,8 @@ Codes. Wie die Bausteine zusammenspielen, erklären die Seiten unter [Daten](../
 
 | Modul | Inhalt |
 | --- | --- |
+| [`awp2.experiment`](experiment.md) | `run()` + `RunConfig`: Modell auf dem gemeinsamen Split ausführen und tracken |
+| [`awp2.tracking`](tracking.md) | Anbindung an MLflow (`log_run`) |
 | [`awp2.config`](config.md) | Pfade, Spaltennamen, Labels und alle Konstanten |
 | [`awp2.data`](data.md) | Artefakte laden (`load_split`, `load_folds`), Datensatz, Split, Rohdaten |
 | [`awp2.preprocessing`](preprocessing.md) | Vorverarbeitung als sklearn-Transformer, `PreprocessingConfig` |

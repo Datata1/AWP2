@@ -1,6 +1,7 @@
 nav:
   - index.md
-  - ansaetze.md
+  - ansatz-entwickeln.md
+  - Ansätze: ansaetze
   - experimente.md
   - glob: "*"
     ignore_no_matches: true

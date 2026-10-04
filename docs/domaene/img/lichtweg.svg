@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title description">
+  <title id="title">Lichtweg bei passiver optischer Fernerkundung</title>
+  <desc id="description">Die Sonne beleuchtet eine landwirtschaftliche Flaeche. Die Flaeche reflektiert einen Teil des Lichts. Ein kleiner Teil davon erreicht einen Satelliten.</desc>
+  <rect width="1200" height="440" fill="#f4faf7"/>
+  <rect y="280" width="1200" height="160" fill="#dcebd9"/>
+  <rect y="215" width="1200" height="65" fill="#cfe8ee" opacity="0.72"/>
+  <text x="600" y="250" text-anchor="middle" font-family="sans-serif" font-size="23" fill="#27505c">Atmosphaere</text>
+
+  <circle cx="125" cy="105" r="52" fill="#f6c344"/>
+  <g stroke="#f6c344" stroke-width="9" stroke-linecap="round">
+    <line x1="125" y1="28" x2="125" y2="8"/>
+    <line x1="125" y1="202" x2="125" y2="182"/>
+    <line x1="48" y1="105" x2="28" y2="105"/>
+    <line x1="222" y1="105" x2="202" y2="105"/>
+    <line x1="70" y1="50" x2="56" y2="36"/>
+    <line x1="180" y1="160" x2="194" y2="174"/>
+    <line x1="70" y1="160" x2="56" y2="174"/>
+    <line x1="180" y1="50" x2="194" y2="36"/>
+  </g>
+  <text x="125" y="112" text-anchor="middle" font-family="sans-serif" font-size="25" font-weight="700" fill="#5b4300">Sonne</text>
+
+  <line x1="196" y1="132" x2="505" y2="303" stroke="#e49b24" stroke-width="12" stroke-linecap="round"/>
+  <polygon points="505,303 470,296 484,270" fill="#e49b24"/>
+  <text x="342" y="192" text-anchor="middle" font-family="sans-serif" font-size="23" fill="#714800">Licht bei 427 nm</text>
+
+  <rect x="455" y="292" width="225" height="92" rx="5" fill="#6daa56"/>
+  <path d="M455 319 C495 287,535 340,575 304 S650 336,680 307 V292 H455 Z" fill="#4d8c42"/>
+  <path d="M485 384 V336 M530 384 V322 M575 384 V342 M620 384 V324 M665 384 V345" stroke="#937043" stroke-width="6"/>
+  <text x="567" y="420" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#315d2b">beobachtete Flaeche</text>
+
+  <line x1="680" y1="301" x2="950" y2="138" stroke="#3c84a2" stroke-width="10" stroke-linecap="round"/>
+  <polygon points="950,138 916,143 930,166" fill="#3c84a2"/>
+  <text x="810" y="204" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#1e5b77">reflektiertes Licht</text>
+  <text x="810" y="232" text-anchor="middle" font-family="sans-serif" font-size="19" fill="#1e5b77">nur ein kleiner Teil erreicht den Sensor</text>
+
+  <g transform="translate(955 70)">
+    <rect x="40" y="32" width="105" height="58" rx="8" fill="#637787"/>
+    <rect x="-42" y="42" width="80" height="39" fill="#3e87ad"/>
+    <rect x="147" y="42" width="80" height="39" fill="#3e87ad"/>
+    <rect x="78" y="0" width="28" height="31" fill="#8498a8"/>
+    <circle cx="94" cy="61" r="15" fill="#d8e5eb"/>
+  </g>
+  <text x="1095" y="199" text-anchor="middle" font-family="sans-serif" font-size="25" font-weight="700" fill="#334752">Satellit</text>
+</svg>
