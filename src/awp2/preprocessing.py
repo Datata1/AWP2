@@ -11,7 +11,20 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from awp2.config import AEZ_COL, BAND_PATTERN, BAND_PREFIX, MONTH_COL
+from awp2.config import (
+    AEZ_COL,
+    BAND_PATTERN,
+    BAND_PREFIX,
+    MONTH_COL,
+    NDRE_RED_EDGE_BAND,
+    NDVI_NIR_BAND,
+    NDVI_RED_BAND,
+    NDWI_SWIR_BAND,
+    PRI_FIRST_BAND,
+    PRI_SECOND_BAND,
+    VEGETATION_INDEX_BANDS,
+    VEGETATION_INDEX_NAMES,
+)
 from awp2.data import wavelengths
 
 
@@ -123,6 +136,56 @@ def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
     return filled.set_axis(spectra.columns, axis=1)
 
 
+class AddVegetationIndices(_BandTransformer):
+    """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the required bands and record output feature names.
+
+        Args:
+            X: Band columns after missing-value processing.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a required band is unavailable.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        missing_bands = sorted(set(VEGETATION_INDEX_BANDS) - set(X.columns))
+        if missing_bands:
+            raise ValueError(f"Vegetation indices require unavailable bands: {missing_bands}")
+        self.feature_names_out_ = [*X.columns, *VEGETATION_INDEX_NAMES]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Append the four index columns.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            The input bands plus the vegetation indices.
+        """
+        X = self._check(X)
+        indices = pd.DataFrame(
+            {
+                "NDVI": (X[NDVI_NIR_BAND] - X[NDVI_RED_BAND])
+                / (X[NDVI_NIR_BAND] + X[NDVI_RED_BAND]),
+                "NDRE": (X[NDVI_NIR_BAND] - X[NDRE_RED_EDGE_BAND])
+                / (X[NDVI_NIR_BAND] + X[NDRE_RED_EDGE_BAND]),
+                "PRI": (X[PRI_FIRST_BAND] - X[PRI_SECOND_BAND])
+                / (X[PRI_FIRST_BAND] + X[PRI_SECOND_BAND]),
+                "NDWI": (X[NDVI_NIR_BAND] - X[NDWI_SWIR_BAND])
+                / (X[NDVI_NIR_BAND] + X[NDWI_SWIR_BAND]),
+            },
+            index=X.index,
+        )
+        return pd.concat([X, indices], axis=1)
+
+
 class PreprocessingConfig(BaseModel):
     """Options of the standard preprocessing.
 
@@ -139,6 +202,10 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Standardise spectra and month – on for SVM, logistic regression, MLP; "
         "off for tree ensembles.",
+    )
+    use_vegetation_indices: bool = Field(
+        default=False,
+        description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
     )
 
 
@@ -167,6 +234,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands()),
     ]
+    if config.use_vegetation_indices:
+        spectra.append(("vegetation_indices", AddVegetationIndices()))
     if config.scale:
         spectra.append(("scale", StandardScaler()))
 

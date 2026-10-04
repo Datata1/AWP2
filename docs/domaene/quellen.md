@@ -5,9 +5,17 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 
 ## Datensatz & Sensor
 
-!!! todo
-    - Originalpublikation des Datensatzes (vermutlich USGS GHISA, Thenkabail / Aneece)
-    - Offizielle Beschreibung EO-1 Hyperion (USGS / NASA)
+- Aneece, I. & Thenkabail, P. (2018): *Accuracies Achieved in Classifying Five Leading
+    World Crop Types and their Growth Stages Using Optimal Earth Observing-1 Hyperion
+    Hyperspectral Narrowbands on Google Earth Engine*. Remote Sensing, 10(12), 2027.
+    https://doi.org/10.3390/rs10122027. - Wissenschaftliche Erstbeschreibung der
+    GHISACONUS-Grundlage: fünf Kulturarten, sechs Entwicklungsstadien, sieben AEZ sowie
+    99 EO-1-Hyperion-Bilder aus den Jahren 2008–2015.
+
+- Thenkabail, P. & Aneece, I. (2019): *Global Hyperspectral Imaging Spectral-library of
+    Agricultural crops for Conterminous United States V001* [Datensatz]. NASA Land Processes
+    Distributed Active Archive Center. https://doi.org/10.5067/COMMUNITY/GHISA/GHISACONUS.001.
+    - Offizieller Datensatz-Release und empfohlene Zitation für GHISACONUS V001.
 
 - Domänenprojekt 2 (2026): *Domaeneprojekt Kickoff Teil Aufgabenbeschreibung*, Folie 7.
     Lokales Projektmaterial unter `data/assets/`. - Karte zum Untersuchungsgebiet Nordamerika

@@ -37,3 +37,6 @@ site/
 .DS_Store
 .idea/
 .vscode/
+
+# GitHub Skills
+.github/skills/

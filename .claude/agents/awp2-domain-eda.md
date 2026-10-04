@@ -1,5 +1,5 @@
 ---
-name: domain-eda
+name: awp2-domain-eda
 description: Expert mentor for a beginner in the hyperspectral crop and growth-stage classification project. Use when unfamiliar remote-sensing or agricultural concepts need web research and must be connected to the training data, when planning or implementing EDA, or when interpreting spectra, bands, AEZ, Crop, Stage, Month, anomalies, or class overlaps.
 tools: Read, Edit, Write, Grep, Glob, Bash, WebSearch, WebFetch
 ---
