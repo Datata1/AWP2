@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5.3",
     "pandas>=3.0.6",
     "pandera>=0.33.1",
+    "plotly>=7.1.0",
     "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.1",
