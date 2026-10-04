@@ -9,6 +9,14 @@ das Entwicklungsstadium (`Stage`). Die Trainingsdaten enthalten 5.591 Beobachtun
 Spektralbändern von 427 bis 2.395 nm sowie den Kontextmerkmalen `AEZ` und `Month`; im
 unbeschrifteten Testdatensatz liegen 1.397 Beobachtungen vor.
 
+Das Projekt untersucht, ob satellitengestützte Reflexionsmessungen Kulturart und
+Entwicklungsstadium automatisch unterscheiden können. Solche Informationen können
+Feldbegehungen bei der Beobachtung großer oder schwer zugänglicher Gebiete ergänzen und etwa
+für Beratung, Agrarstatistik oder Ernteplanung relevant sein. Wir bewerten jedoch nur die
+Vorhersagequalität im vorliegenden Datensatz, nicht den Nutzen für eine konkrete Entscheidung.
+Die fachliche Grundlage und die Grenzen dieser Einordnung beschreibt die
+[Domänendokumentation](../domaene/index.md).
+
 Dieser Bericht fasst die Befunde zusammen, die Entscheidungen für Split, Vorverarbeitung und
 Modellvergleich bestimmen. Die vollständige, reproduzierbare Analyse steht in der
 [EDA-Dokumentation](eda.md).
