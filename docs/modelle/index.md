@@ -14,11 +14,12 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 
 | | |
 | --- | --- |
-| Bestes Modell | `combined_rf` (Kombinierte Klasse, MLflow-Run `5b7e6cef`) |
-| BAcc Crop / Stage / kombiniert | 0.874 / 0.876 / **0.779** |
-| Macro-F1 kombiniert · Samples-F1 | 0.762 · 0.880 |
+| Bestes Modell | `combined_svm` (Kombinierte Klasse, MLflow-Run `b2776f68`) |
+| BAcc Crop / Stage / kombiniert | 0.914 / 0.890 / **0.845** |
+| Macro-F1 kombiniert · Samples-F1 | 0.804 · 0.890 |
 
-Wichtigste Erkenntnis: Kombinierte Klassen verhindern ungültige Crop/Stage-Paare und verbessern
-die kombinierte BAcc gegenüber der Baseline. Fehler entstehen weiterhin vor allem zwischen Mais
-und Soja sowie zwischen benachbarten Stadien. Nächster Schritt (M2): den Ansatz gegen
-[hierarchische](ansaetze/hierarchisch.md) und Multi-Task-Modelle vergleichen.
+Wichtigste Erkenntnis: Die skalierte RBF-SVM verbessert die kombinierte BAcc im Ansatz mit
+kombinierten Klassen deutlich und verhindert ungültige Crop/Stage-Paare. Fehler entstehen
+weiterhin vor allem zwischen Winterweizen und Baumwolle, Mais und Soja sowie bei ähnlichen
+Stadien. Nächster Schritt (M2): den Ansatz gegen [hierarchische](ansaetze/hierarchisch.md) und
+Multi-Task-Modelle vergleichen.

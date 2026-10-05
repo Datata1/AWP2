@@ -44,8 +44,31 @@ Klassen und gibt seine Vorhersagen anschließend wieder als `Crop` und `Stage` a
 
 ![Häufigste Verwechslungen](../img/combined_rf_confusions.png)
 
+### RBF-SVM
+
+Notebook: `notebooks/02_duac1011_combined-svm.ipynb`. Die SVM lernt dieselben 23 kombinierten
+Klassen wie der Random Forest; Spektren und Month werden dafür standardisiert.
+
+- Die Suche `combined_svm_search` (MLflow `9b1c0917`) verglich neun Kombinationen aus `C` und
+    `gamma`. Beste Einstellung: `C=10.0`, `gamma=0.01`, CV-BAcc kombiniert 0.834.
+- Der einmalige Validierungslauf `combined_svm` (MLflow `b2776f68`) erreicht BAcc 0.914 für
+    Crop, 0.890 für Stage und **0.845 kombiniert**. Das übertrifft den kombinierten Random Forest
+    um 0.066.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Bei Crop bleibt Winterweizen mit Recall 0.83
+    am schwächsten; bei Stage sind Emerge_VEarly (0.82) und Mature_Senesc (0.83) am schwächsten.
+- Die häufigsten Verwechslungen sind Winterweizen → Baumwolle (37), Soja → Mais (36) und
+    Critical → Mature_Senesc (23).
+
+![Tuning der RBF-SVM](../img/combined_svm_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_confusions.png)
+
 ## Fazit
 
-**Verglichen – vorläufig führend.** Der Ansatz verbessert die kombinierte BAcc gegenüber der
-Baseline und verhindert ungültige Paare. Gegen hierarchische und Multi-Task-Ansätze bleibt er
-weiter zu vergleichen.
+**Verglichen – vorläufig führend.** Die RBF-SVM verbessert die kombinierte BAcc gegenüber dem
+Random Forest deutlich und verhindert weiterhin ungültige Paare. Gegen hierarchische und
+Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu vergleichen.
