@@ -1,4 +1,4 @@
-.PHONY: help setup data lab docs docs-build lint format mlflow stunden clean
+.PHONY: help setup data lab docs docs-build lint lint-ruff lint-ty format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -19,8 +19,12 @@ docs: ## Doku lokal mit Live-Reload servieren (http://127.0.0.1:8000)
 docs-build: ## Doku statisch nach site/ bauen
 	uv run mkdocs build --strict
 
-lint: ## Code prüfen (ruff + Typen mit ty)
+lint: lint-ruff lint-ty ## Code prüfen (ruff + Typen mit ty)
+
+lint-ruff:
 	uv run ruff check .
+
+lint-ty:
 	uv run ty check src
 
 format: ## Code formatieren (ruff)
