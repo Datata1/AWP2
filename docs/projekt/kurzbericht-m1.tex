@@ -37,25 +37,18 @@ Mitglieder: Achim Duong, Pascal Heinzemann, Jan-David Wiederstein}
 
 Die Aufgabenbeschreibung behandelt satellitengestützte Hyperspektralaufnahmen landwirtschaftlicher
 Flächen in den USA. EO-1 Hyperion erfasst Reflexion in vielen schmalen Spektralkanälen von
-ungefähr 10\,nm Breite. Die Aufgabenfolien beschreiben jede Beobachtung als ein Feld und nennen
+ungefähr 10\,nm Breite. Jede Beobachtung als ein Feld und hat eine
 eine räumliche Auflösung von 30\,m. Im bereitgestellten Datensatz entspricht eine Zeile einem
 Spektrum; ob jede Zeile unverändert genau einem Originalpixel entspricht, ist anhand der
 Tabellendaten allein nicht nachprüfbar.
 
-Neben den Spektralbändern enthält der Datensatz \texttt{AEZ} und \texttt{Month}. Laut
-Aufgabenbeschreibung fassen agroökologische Zonen Gebiete mit ähnlichen natürlichen
-Anbaubedingungen zusammen, unter anderem Klima, Böden und Vegetationsperiode. Diese Angaben
-sind möglicher zusätzlicher Kontext für die Klassifikation; ihre Verfügbarkeit und Aussagekraft
-für spätere, neue Daten muss bei der Bewertung berücksichtigt werden.
+Neben den Spektralbändern enthält der Datensatz \texttt{AEZ} und \texttt{Month}. Agro-ökologische Zonen (AEZ) fassen Gebiete mit ähnlichen natürlichen
+Anbaubedingungen zusammen, unter anderem Klima, Böden und Vegetationsperiode.
 
 \subsection{Projektziel und fachliche Relevanz}
 
 Das Projektziel ist die zuverlässige Klassifikation der Kulturpflanze (\texttt{Crop}) und ihres
 Entwicklungsstadiums (\texttt{Stage}) anhand der spektralen Signaturen aus EO-1-Hyperion-Aufnahmen.
-Die Aufgabenbeschreibung formuliert den Zielansatz hierarchisch: zuerst die Kulturpflanzenart,
-dann das Entwicklungsstadium innerhalb der vorhergesagten Kulturklasse. Andere Strategien --
-beispielsweise kombinierte Crop-Stage-Klassen oder getrennte Modelle -- sind ebenfalls zulässig,
-sofern sie begründet und miteinander verglichen werden.
 
 Die Aufgabenbeschreibung begründet die Relevanz mit der landwirtschaftlichen Bestandsaufnahme,
 der Planung von Bewirtschaftungsmaßnahmen sowie der Erstellung präziserer Modelle, Karten und
@@ -146,24 +139,17 @@ Zusammenhang zwischen Kontextmerkmalen und Labels.}
 Im Training wurden zwei Paare identischer Eingaben mit übereinstimmenden Labels gefunden.
 Zwischen vollständigen Train- und Test-Spektren der verfügbaren Bänder wurden keine exakten
 Treffer festgestellt. Der explorative Similarity-Screen fand innerhalb derselben
-Crop-Stage-Gruppe viele Paare mit hoher Cosinus-Ähnlichkeit. Da die verwendete Schwelle nicht
-als Duplikatgrenze validiert ist und Feld- oder Aufnahme-IDs fehlen, belegt das weder Duplikate
-noch gemeinsame Flächen oder Leakage.
+Crop-Stage-Gruppe viele Paare mit hoher Cosinus-Ähnlichkeit, insbesondere bei Mais und Soja. 
 
-Die Ausreißer- und Sprungdiagnostik markiert Kandidaten zur Prüfung, bestätigt aber keine
-fehlerhaften Messungen. Insbesondere die verfügbaren Bänder \texttt{X912}, \texttt{X915} und
-\texttt{X923} werden nicht allein wegen ihrer Lage oder eines lokalen Kurvenverlaufs entfernt.
-Eine technische oder biologische Ursache der dortigen Auffälligkeiten ist anhand der
-vorliegenden Angaben nicht belegt.
+Die Ausreißer- und Sprungdiagnostik markiert Kandidaten zur Prüfung, die jedoch aufgrund der teils 
+sehr geringen Gruppengrößen nicht automatisch entfernt werden sollten..
 
 \subsection{Grenzen der Datengrundlage}
 
 Feld-, Bild- oder räumliche Gruppenkennungen liegen in der verwendeten Tabelle nicht vor.
 Deshalb lässt sich nicht feststellen, ob ähnlich erscheinende Spektren abhängige Beobachtungen
 sind. Auch die technische Ursache vollständig leerer Bänder und die genaue Vorverarbeitung vor
-Bereitstellung des Datensatzes sind nicht abschließend dokumentiert. Die mögliche
-Übertragbarkeit auf andere Regionen, Jahre oder Aufnahmebedingungen wird mit diesem
-Holdout-Split nicht belegt.
+Bereitstellung des Datensatzes sind nicht abschließend dokumentiert. 
 
 \section{Erste Data-Preprocessing-Pipeline}
 
@@ -173,9 +159,6 @@ Holdout-Split nicht belegt.
 
 \subsection{Cleaning- und Preprocessing-Entscheidungen}
 
-Die folgenden Empfehlungen stützen sich auf die explorative Datenanalyse. Sie unterscheiden
-zwischen unmittelbar begründeten Bereinigungen und Varianten, deren Nutzen erst in einer
-sauberen Validierung geprüft werden muss.
 
 \begingroup
 \small
@@ -197,7 +180,7 @@ Thema & Empfehlung & Begründung \\
 \bottomrule
 \endlastfoot
 
-Vollständig leere Bänder & Die 67 vollständig leeren Bänder aus den Modellmerkmalen entfernen; die 131 verfügbaren zunächst als Rohband-Baseline behalten. & Leere Spalten enthalten keine Messinformation. Die Ursache ihres Fehlens ist nicht belegt. Die verfügbaren Bänder \texttt{X912}, \texttt{X915} und \texttt{X923} nicht allein wegen ihrer Nähe zu leeren Bändern entfernen. \\
+Vollständig leere Bänder & Die 67 vollständig leeren Bänder aus den Modellmerkmalen entfernen; die 131 verfügbaren zunächst als Rohband-Baseline behalten. & Leere Spalten enthalten keine Messinformation. Die Ursache ihres Fehlens ist nicht belegt.  \\
 
 Fehlende Einzelwerte & Verbleibende Lücken innerhalb eines Spektrums interpolieren und Randlücken mit dem nächstgelegenen vorhandenen Wert behandeln. Die Imputation innerhalb der Modellpipeline durchführen. & Es fehlen einzelne Bandwerte in wenigen Zeilen. Die Vorverarbeitung muss innerhalb jedes Trainingsfolds angepasst werden, damit keine Validierungsinformation einfließt. \\
 
@@ -241,8 +224,6 @@ ergänzen.]}
 
 \begin{itemize}
   \item Domänenziel und Grenzen der Vorhersage sind beschrieben.
-  \item Datenumfang, Labelungleichgewicht, fehlende Bänder und sichtbare spektrale
-        Überlappungen wurden untersucht.
   \item Pipeline und Baseline werden in den dafür vorgesehenen Abschnitten dokumentiert.
 \end{itemize}
 
@@ -252,13 +233,11 @@ ergänzen.]}
   \item Bedeutung des geforderten „70/30 Clusterplot-Splits“ klären.
   \item Verfügbarkeit von Feld-, Bild- oder räumlichen IDs sowie die Bedeutung von
         \texttt{Month} und \texttt{AEZ} klären.
-  \item Herkunft und Vorverarbeitung der Spektralbänder klären.
 \end{itemize}
 
 \subsection{Nächste Schritte}
 
 \begin{itemize}
-  \item Die Pipeline- und Baseline-Abschnitte nach den jeweiligen Demo-Läufen vervollständigen.
   \item Modelle mit und ohne \texttt{AEZ} und \texttt{Month} sowie begründete Glättungs- oder
         Merkmalsreduktionsvarianten innerhalb derselben Cross-Validation vergleichen.
 \end{itemize}
