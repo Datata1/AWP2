@@ -22,6 +22,8 @@
 \setlist{nosep,leftmargin=*}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.55em}
+% Code names cannot be hyphenated; extra stretch keeps such lines inside the margin.
+\setlength{\emergencystretch}{2em}
 \captionsetup{font=small,labelfont=bf}
 \graphicspath{{../daten/img/}{../modelle/img/}}
 
@@ -222,9 +224,10 @@ zwei Stufen (Abbildung~\ref{fig:pipeline}):
 \begin{enumerate}
   \item \textbf{Datenaufbereitung, einmalig} (\texttt{make data}): Die Rohdaten werden beim
         Laden gegen ein Schema geprüft (Spalten, Wertebereiche, gültige Labels), die zwei exakt
-        doppelten Zeilen entfernt und der Split festgelegt (Abschnitt~\ref{sec:split}). Das
-        Ergebnis sind zwei Dateien (\texttt{train\_clean.parquet}, \texttt{split.csv}), die
-        deterministisch erzeugt werden und damit bei allen Teammitgliedern identisch sind.
+        doppelten Zeilen entfernt und der Split festgelegt (Abschnitt~\ref{sec:split}).
+        Ergebnis sind zwei deterministisch erzeugte und damit bei allen Teammitgliedern
+        identische Dateien: \texttt{train\_clean.parquet} mit den bereinigten Daten und
+        \texttt{split.csv} mit der Zuordnung jeder Zeile zu Train, Holdout und CV-Fold.
   \item \textbf{Vorverarbeitung, je Modell}: Leere Bänder entfernen, Lücken interpolieren,
         \texttt{AEZ} als One-Hot-Kodierung, optional Skalierung und Vegetationsindizes. Diese
         Schritte sind der erste Teil einer sklearn-\texttt{Pipeline} und werden nur auf dem
@@ -250,7 +253,7 @@ Einzelcode in Notebooks.
 \small
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.15}
-\begin{longtable}{p{2.4cm}p{6.0cm}p{7.0cm}}
+\begin{longtable}{p{2.4cm}p{6.0cm}p{6.9cm}}
 \caption{Cleaning- und Preprocessing-Empfehlungen aus der EDA.}\label{tab:cleaning-entscheidungen}\\
 \toprule
 Thema & Empfehlung & Begründung \\
