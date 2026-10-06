@@ -10,6 +10,7 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{float}
+\usepackage[section]{placeins}
 \usepackage{microtype}
 \usepackage[hidelinks]{hyperref}
 \usepackage{enumitem}
@@ -116,14 +117,14 @@ Vorhersageleistung.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.96\textwidth]{../daten/img/EDA_mittlere_spektralsignatur_1_standardabweichung_nach_crop.png}
+\includegraphics[width=0.96\textwidth,height=0.3\textheight,keepaspectratio]{../daten/img/EDA_mittlere_spektralsignatur_1_standardabweichung_nach_crop.png}
 \caption{Mittlere Spektralsignaturen nach Crop; Unterschiede und Überlappungen zeigen, wie
 trennbar die Kulturen anhand der Spektren erscheinen.}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.96\textwidth]{../daten/img/EDA_mittlere_spektralsignatur_1_standardabweichung_nach_stage_innerhalb_jedes_crop.png}
+\includegraphics[width=0.96\textwidth,height=0.48\textheight,keepaspectratio]{../daten/img/EDA_mittlere_spektralsignatur_1_standardabweichung_nach_stage_innerhalb_jedes_crop.png}
 \caption{Mittlere Stadien-Spektren innerhalb jeder Crop-Klasse; Streuung und Überlappung
 veranschaulichen die Schwierigkeit der Stage-Vorhersage.}
 \end{figure}
@@ -156,7 +157,12 @@ Bereitstellung des Datensatzes sind nicht abschließend dokumentiert.
 
 \subsection{Pipeline-Ablauf}
 
-\begin{figure}[!t]
+Die Pipeline liefert allen Modellierungsansätzen dieselben bereinigten Daten, denselben Split,
+dieselbe Vorverarbeitung und dieselben Metriken. Ergebnisse verschiedener Ansätze sind dadurch
+direkt vergleichbar. Das Modell selbst baut jeder Ansatz eigenständig. Die Pipeline arbeitet in
+zwei Stufen (Abbildung~\ref{fig:pipeline}):
+
+\begin{figure}[htbp]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -212,10 +218,6 @@ Bereitstellung des Datensatzes sind nicht abschließend dokumentiert.
 \label{fig:pipeline}
 \end{figure}
 
-Die Pipeline liefert allen Modellierungsansätzen dieselben bereinigten Daten, denselben Split,
-dieselbe Vorverarbeitung und dieselben Metriken. Ergebnisse verschiedener Ansätze sind dadurch
-direkt vergleichbar. Das Modell selbst baut jeder Ansatz eigenständig. Die Pipeline arbeitet in
-zwei Stufen (Abbildung~\ref{fig:pipeline}):
 
 \begin{enumerate}
   \item \textbf{Datenaufbereitung, einmalig} (\texttt{make data}): Die Rohdaten werden beim
