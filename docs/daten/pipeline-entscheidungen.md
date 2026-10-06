@@ -34,7 +34,7 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | Schritt | Grund |
 | --- | --- |
 | 67 komplett leere Bänder entfernen → 131 Bänder | Keine Information (Wasserabsorption/Randbänder, siehe [EDA](eda.md)) |
-| Lücken entlang der Wellenlänge interpolieren | Nachbarbänder sind stark korreliert – das schätzt besser als ein Spaltenmittel. Am Rand zählt das nächste Band (Spektren sind unterschiedlich hell, ein globaler Median läge daneben). Betrifft 43 Zeilen train und **11 Zeilen test** – muss daher auch bei der Vorhersage greifen |
+| Lücken entlang der Wellenlänge interpolieren | Nachbarbänder sind stark korreliert – das schätzt besser als ein Spaltenmittel. Am Rand zählt das nächste Band (Spektren sind unterschiedlich hell, ein globaler Median läge daneben). Betrifft nach der Duplikatbereinigung 43 Trainings- und 11 Testzeilen; in den Rohdaten sind es 44 Trainingszeilen. Die Interpolation muss daher auch bei der Vorhersage greifen. |
 | `AEZ` und `Month` optional als Features | Laut Aufgabe erlaubt; abschaltbar, um ihren Nutzen zu messen |
 | Skalierung optional | Nötig für SVM, logistische Regression, MLP; für Baum-Modelle überflüssig |
 | Optionen als pydantic-`PreprocessingConfig` | Tippfehler oder falsche Typen (`scale="yes"`) fallen sofort auf |
@@ -51,5 +51,4 @@ Balanced Accuracy als Hauptmetrik.
 - Umgang mit Ausreißern
 - Bandauswahl, Vegetationsindizes als Features
 - Split-Strategie, falls räumliche Cluster gefunden werden (dann Gruppen in `cv_splits`)
-- 2 Spektren in `test.csv` sind identisch mit Trainingszeilen – für die EDA (#15) notiert
 - `Month` ist zyklisch; ggf. als sin/cos kodieren

@@ -2,6 +2,7 @@ nav:
   - index.md
   - ansatz-entwickeln.md
   - Ansätze: ansaetze
+  - klassifikatoren.md
   - experimente.md
   - glob: "*"
     ignore_no_matches: true

@@ -17,7 +17,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | --- | --- | --- | --- | --- |
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
-| [Kombinierte Klasse](kombiniert.md) | offen | – | | |
+| [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm` (BAcc kombiniert 0.845) | vorläufig führend; gegen weitere Ansätze vergleichen |
 | [Hierarchisch](hierarchisch.md) | offen | – | | |
 | [Multi-Task](multi-task.md) | offen | – | | |
 
@@ -31,7 +31,8 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | Klassifikator | Baseline | Getrennt | Kombiniert | Hierarchisch | Multi-Task |
 | --- | --- | --- | --- | --- | --- |
 | Dummy | [0.044](baseline.md#dummy) | | | | |
-| Random Forest | [**0.743**](baseline.md#random-forest) | | | | |
+| Random Forest | [0.743](baseline.md#random-forest) | | [0.779](kombiniert.md#random-forest) | | |
+| RBF-SVM | | | [**0.845**](kombiniert.md#rbf-svm) | | |
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.

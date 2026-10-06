@@ -82,6 +82,20 @@ Crop-Stage-Paare müssen wir daher auch die Unsicherheit und Fehleranalyse offen
 
 ## Bewertungsmetriken
 
+`awp2.evaluation.evaluate()` liefert die folgenden Werte. Die primäre Metrik für Vergleiche
+fertiger Ansätze ist `bacc_combined`.
+
+| Feld | Bedeutung |
+| --- | --- |
+| `bacc_crop` | Balanced Accuracy der Kulturart |
+| `bacc_stage` | Balanced Accuracy des Entwicklungsstadiums |
+| `bacc_combined` | Balanced Accuracy des gemeinsamen Crop/Stage-Paars |
+| `f1_macro_crop` | Macro-F1 der Kulturarten; jede Kultur zählt gleich viel |
+| `f1_macro_stage` | Macro-F1 der Entwicklungsstadien; jedes Stadium zählt gleich viel |
+| `f1_macro_combined` | Macro-F1 der kombinierten Crop/Stage-Paare |
+| `f1_samples` | Mittlerer Anteil korrekter Zielwerte pro Beobachtung |
+| `invalid_combinations` | Anteil vorhergesagter Paare, die im Training nicht vorkamen |
+
 Eine **Confusion Matrix** zählt, welche wahre Klasse als welche Klasse vorhergesagt wurde.
 In unseren Diagrammen stehen die wahren Klassen in den Zeilen und die Vorhersagen in den
 Spalten. Die Diagonale enthält korrekte Vorhersagen; außerhalb der Diagonale stehen die

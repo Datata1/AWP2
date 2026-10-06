@@ -28,6 +28,11 @@ Trainings- und 11 Testzeilen in wenigen sonst verfügbaren Bändern. Alle sieben
 die Monate 5 bis 10 kommen in beiden Datensätzen vor. Zwei Paare im Training haben identische
 Eingaben; zwischen Train und Test gibt es keine identischen vollständigen Spektren.
 
+Beide Datensätze verwenden `id` als eindeutigen Index und haben dieselben Eingabetypen. Ihre
+globalen Reflektanzmediane (24,68 % in Train, 24,64 % in Test) sowie zeilenweisen robusten
+Spektralkennwerte sind ähnlich. Dies schließt eine Verteilungsverschiebung einzelner Bänder nicht
+aus.
+
 ![Fehlende Werte je Band in Train und Test](img/fehlende_werte_baender.png)
 
 **Konsequenz:** Vollständig leere Bänder werden entfernt. Einzelne Lücken werden innerhalb jedes
@@ -35,11 +40,18 @@ Trainingsfolds entlang der Wellenlänge interpoliert. Exakte Trainingsduplikate 
 gemeinsamen Split entfernt. Die Ursache der leeren Bänder ist ohne technische Metadaten nicht
 belegt und wird daher nicht weiter interpretiert.
 
+Eines der entfernten Duplikate hat eine partielle Lücke. Die Interpolation betrifft deshalb nach
+der Duplikatbereinigung 43 Trainings- und 11 Testzeilen.
+
 ## 2. Labels erfordern einen klassenfairen Split und klassenfaire Metriken
 
 Die Kulturarten und Stadien sind unausgewogen. `rice` hat 93 Beobachtungen, `Harvest` 180; das
 seltenste beobachtete Crop-Stage-Paar `cotton|Harvest` besteht aus 11 Beobachtungen. Mehrere
 Kombinationen fehlen in der Stichprobe vollständig.
+
+Die konservative Zählprüfung lässt für `cotton|Harvest` mindestens sieben Zeilen im 70%-Training
+und drei in der 30%-Validierung erwarten. Alle beobachteten Paare haben danach mindestens fünf
+Trainingszeilen für die fünf inneren CV-Folds.
 
 ![Verteilung der Crop- und Stage-Labels](img/klassenverteilungen.png)
 
