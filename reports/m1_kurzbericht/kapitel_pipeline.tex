@@ -1,0 +1,131 @@
+% Kapitel "Data Pipeline, Baseline und Experiment-Tracking" (Jan-David Wiederstein).
+% Eigenständig einbindbar: \input{kapitel_pipeline} – benötigt tikz (arrows.meta, positioning,
+% fit, backgrounds) und booktabs in der Präambel.
+
+\section{Data Pipeline, Baseline und Experiment-Tracking}
+\label{sec:pipeline}
+{\small\textit{Jan-David Wiederstein}}
+
+Aus den Befunden des Data Understanding ist eine gemeinsame Pipeline entstanden. Sie liefert
+allen Ansätzen dieselben bereinigten Daten, denselben Split, dieselbe Vorverarbeitung und
+dieselben Metriken -- Ergebnisse unterschiedlicher Modelle sind damit direkt vergleichbar.
+Das Modell selbst baut jeder Ansatz eigenständig (Abb.~\ref{fig:pipeline}).
+
+\subsection*{Was die Pipeline macht}
+
+\begin{itemize}
+  \item \textbf{Datenaufbereitung} (\texttt{make data}): Rohdaten werden per Schema validiert,
+        zwei exakt doppelte Zeilen entfernt (sonst könnte dieselbe Messung in Training
+        \emph{und} Validierung landen). Daraus entstehen ein fester 70/30-Holdout und fünf
+        CV-Folds im Trainingsteil, stratifiziert nach \texttt{Crop|Stage}, damit auch seltene
+        Paare wie \texttt{cotton|Harvest} (11 Zeilen) in beiden Teilen vorkommen -- per festem
+        Seed bei allen identisch.
+  \item \textbf{Vorverarbeitung} als sklearn-\texttt{Pipeline}, die nur auf dem Trainingsteil
+        gefittet wird: 67 leere Bänder entfernen (131 bleiben), Lücken entlang der Wellenlänge
+        interpolieren, \texttt{AEZ}/\texttt{Month} sowie Skalierung und Vegetationsindizes
+        optional zuschaltbar.
+  \item \textbf{Bewertung}: Balanced Accuracy, Macro-F1 und Samples-F1 für Crop, Stage und
+        kombiniert sowie der Anteil ungültiger Crop/Stage-Paare.
+\end{itemize}
+
+\subsection*{Verwendung}
+
+Hyperparameter werden mit \texttt{tune()} ausschließlich per Cross-Validation auf dem
+Trainingsteil gesucht; das beste Modell wird mit \texttt{run()} genau einmal auf dem Holdout
+bewertet. So wird nicht unbemerkt auf den Validierungsdaten optimiert.
+
+\smallskip
+\noindent\texttt{\small tuned = tune(model, TuneConfig(name=..., approach=..., param\_grid=\{...\}))}\\
+\texttt{\small result = run(tuned.best\_model, RunConfig(name=..., tuning\_run=tuned.run\_id))}
+
+\subsection*{Baseline}
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+  \toprule
+  Modell & BAcc Crop & BAcc Stage & BAcc kombiniert & Samples-F1 \\
+  \midrule
+  Dummy (häufigste Klasse) & 0{,}200 & 0{,}167 & 0{,}044 & 0{,}326 \\
+  Random Forest (300 Bäume, balanced) & 0{,}890 & 0{,}870 & \textbf{0{,}743} & 0{,}878 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+Der Random Forest liegt mit 0{,}743 im Streubereich seines CV-Scores ($0{,}750 \pm 0{,}019$),
+überschätzt sich also nicht. Verwechselt werden vor allem Mais/Soja und benachbarte Stadien;
+0{,}3\,\% der Vorhersagen sind unmögliche Paare. Jeder weitere Ansatz muss 0{,}743 schlagen.
+
+\subsection*{Wie MLflow uns hilft}
+
+Jeder Aufruf von \texttt{tune()} und \texttt{run()} wird automatisch protokolliert: Parameter,
+Metriken, Confusion Matrices, trainiertes Modell, Hash der Daten und Git-Stand. So lassen sich
+Läufe in der Oberfläche (\texttt{make mlflow}) nach Ansatz gruppieren und vergleichen, jedes
+Ergebnis ist auf Code und Daten zurückführbar, und gespeicherte Modelle können direkt für die
+Testvorhersage geladen werden. Wichtige Läufe kommen mit Run-ID ins Experiment-Log.
+
+\subsection*{Was noch fehlt}
+
+\begin{itemize}
+  \item Weitere Vorverarbeitung als Optionen: Glättung (z.\,B.\ Savitzky-Golay), PCA oder
+        Bandauswahl, zyklische Kodierung von \texttt{Month}, Umgang mit Ausreißern.
+  \item Nur gültige Crop/Stage-Kombinationen vorhersagen (z.\,B.\ hierarchisch); gruppierter
+        Split, falls sich räumliche Cluster bestätigen; Vorhersage für \texttt{test.csv}.
+  \item MLflow läuft lokal (jede:r sieht nur eigene Läufe) -- ein gemeinsamer Server würde
+        nur das Tracking-Modul betreffen.
+\end{itemize}
+
+\begin{figure}[p]
+\centering
+\begin{tikzpicture}[
+    node distance=7mm and 6mm,
+    >={Stealth[length=2mm]},
+    box/.style={draw, rounded corners=2pt, align=center, font=\small,
+                minimum width=44mm, minimum height=10mm, fill=white},
+    file/.style={box, fill=gray!8},
+    lbl/.style={font=\scriptsize\itshape, midway, right=1mm},
+    group/.style={draw=gray!60, dashed, rounded corners=4pt, inner sep=3mm},
+    gtitle/.style={font=\footnotesize\bfseries, text=gray!70!black, anchor=south west},
+  ]
+  \node[file] (raw) {\texttt{data/raw/train.csv}\\ Rohdaten (read-only)};
+  \node[box, below=of raw] (clean) {Schema-Validierung\\ 2 Duplikate entfernen};
+  \node[box, below=of clean] (split) {Stratifizierter Split nach \texttt{Crop|Stage}\\
+                                       70\,\% Train / 30\,\% Holdout, 5 CV-Folds};
+  \node[file, below=of split] (art) {\texttt{train\_clean.parquet}\\ \texttt{split.csv}};
+
+  \node[box, right=42mm of raw] (pre) {Vorverarbeitung\\ leere Bänder raus, Interpolation,\\
+                                        opt.\ AEZ/Month, Skalierung, Indizes};
+  \node[box, below=of pre] (model) {Modell des Ansatzes\\ (z.\,B.\ Random Forest)};
+  \node[box, below=of model] (tune) {\texttt{tune()}: CV auf Train};
+  \node[box, below=of tune] (run) {\texttt{run()}: einmal auf Holdout\\ \texttt{evaluate()} $\to$ Metriken};
+
+  \node[file, below=17mm of run] (mlflow) {MLflow: Parameter, Metriken,\\
+                                           Modell, Daten-Hash, Git-Stand};
+  \node[file, left=22mm of mlflow] (log) {Experiment-Log\\ (Doku, mit Run-ID)};
+
+  \draw[->] (raw) -- (clean);
+  \draw[->] (clean) -- (split);
+  \draw[->] (split) -- (art);
+  \draw[->] (art.east) -- ++(18mm,0) |- node[pos=0.25, right, font=\scriptsize\itshape]
+            {\texttt{load\_split()}} (pre.west);
+  \draw[->] (pre) -- (model);
+  \draw[->] (model) -- (tune);
+  \draw[->] (tune) -- node[lbl] {bestes Modell} (run);
+  \draw[->] (run) -- node[lbl] {\texttt{log\_run()}} (mlflow);
+  \draw[->] (tune.east) -- ++(6mm,0) |- (mlflow.east);
+  \draw[->] (mlflow) -- node[above, font=\scriptsize\itshape] {Run-ID} (log);
+
+  \begin{scope}[on background layer]
+    \node[group, fit=(raw)(split)(art)] (g1) {};
+    \node[group, fit=(pre)(run)] (g2) {};
+    \node[group, fit=(mlflow)] (g3) {};
+  \end{scope}
+  \node[gtitle] at (g1.north west) {Einmalig: \texttt{make data}};
+  \node[gtitle] at (g2.north west) {Je Ansatz: sklearn-Pipeline};
+  \node[gtitle] at (g3.north west) {Tracking};
+\end{tikzpicture}
+\caption{Gemeinsame Data Pipeline: Die Datenaufbereitung läuft einmal und ist für alle gleich;
+  Vorverarbeitung und Modell werden je Ansatz nur auf dem Trainingsteil gefittet und jeder Lauf
+  in MLflow protokolliert.}
+\label{fig:pipeline}
+\end{figure}
