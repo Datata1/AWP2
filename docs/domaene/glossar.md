@@ -8,7 +8,7 @@ Jede:r ergänzt die Begriffe aus der eigenen Seite.
 | AEZ (agroökologische Zone) | Gruppe von Gebieten mit ähnlichem Klima, Böden und ähnlicher Vegetationsperiode; sie beschreibt keine genaue Position. | [Daten](../daten/index.md#herkunft-aez) |
 | Atmosphärische Korrektur | Rechenschritt, der Einflüsse der Atmosphäre aus einem Satellitensignal möglichst entfernt. | [Fernerkundung](fernerkundung.md#atmosphare-toa-und-oberflachenreflektanz) |
 | Atmosphärisches Wasserabsorptionsband | Wellenlängenbereich, in dem Wasserdampf in der Atmosphäre einen großen Teil des Lichts absorbiert; um 1.400 und 1.900 nm ist die Oberflächenreflektanz besonders unsicher. | [Vegetation](vegetation.md#wasserabsorptionsbander) |
-| Balanced Accuracy | Mittelwert der Recalls aller Klassen. Dadurch zählt eine seltene Klasse wie Reis genauso stark wie eine häufige Klasse wie Mais. | [ML-Aufgabe](ml-aufgabe.md#warum-nicht-nur-accuracy) |
+| Balanced Accuracy | Mittelwert der Recalls aller Klassen. Dadurch zählt eine seltene Klasse wie Reis genauso stark wie eine häufige Klasse wie Mais; Zufallsniveau ist 1/Anzahl Klassen. | [ML-Aufgabe](ml-aufgabe.md#balanced-accuracy-hauptmetrik) |
 | BBCH-Skala | Standardisierte Dezimalskala zur Beschreibung beobachtbarer Entwicklungsstadien von Pflanzen. | [Kulturpflanzen](kulturpflanzen.md#entwicklungsstadien-als-gemeinsame-sprache) |
 | Blattflächenindex (LAI) | Verhältnis der gesamten Blattfläche zur Bodenfläche. Er beeinflusst, wie stark der Boden unter einem Pflanzenbestand im Pixel noch sichtbar ist. | [Vegetation](vegetation.md#red-edge-und-nahes-infrarot) |
 | CAI (Cellulose Absorption Index) | Index für die Absorption trockener Pflanzenbestandteile um 2.100 nm. Der Standard-CAI ist hier wegen des leeren Bands `X2002` nicht direkt berechenbar. | [Vegetation](vegetation.md#indizes-fur-photosynthese-wasser-und-trockene-bestandteile) |
@@ -21,10 +21,12 @@ Jede:r ergänzt die Begriffe aus der eigenen Seite.
 | F1-Score | Harmonisches Mittel von Precision und Recall. Er ist nur hoch, wenn ein Modell eine Klasse sowohl zuverlässig vorhersagt als auch möglichst vollständig findet. | [ML-Aufgabe](ml-aufgabe.md#bewertungsmetriken) |
 | Fernerkundung | Gewinnung von Informationen aus der Entfernung, etwa mit Sensoren auf Satelliten. | [Fernerkundung](fernerkundung.md#grundlagen-der-optischen-fernerkundung) |
 | Hierarchische Klassifikation | Mehrstufige Vorhersage, hier zuerst `Crop` und anschließend `Stage` innerhalb der vorhergesagten Kultur. | [ML-Aufgabe](ml-aufgabe.md#mogliche-formulierungen) |
+| Holdout | Beschrifteter Datenteil, der vor der Modellarbeit beiseitegelegt und nur einmal zur abschließenden Bewertung genutzt wird. Bei uns dasselbe wie die 30-%-Validierung. | [ML-Aufgabe](ml-aufgabe.md#validierung) |
 | Hyperspektral | Viele schmale, aufeinanderfolgende Spektralbänder erfassen ein detailliertes Spektrum. | [Fernerkundung](fernerkundung.md#multispektral-vs-hyperspektral) |
 | Klassenungleichgewicht | Manche Klassen haben sehr viel weniger Beobachtungen als andere. Bei uns betrifft das insbesondere Reis und `Harvest`. | [ML-Aufgabe](ml-aufgabe.md#klassenungleichgewicht) |
-| Klassengewichte | Gewichte beim Training, die Fehler bei seltenen Klassen stärker berücksichtigen. | [ML-Aufgabe](ml-aufgabe.md#mogliche-gegenmassnahmen) |
+| Klassengewichte | Gewichte beim Training, die Fehler bei seltenen Klassen stärker berücksichtigen. | [ML-Aufgabe](ml-aufgabe.md#mogliche-gegenmanahmen) |
 | Kulturart (Crop) | Landwirtschaftlich angebaute Pflanzenart, zum Beispiel Mais oder Soja. | [Domäne](index.md#projektziel) |
+| Macro-F1 | Ungewichteter Mittelwert der F1-Scores aller Klassen. Bestraft im Gegensatz zur Balanced Accuracy auch, wenn eine Klasse zu oft vorhergesagt wird. | [ML-Aufgabe](ml-aufgabe.md#macro-f1) |
 | Macro-/Micro-/Weighted-Mittelung | Arten, Klassenwerte zusammenzufassen: Macro gewichtet Klassen gleich, Micro einzelne Vorhersagen gleich und Weighted Klassen nach ihrer Häufigkeit. | [ML-Aufgabe](ml-aufgabe.md#mittelungen-und-samples-f1) |
 | Mischpixel | Pixel, das mehrere Oberflächen wie Kultur, Boden oder Feldrand zugleich enthält. | [Fernerkundung](fernerkundung.md#raumliche-auflosung-mischpixel) |
 | Multi-Label-Klassifikation | Jede Beobachtung kann mehrere unabhängige Labels gleichzeitig tragen. Unsere Daten haben stattdessen genau ein `Crop`- und ein `Stage`-Label. | [ML-Aufgabe](ml-aufgabe.md#was-soll-vorhergesagt-werden) |
@@ -45,7 +47,7 @@ Jede:r ergänzt die Begriffe aus der eigenen Seite.
 | Recall | Anteil der gefundenen Beobachtungen einer Klasse; „Welchen Anteil der echten Reis-Spektren erkennt das Modell?“ | [ML-Aufgabe](ml-aufgabe.md#bewertungsmetriken) |
 | Red Edge | Steiler Anstieg der Vegetationsreflexion zwischen ungefähr 680 und 750 nm, vom roten Licht zum NIR. | [Vegetation](vegetation.md#red-edge-und-nahes-infrarot) |
 | Reflektanz | Anteil des einfallenden Lichts, den eine Oberfläche bei einer Wellenlänge zurückreflektiert. | [Fernerkundung](fernerkundung.md#reflektanz-und-die-bandspalten) |
-| Samples-F1 | F1-Score pro Beobachtung über beide Zielwerte. Bei uns zählen beide korrekt als 1, nur einer korrekt als 0,5 und beide falsch als 0. | [ML-Aufgabe](ml-aufgabe.md#mittelungen-und-samples-f1) |
+| Samples-F1 | F1-Score pro Beobachtung über beide Zielwerte. Bei uns zählen beide korrekt als 1, nur einer korrekt als 0,5 und beide falsch als 0; nicht klassenfair. | [ML-Aufgabe](ml-aufgabe.md#samples-f1) |
 | Seneszenz | Alterungsphase von Pflanzenteilen, in der unter anderem die photosynthetische Aktivität abnimmt. | [Vegetation](vegetation.md#veranderung-uber-die-saison) |
 | Spektralband | Kleiner Wellenlängenbereich, für den ein Sensor einen Reflektanzwert speichert. | [Fernerkundung](fernerkundung.md#reflektanz-und-die-bandspalten) |
 | Spektrale Signatur | Verlauf der Reflektanz einer Oberfläche über die Wellenlängen; sie kann Hinweise auf Material- und Vegetationseigenschaften geben. | [Vegetation](vegetation.md#die-typische-reflexionskurve) |

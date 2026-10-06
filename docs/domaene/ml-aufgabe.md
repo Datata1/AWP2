@@ -134,6 +134,67 @@ Bei genau zwei Zielwerten ist Samples-F1 besonders anschaulich: Sind beide Werte
 erhält die Beobachtung 1; ist nur `Crop` oder nur `Stage` korrekt, erhält sie 0,5; sind beide
 falsch, erhält sie 0. Der Samples-F1 ist der Mittelwert dieser Werte über alle Beobachtungen.
 
+### Was die Kennzahlen aussagen und wo ihre Grenzen liegen
+
+Alle Werte liegen zwischen 0 und 1. Jede Kennzahl beantwortet eine andere Frage – erst
+zusammen ergeben sie ein ehrliches Bild. **Kombiniert** heißt jeweils: Das Paar
+`Crop|Stage` gilt als eine Klasse (23 Paare in der Validierung) und zählt nur als richtig,
+wenn **beide** Werte stimmen.
+
+#### Balanced Accuracy (Hauptmetrik)
+
+- **Entstehung:** Für jede wahre Klasse $k$ den Recall bestimmen, dann ungewichtet mitteln:
+  $\mathrm{BAcc} = \frac{1}{K}\sum_{k=1}^{K} \mathrm{Recall}_k$.
+- **Aussage:** „Welchen Anteil jeder Klasse erkennt das Modell im Durchschnitt?“ Reis zählt so
+  viel wie Mais. Das **Zufallsniveau** ist $1/K$: 0,20 für 5 Kulturen, 0,17 für 6 Stadien,
+  rund 0,04 für die Paare – ein Wert ist erst im Vergleich dazu einzuordnen.
+- **Grenzen:**
+    - Sie misst nur Recall, keine Precision. Sagt ein Modell zu oft Reis, sinkt nur der
+      Recall der anderen Klassen etwas – Fehlalarme fallen kaum auf.
+    - Alle Fehler wiegen gleich: Ein Nachbarstadium (`Early_Mid` statt `Late`) kostet so viel
+      wie ein völlig falsches.
+    - Seltene Klassen machen sie unruhig: In der Validierung gibt es 27 Reis-Zeilen – ein Fehler
+      mehr kostet 3,7 Prozentpunkte Reis-Recall und damit 0,7 Punkte BAcc Crop. Bei
+      `cotton|Harvest` (3 Zeilen) kostet ein Fehler 33 Punkte Recall dieser Klasse.
+
+#### Macro-F1
+
+- **Entstehung:** Für jede Klasse F1 aus Precision und Recall bilden, dann ungewichtet mitteln:
+  $\mathrm{Macro\text{-}F1} = \frac{1}{K}\sum_{k=1}^{K} F1_k$.
+- **Aussage:** Ergänzt die Balanced Accuracy um die Precision: Ein hoher Wert heißt, das Modell
+  findet jede Klasse **und** vergibt sie nicht zu oft. Liegt Macro-F1 deutlich unter der
+  Balanced Accuracy, sagt das Modell einzelne Klassen zu häufig vorher.
+- **Grenzen:**
+    - Wie bei der Balanced Accuracy wiegen alle Fehler gleich, und seltene Klassen streuen stark.
+    - Eine Klasse, die nie vorhergesagt wird, hat F1 = 0 und zieht den Mittelwert deutlich
+      herunter.
+    - Kombiniert: Ein vorhergesagtes Paar, das in der Validierung nicht vorkommt (z. B. ein
+      unmögliches Paar), zählt als zusätzliche Klasse mit F1 = 0. Ungültige Paare senken
+      Macro-F1 kombiniert daher stärker als die Balanced Accuracy.
+
+#### Samples-F1
+
+- **Entstehung:** Je Beobachtung der Anteil richtiger Zielwerte (0, 0,5 oder 1), gemittelt über
+  alle Beobachtungen. Bei genau einem `Crop`- und einem `Stage`-Label ist das der Mittelwert aus
+  der gewöhnlichen Accuracy von `Crop` und von `Stage`.
+- **Aussage:** „Wie viele der vorhergesagten Werte stimmen insgesamt?“ – anschaulich und
+  verlangt von der Aufgabenstellung.
+- **Grenzen:**
+    - **Nicht klassenfair:** Häufige Klassen dominieren, genau wie bei der Accuracy. Die
+      Dummy-Baseline, die immer Mais und `Critical` sagt, erreicht schon 0,33, obwohl sie nichts
+      gelernt hat.
+    - Sie verrät nicht, ob `Crop` oder `Stage` falsch war, und belohnt halb richtige Paare.
+
+#### Für alle Kennzahlen
+
+- Sie sind **Schätzungen auf einer Stichprobe** (1.677 Validierungszeilen). Die Streuung über
+  die CV-Folds (bei der Baseline ±0,02) zeigt, wie groß Unterschiede mindestens sein müssen,
+  um mehr als Zufall zu sein.
+- Sie gelten für die Verteilung unserer Daten. Wie gut ein Modell auf anderen Regionen, Jahren
+  oder Feldern funktioniert, sagen sie nicht – siehe
+  [Räumliche Ähnlichkeit](#raumliche-ahnlichkeit-als-risiko).
+- Welche Klassen verwechselt werden, zeigen erst Confusion Matrix und Recall pro Klasse.
+
 ### Was die Projektfunktion berechnet
 
 `awp2.evaluation.evaluate()` gibt für `Crop`, `Stage` und das kombinierte
@@ -156,6 +217,12 @@ ist dafür kein aussagekräftiger Test.[^3]
 | Cross-Validation-Folds | Der Trainingsanteil wird fünfmal intern geteilt, um Hyperparameter und Varianten zu vergleichen. |
 | Validierung | Bleibt während des Tunings unangetastet und bewertet die gewählte Variante genau einmal. |
 | Unbeschriftete Testdaten | Enthalten keine Zielwerte und dürfen keine Modellentscheidung beeinflussen. Ob `test.csv` bereits dem späteren Challenge-Datensatz entspricht, ist noch offen. |
+
+Ein **Holdout** ist ein Teil der beschrifteten Daten, der vor jeder Modellarbeit beiseitegelegt
+und erst ganz am Ende einmal zur Bewertung genutzt wird – das Modell hat ihn nie gesehen, und
+keine Entscheidung wurde anhand seiner Ergebnisse getroffen. Nur dann ist sein Score eine
+ehrliche Schätzung für neue Daten. Bei uns sind „Holdout“ und „Validierung“ derselbe
+30-%-Anteil; die unbeschrifteten Testdaten sind etwas anderes, weil sie keine Zielwerte haben.
 
 Unser gemeinsamer Split reserviert 30 % der beschrifteten Daten als Validierung und stratifiziert
 nach dem kombinierten Crop-Stage-Label. Dadurch sind seltene, aber vorhandene Paare möglichst
