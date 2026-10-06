@@ -27,7 +27,7 @@ def fill_spectral_nans(
     result = df.copy()
     column_means = original.mean()
 
-    def nearest_value(row_number, candidate_indices):
+    def nearest_value(row_number: int, candidate_indices: list[int]) -> float | None:
         for candidate_index in candidate_indices:
             value = original.iat[row_number, candidate_index]
             if pd.notna(value):
@@ -72,8 +72,8 @@ def fill_spectral_nans(
                 radius = min(radius + base_step_range, total_range)
 
             if not filled:
-                result.iat[row_number, result.columns.get_loc(column_name)] = (
-                    column_means[column_name]
-                )
+                result.iat[row_number, result.columns.get_loc(column_name)] = column_means[
+                    column_name
+                ]
 
     return result
