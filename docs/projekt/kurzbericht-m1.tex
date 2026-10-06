@@ -164,7 +164,31 @@ dieselbe Vorverarbeitung und dieselben Metriken. Ergebnisse verschiedener Ansät
 direkt vergleichbar. Das Modell selbst baut jeder Ansatz eigenständig. Die Pipeline arbeitet in
 zwei Stufen (Abbildung~\ref{fig:pipeline}):
 
-\begin{figure}[htbp]
+\begin{enumerate}
+  \item \textbf{Datenaufbereitung, einmalig} (\texttt{make data}): Die Rohdaten werden beim
+        Laden gegen ein Schema geprüft (Spalten, Wertebereiche, gültige Labels), die zwei exakt
+        doppelten Zeilen entfernt und der Split festgelegt (Abschnitt~\ref{sec:split}).
+        Ergebnis sind zwei deterministisch erzeugte und damit bei allen Teammitgliedern
+        identische Dateien: \texttt{train\_clean.parquet} mit den bereinigten Daten und
+        \texttt{split.csv} mit der Zuordnung jeder Zeile zu Train, Holdout und CV-Fold.
+  \item \textbf{Vorverarbeitung, je Modell}: Leere Bänder entfernen, Lücken interpolieren,
+        \texttt{AEZ} als One-Hot-Kodierung, optional Skalierung und Vegetationsindizes. Diese
+        Schritte sind der erste Teil einer sklearn-\texttt{Pipeline} und werden nur auf dem
+        jeweiligen Trainingsteil gelernt. Validierungs- und Testdaten werden mit denselben
+        gelernten Werten transformiert, ohne dass Informationen aus ihnen in das Modell
+        einfließen. Die Vorverarbeitung wird deshalb bewusst nicht als Datei gespeichert.
+\end{enumerate}
+
+Gesteuert wird alles über zwei Funktionen: \texttt{tune()} sucht Hyperparameter per
+Cross-Validation auf dem Trainingsteil, \texttt{run()} trainiert das gewählte Modell und
+bewertet es einmal auf dem Holdout. \texttt{evaluate()} berechnet dabei Balanced Accuracy und
+Macro-F1 für \texttt{Crop}, \texttt{Stage} und das kombinierte Paar, den Samples-F1 sowie den
+Anteil ungültiger Crop--Stage-Kombinationen. Jeder Aufruf wird in MLflow protokolliert
+(Abschnitt~\ref{sec:tracking}). Vorverarbeitungsoptionen sind Felder einer validierten
+Konfiguration (\texttt{PreprocessingConfig}); neue Schritte werden dort ergänzt statt als
+Einzelcode in Notebooks.
+
+\begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -219,31 +243,6 @@ zwei Stufen (Abbildung~\ref{fig:pipeline}):
   in MLflow protokolliert.}
 \label{fig:pipeline}
 \end{figure}
-
-
-\begin{enumerate}
-  \item \textbf{Datenaufbereitung, einmalig} (\texttt{make data}): Die Rohdaten werden beim
-        Laden gegen ein Schema geprüft (Spalten, Wertebereiche, gültige Labels), die zwei exakt
-        doppelten Zeilen entfernt und der Split festgelegt (Abschnitt~\ref{sec:split}).
-        Ergebnis sind zwei deterministisch erzeugte und damit bei allen Teammitgliedern
-        identische Dateien: \texttt{train\_clean.parquet} mit den bereinigten Daten und
-        \texttt{split.csv} mit der Zuordnung jeder Zeile zu Train, Holdout und CV-Fold.
-  \item \textbf{Vorverarbeitung, je Modell}: Leere Bänder entfernen, Lücken interpolieren,
-        \texttt{AEZ} als One-Hot-Kodierung, optional Skalierung und Vegetationsindizes. Diese
-        Schritte sind der erste Teil einer sklearn-\texttt{Pipeline} und werden nur auf dem
-        jeweiligen Trainingsteil gelernt. Validierungs- und Testdaten werden mit denselben
-        gelernten Werten transformiert, ohne dass Informationen aus ihnen in das Modell
-        einfließen. Die Vorverarbeitung wird deshalb bewusst nicht als Datei gespeichert.
-\end{enumerate}
-
-Gesteuert wird alles über zwei Funktionen: \texttt{tune()} sucht Hyperparameter per
-Cross-Validation auf dem Trainingsteil, \texttt{run()} trainiert das gewählte Modell und
-bewertet es einmal auf dem Holdout. \texttt{evaluate()} berechnet dabei Balanced Accuracy und
-Macro-F1 für \texttt{Crop}, \texttt{Stage} und das kombinierte Paar, den Samples-F1 sowie den
-Anteil ungültiger Crop--Stage-Kombinationen. Jeder Aufruf wird in MLflow protokolliert
-(Abschnitt~\ref{sec:tracking}). Vorverarbeitungsoptionen sind Felder einer validierten
-Konfiguration (\texttt{PreprocessingConfig}); neue Schritte werden dort ergänzt statt als
-Einzelcode in Notebooks.
 
 
 \subsection{Cleaning- und Preprocessing-Entscheidungen}
