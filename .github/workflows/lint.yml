@@ -1,0 +1,80 @@
+name: Lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Install environment
+        run: uv sync --locked
+
+      - name: make lint
+        id: lint
+        env:
+          # One line per finding keeps the PR comment readable.
+          RUFF_OUTPUT_FORMAT: concise
+          NO_COLOR: "1"
+        run: |
+          set +e
+          # -k: ty still runs when ruff fails, so the comment lists all problems at once.
+          make -k lint > lint.log 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat lint.log
+
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          STATUS: ${{ steps.lint.outputs.status }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The marker identifies our comment, so each push updates it instead of adding a new one.
+          marker="<!-- lint-report -->"
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+
+          if [ "$STATUS" = "0" ]; then
+            [ -z "$existing" ] && exit 0
+            printf '%s\n### ✅ `make lint` bestanden\n\nCommit %s · [Lauf](%s)\n' \
+              "$marker" "${SHA:0:7}" "$RUN_URL" > comment.md
+          else
+            # GitHub rejects comments above 65 536 characters.
+            {
+              printf '%s\n### ❌ `make lint` fehlgeschlagen\n\n' "$marker"
+              printf 'Commit %s · [Lauf](%s) · lokal beheben: `make format`, dann `make lint`\n\n' \
+                "${SHA:0:7}" "$RUN_URL"
+              grep -E '^Found [0-9]+ error|^\[\*\]|^Found [0-9]+ diagnostic' lint.log | sed 's/^/- /'
+              printf '\n<details><summary>Ausgabe</summary>\n\n````text\n'
+              grep -vE '^make(\[[0-9]+\])?: ' lint.log | head -c 60000
+              printf '\n````\n\n</details>\n'
+            } > comment.md
+          fi
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@comment.md > /dev/null
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file comment.md
+          fi
+
+      - name: Fail on lint errors
+        if: steps.lint.outputs.status != '0'
+        run: exit 1
