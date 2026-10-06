@@ -405,40 +405,6 @@ gespeicherte Modelle können direkt für die Vorhersage auf den Testdaten gelade
 Ergebnisse, die das Team kennen soll, werden mit ihrer Run-ID im Experiment-Log
 (\texttt{docs/modelle/experimente.md}) festgehalten.
 
-\section{Fazit, offene Punkte und nächste Schritte}
-
-\subsection{Ergebnis von Meilenstein 1}
-
-\begin{itemize}
-  \item Domänenziel und Grenzen der Vorhersage sind beschrieben.
-  \item Die EDA hat Datenqualität, Klassenungleichgewicht, Kontextabhängigkeit und Redundanz
-        der Bänder herausgearbeitet und daraus Cleaning-Empfehlungen abgeleitet.
-  \item Eine gemeinsame, reproduzierbare Pipeline setzt diese Empfehlungen um und stellt Split,
-        Vorverarbeitung, Bewertung und Tracking für alle Ansätze bereit.
-  \item Die Random-Forest-Baseline erreicht eine kombinierte Balanced Accuracy von 0,743 und ist
-        die Referenz für Meilenstein 2.
-\end{itemize}
-
-\subsection{Offene Punkte}
-
-\begin{itemize}
-  \item Bedeutung des geforderten „70/30 Clusterplot-Splits“ klären.
-  \item Verfügbarkeit von Feld-, Bild- oder räumlichen IDs sowie die Bedeutung von
-        \texttt{Month} und \texttt{AEZ} klären -- die Baseline hängt stark von beiden ab.
-\end{itemize}
-
-\subsection{Nächste Schritte}
-
-\begin{itemize}
-  \item Modelle mit und ohne \texttt{AEZ} und \texttt{Month} sowie begründete Glättungs- oder
-        Merkmalsreduktionsvarianten (Bandauswahl, PCA) innerhalb derselben Cross-Validation
-        vergleichen; neue Schritte als Optionen der Pipeline.
-  \item Die Abhängigkeit zwischen \texttt{Crop} und \texttt{Stage} nutzen (hierarchisch oder
-        kombiniertes Label), damit nur gültige Paare vorhergesagt werden.
-  \item Fehleranalyse für Mais/Soja und benachbarte Stadien; Vorhersage im Abgabeformat für die
-        Testdaten.
-\end{itemize}
-
 \section{Dokumentation und Notebooks}
 
 Alle Inhalte dieses Berichts sind ausführlicher in der Projektdokumentation im Repository
