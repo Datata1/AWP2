@@ -15,6 +15,8 @@
 \usepackage{enumitem}
 \usepackage{caption}
 \usepackage{xurl}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
 
 \setlist{nosep,leftmargin=*}
 \setlength{\parindent}{0pt}
@@ -25,8 +27,8 @@
 \title{Meilenstein 1:\\Problemverständnis, Data Understanding und Baseline}
 \author{Domänenprojekt 2 -- Kultur- und Entwicklungsstadiumsklassifikation\\[0.5em]
 Team: \AE-R\O\O T\\
-Mitglieder: Achim Duong, Pascal Heinzemann, Jan-David Wiederstein}
-\date{Stand: 06.10.2026\\Code-Version: \textit{[Commit oder Branch ergänzen]}}
+Mitglieder: Achim Duong, Pascal Heinzelmann, Jan-David Wiederstein}
+\date{Stand: 06.10.2026\\Code-Version: Branch \texttt{main}, Pipeline-Code (\texttt{src/awp2}) Stand Commit \texttt{a43ef23}}
 
 \begin{document}
 \maketitle
@@ -37,8 +39,7 @@ Mitglieder: Achim Duong, Pascal Heinzemann, Jan-David Wiederstein}
 
 Die Aufgabenbeschreibung behandelt satellitengestützte Hyperspektralaufnahmen landwirtschaftlicher
 Flächen in den USA. EO-1 Hyperion erfasst Reflexion in vielen schmalen Spektralkanälen von
-ungefähr 10\,nm Breite. Jede Beobachtung als ein Feld und hat eine
-eine räumliche Auflösung von 30\,m. Im bereitgestellten Datensatz entspricht eine Zeile einem
+ungefähr 10\,nm Breite; ein Pixel deckt eine Fläche von 30\,m $\times$ 30\,m ab. Im bereitgestellten Datensatz entspricht eine Zeile einem
 Spektrum; ob jede Zeile unverändert genau einem Originalpixel entspricht, ist anhand der
 Tabellendaten allein nicht nachprüfbar.
 
@@ -142,7 +143,7 @@ Treffer festgestellt. Der explorative Similarity-Screen fand innerhalb derselben
 Crop-Stage-Gruppe viele Paare mit hoher Cosinus-Ähnlichkeit, insbesondere bei Mais und Soja. 
 
 Die Ausreißer- und Sprungdiagnostik markiert Kandidaten zur Prüfung, die jedoch aufgrund der teils 
-sehr geringen Gruppengrößen nicht automatisch entfernt werden sollten..
+sehr geringen Gruppengrößen nicht automatisch entfernt werden sollten.
 
 \subsection{Grenzen der Datengrundlage}
 
@@ -155,7 +156,90 @@ Bereitstellung des Datensatzes sind nicht abschließend dokumentiert.
 
 \subsection{Pipeline-Ablauf}
 
-\textit{[Wird von der zuständigen Person ergänzt.]}
+\begin{figure}[!t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=7mm and 6mm,
+    >={Stealth[length=2mm]},
+    box/.style={draw, rounded corners=2pt, align=center, font=\small,
+                minimum width=44mm, minimum height=10mm, fill=white},
+    file/.style={box, fill=gray!8},
+    lbl/.style={font=\scriptsize\itshape, midway, right=1mm},
+    group/.style={draw=gray!60, dashed, rounded corners=4pt, inner sep=3mm},
+    gtitle/.style={font=\footnotesize\bfseries, text=gray!70!black, anchor=south west},
+  ]
+  \node[file] (raw) {\texttt{data/raw/train.csv}\\ Rohdaten (read-only)};
+  \node[box, below=of raw] (clean) {Schema-Validierung\\ 2 Duplikate entfernen};
+  \node[box, below=of clean] (split) {Stratifizierter Split nach \texttt{Crop|Stage}\\
+                                       70\,\% Train / 30\,\% Holdout, 5 CV-Folds};
+  \node[file, below=of split] (art) {\texttt{train\_clean.parquet}\\ \texttt{split.csv}};
+
+  \node[box, right=42mm of raw] (pre) {Vorverarbeitung\\ leere Bänder raus, Interpolation,\\
+                                        opt.\ AEZ/Month, Skalierung, Indizes};
+  \node[box, below=of pre] (model) {Modell des Ansatzes\\ (z.\,B.\ Random Forest)};
+  \node[box, below=of model] (tune) {\texttt{tune()}: CV auf Train};
+  \node[box, below=of tune] (run) {\texttt{run()}: einmal auf Holdout\\ \texttt{evaluate()} $\to$ Metriken};
+
+  \node[file, below=17mm of run] (mlflow) {MLflow: Parameter, Metriken,\\
+                                           Modell, Daten-Hash, Git-Stand};
+  \node[file, left=22mm of mlflow] (log) {Experiment-Log\\ (Doku, mit Run-ID)};
+
+  \draw[->] (raw) -- (clean);
+  \draw[->] (clean) -- (split);
+  \draw[->] (split) -- (art);
+  \draw[->] (art.east) -- ++(18mm,0) |- node[pos=0.25, right, font=\scriptsize\itshape]
+            {\texttt{load\_split()}} (pre.west);
+  \draw[->] (pre) -- (model);
+  \draw[->] (model) -- (tune);
+  \draw[->] (tune) -- node[lbl] {bestes Modell} (run);
+  \draw[->] (run) -- node[lbl] {\texttt{log\_run()}} (mlflow);
+  \draw[->] (tune.east) -- ++(6mm,0) |- (mlflow.east);
+  \draw[->] (mlflow) -- node[above, font=\scriptsize\itshape] {Run-ID} (log);
+
+  \begin{scope}[on background layer]
+    \node[group, fit=(raw)(split)(art)] (g1) {};
+    \node[group, fit=(pre)(run)] (g2) {};
+    \node[group, fit=(mlflow)] (g3) {};
+  \end{scope}
+  \node[gtitle] at (g1.north west) {Einmalig: \texttt{make data}};
+  \node[gtitle] at (g2.north west) {Je Ansatz: sklearn-Pipeline};
+  \node[gtitle] at (g3.north west) {Tracking};
+\end{tikzpicture}}
+\caption{Gemeinsame Data Pipeline: Die Datenaufbereitung läuft einmal und ist für alle gleich;
+  Vorverarbeitung und Modell werden je Ansatz nur auf dem Trainingsteil gelernt, jeder Lauf wird
+  in MLflow protokolliert.}
+\label{fig:pipeline}
+\end{figure}
+
+Die Pipeline liefert allen Modellierungsansätzen dieselben bereinigten Daten, denselben Split,
+dieselbe Vorverarbeitung und dieselben Metriken. Ergebnisse verschiedener Ansätze sind dadurch
+direkt vergleichbar. Das Modell selbst baut jeder Ansatz eigenständig. Die Pipeline arbeitet in
+zwei Stufen (Abbildung~\ref{fig:pipeline}):
+
+\begin{enumerate}
+  \item \textbf{Datenaufbereitung, einmalig} (\texttt{make data}): Die Rohdaten werden beim
+        Laden gegen ein Schema geprüft (Spalten, Wertebereiche, gültige Labels), die zwei exakt
+        doppelten Zeilen entfernt und der Split festgelegt (Abschnitt~\ref{sec:split}). Das
+        Ergebnis sind zwei Dateien (\texttt{train\_clean.parquet}, \texttt{split.csv}), die
+        deterministisch erzeugt werden und damit bei allen Teammitgliedern identisch sind.
+  \item \textbf{Vorverarbeitung, je Modell}: Leere Bänder entfernen, Lücken interpolieren,
+        \texttt{AEZ} als One-Hot-Kodierung, optional Skalierung und Vegetationsindizes. Diese
+        Schritte sind der erste Teil einer sklearn-\texttt{Pipeline} und werden nur auf dem
+        jeweiligen Trainingsteil gelernt. Validierungs- und Testdaten werden mit denselben
+        gelernten Werten transformiert, ohne dass Informationen aus ihnen in das Modell
+        einfließen. Die Vorverarbeitung wird deshalb bewusst nicht als Datei gespeichert.
+\end{enumerate}
+
+Gesteuert wird alles über zwei Funktionen: \texttt{tune()} sucht Hyperparameter per
+Cross-Validation auf dem Trainingsteil, \texttt{run()} trainiert das gewählte Modell und
+bewertet es einmal auf dem Holdout. \texttt{evaluate()} berechnet dabei Balanced Accuracy und
+Macro-F1 für \texttt{Crop}, \texttt{Stage} und das kombinierte Paar, den Samples-F1 sowie den
+Anteil ungültiger Crop--Stage-Kombinationen. Jeder Aufruf wird in MLflow protokolliert
+(Abschnitt~\ref{sec:tracking}). Vorverarbeitungsoptionen sind Felder einer validierten
+Konfiguration (\texttt{PreprocessingConfig}); neue Schritte werden dort ergänzt statt als
+Einzelcode in Notebooks.
+
 
 \subsection{Cleaning- und Preprocessing-Entscheidungen}
 
@@ -198,25 +282,120 @@ Split und Evaluation & Den kombinierten Crop-Stage-Label beim stratifizierten Sp
 \end{longtable}
 \endgroup
 
+\textbf{Umsetzung in Pipeline v1:} Entfernen leerer Bänder, Interpolation, Deduplizierung,
+stratifizierter Split und \texttt{AEZ}/\texttt{Month} als abschaltbare Option sind umgesetzt.
+Glättung, Ausreißerentfernung und ein gruppierter Split sind bewusst nicht Teil der ersten
+Pipeline; sie folgen bei Bedarf als zusätzliche Konfigurationsoptionen und werden dann per
+Cross-Validation gegen die Baseline verglichen.
+
 \section{Erster Baseline-Klassifikator}
 
-\subsection{70/30 Clusterplot-Split}
+Die Baseline ist bewusst kein begründeter Modellierungsansatz, sondern die Messlatte für alle
+weiteren: eine Untergrenze ohne Lernen und ein einfaches Modell, das \texttt{Crop} und
+\texttt{Stage} ohne eigene Logik gemeinsam vorhersagt.
 
-\textit{[Tatsächlich verwendete Split-Methode und Klärung des Begriffs
-„Clusterplot-Split“ ergänzen.]}
+\subsection{Split und Validierungsdesign}
+\label{sec:split}
 
-\subsection{Modell und Code}
+Was mit dem geforderten „70/30 Clusterplot-Split“ genau gemeint ist, ist bei der Betreuung
+angefragt und noch offen. Bis zur Klärung verwenden wir einen festen 70/30-Holdout,
+stratifiziert nach dem kombinierten Label \texttt{Crop|Stage}:
 
-\textit{[Modell, Merkmale, Einstellungen und Code-Einstiegspunkt ergänzen.]}
+\begin{itemize}
+  \item 3.912 Zeilen Training, 1.677 Zeilen Holdout (nach Entfernen der Duplikate). Die
+        Klassenanteile weichen zwischen beiden Teilen um höchstens 0,05 Prozentpunkte ab; auch
+        das seltenste Paar \texttt{cotton|Harvest} ist in beiden Teilen vertreten (8 bzw. 3).
+  \item Hyperparameter werden ausschließlich per fünffacher, ebenfalls stratifizierter
+        Cross-Validation auf dem Trainingsteil gewählt. Der Holdout wird je Modell genau einmal
+        zur abschließenden Bewertung genutzt, damit sein Score nicht durch wiederholtes
+        Nachjustieren zu optimistisch wird.
+  \item Ohne Feld- oder Bildkennungen ist kein räumlich gruppierter Split möglich. Ähnliche
+        Spektren können daher auf beiden Seiten des Splits liegen; die Scores sind in dieser
+        Hinsicht eher eine Obergrenze.
+\end{itemize}
 
-\subsection{Kurzer Demo-Run}
+\subsection{Modelle und Einstellungen}
 
-\textit{[Ausführungsbefehl, Demo-Ablauf und erzeugte Ausgabe ergänzen.]}
+\begin{itemize}
+  \item \textbf{Dummy}: sagt immer die häufigste Kultur und das häufigste Stadium vorher und
+        markiert damit das Zufallsniveau.
+  \item \textbf{Random Forest}: 300 Bäume, \texttt{class\_weight="balanced"} gegen das
+        Klassenungleichgewicht; sagt beide Zielgrößen nativ gemeinsam vorher. Eingaben sind die
+        131 verfügbaren Bänder, \texttt{AEZ} (One-Hot) und \texttt{Month}, ohne Skalierung.
+        Gesucht wurden 8 Kombinationen aus \texttt{max\_depth} \{unbegrenzt, 20\},
+        \texttt{min\_samples\_leaf} \{1, 3\} und \texttt{max\_features} \{$\sqrt{p}$, 0,3\};
+        am besten war \texttt{max\_depth=20}, \texttt{min\_samples\_leaf=1},
+        \texttt{max\_features=0.3}.
+\end{itemize}
 
-\subsection{Ergebnisse und kurze Einordnung}
+\textbf{Code-Einstiegspunkte:} \texttt{awp2.experiment.tune()} und \texttt{run()};
+Baseline mit Fehleranalyse in \texttt{notebooks/01\_jd\_baseline.ipynb}; ein vollständiger
+Durchlauf von den Rohdaten bis zur Testvorhersage (ca.\ 15\,s) in
+\texttt{notebooks/03\_jd\_pipeline\_rundgang.ipynb}.
 
-\textit{[Metriken für Crop und Stage, Vergleichsreferenz und wichtigste Beobachtungen
-ergänzen.]}
+\subsection{Ergebnisse}
+
+\begin{table}[htbp]
+\centering
+\caption{Baseline auf dem Holdout (1.677 Zeilen). BAcc = Balanced Accuracy; „kombiniert“ zählt
+nur, wenn \texttt{Crop} und \texttt{Stage} beide stimmen.}
+\label{tab:baseline}
+\small
+\begin{tabular}{l cc cc cc c}
+\toprule
+& \multicolumn{2}{c}{\texttt{Crop}} & \multicolumn{2}{c}{\texttt{Stage}}
+& \multicolumn{2}{c}{kombiniert} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Modell & BAcc & Macro-F1 & BAcc & Macro-F1 & BAcc & Macro-F1 & Samples-F1 \\
+\midrule
+Dummy & 0,200 & 0,109 & 0,167 & 0,072 & 0,044 & 0,009 & 0,326 \\
+Random Forest & 0,890 & 0,873 & 0,870 & 0,862 & \textbf{0,743} & 0,708 & 0,878 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../modelle/img/baseline_confusion.png}
+\caption{Zeilennormierte Confusion Matrices des Random Forest auf dem Holdout.}
+\label{fig:confusion}
+\end{figure}
+
+\subsection{Einordnung}
+
+\begin{itemize}
+  \item \textbf{Deutlich über Zufallsniveau}: Der Dummy liegt exakt beim Zufallsniveau
+        (1/5 bzw.\ 1/6); der Random Forest erkennt Kultur und Stadium im Klassenmittel jeweils
+        zu knapp 90\,\%, das vollständige Paar zu 74\,\%. Die Messlatte für alle weiteren
+        Ansätze ist \textbf{BAcc kombiniert 0,743}.
+  \item \textbf{Ehrliche Schätzung}: Der Holdout-Score liegt im Streubereich der
+        Cross-Validation ($0{,}750 \pm 0{,}019$); es gibt keine Anzeichen für Überanpassung
+        an den Holdout. Unterschiede unter etwa 0,02 sind zwischen Modellen nicht belastbar.
+  \item \textbf{Fehlermuster}: Bei der Kultur werden vor allem Mais und Soja verwechselt, beim
+        Stadium benachbarte Stadien. Am schwächsten ist \texttt{Mature\_Senesc} (Recall 0,79),
+        das auch mit \texttt{Emerge\_VEarly} verwechselt wird -- beide Phasen zeigen wenig grüne
+        Vegetation und viel Boden.
+  \item \textbf{Ungültige Paare}: 0,3\,\% der Vorhersagen sind Crop--Stage-Kombinationen, die im
+        Training nicht vorkommen. Der Random Forest kennt die Abhängigkeit zwischen den
+        Zielgrößen nicht; ohne Korrektur ist er keine abgabefertige Vorhersage.
+  \item \textbf{Starke Abhängigkeit vom Kontext}: Ein Vergleich der Eingaben per
+        Cross-Validation ergab für Spektren allein 0,570, mit vier Vegetationsindizes 0,590 und
+        mit \texttt{AEZ}/\texttt{Month} 0,750 (BAcc kombiniert). Ein großer Teil der Leistung
+        stammt also aus den Kontextmerkmalen -- ob sie beim späteren Einsatz verfügbar und
+        erwünscht sind, ist daher eine zentrale offene Frage.
+\end{itemize}
+
+\subsection{Reproduzierbarkeit und Experiment-Tracking}
+\label{sec:tracking}
+
+Alle Zufallsprozesse (Split, Folds, Modelle) verwenden einen festen Seed. Jeder Aufruf von
+\texttt{tune()} und \texttt{run()} wird lokal in MLflow protokolliert: Parameter, Metriken,
+Confusion Matrices, das trainierte Modell inklusive Vorverarbeitung, ein Hash der verwendeten
+Daten und der Git-Stand (Commit, ungespeicherte Änderungen). Dadurch lassen sich Läufe nach
+Ansatz gruppieren und vergleichen, jedes Ergebnis ist auf Code und Daten zurückführbar, und
+gespeicherte Modelle können direkt für die Vorhersage auf den Testdaten geladen werden.
+Ergebnisse, die das Team kennen soll, werden mit ihrer Run-ID im Experiment-Log
+(\texttt{docs/modelle/experimente.md}) festgehalten.
 
 \section{Fazit, offene Punkte und nächste Schritte}
 
@@ -224,7 +403,12 @@ ergänzen.]}
 
 \begin{itemize}
   \item Domänenziel und Grenzen der Vorhersage sind beschrieben.
-  \item Pipeline und Baseline werden in den dafür vorgesehenen Abschnitten dokumentiert.
+  \item Die EDA hat Datenqualität, Klassenungleichgewicht, Kontextabhängigkeit und Redundanz
+        der Bänder herausgearbeitet und daraus Cleaning-Empfehlungen abgeleitet.
+  \item Eine gemeinsame, reproduzierbare Pipeline setzt diese Empfehlungen um und stellt Split,
+        Vorverarbeitung, Bewertung und Tracking für alle Ansätze bereit.
+  \item Die Random-Forest-Baseline erreicht eine kombinierte Balanced Accuracy von 0,743 und ist
+        die Referenz für Meilenstein 2.
 \end{itemize}
 
 \subsection{Offene Punkte}
@@ -232,14 +416,19 @@ ergänzen.]}
 \begin{itemize}
   \item Bedeutung des geforderten „70/30 Clusterplot-Splits“ klären.
   \item Verfügbarkeit von Feld-, Bild- oder räumlichen IDs sowie die Bedeutung von
-        \texttt{Month} und \texttt{AEZ} klären.
+        \texttt{Month} und \texttt{AEZ} klären -- die Baseline hängt stark von beiden ab.
 \end{itemize}
 
 \subsection{Nächste Schritte}
 
 \begin{itemize}
   \item Modelle mit und ohne \texttt{AEZ} und \texttt{Month} sowie begründete Glättungs- oder
-        Merkmalsreduktionsvarianten innerhalb derselben Cross-Validation vergleichen.
+        Merkmalsreduktionsvarianten (Bandauswahl, PCA) innerhalb derselben Cross-Validation
+        vergleichen; neue Schritte als Optionen der Pipeline.
+  \item Die Abhängigkeit zwischen \texttt{Crop} und \texttt{Stage} nutzen (hierarchisch oder
+        kombiniertes Label), damit nur gültige Paare vorhergesagt werden.
+  \item Fehleranalyse für Mais/Soja und benachbarte Stadien; Vorhersage im Abgabeformat für die
+        Testdaten.
 \end{itemize}
 
 \section{Quellen im Projekt}
@@ -248,8 +437,13 @@ ergänzen.]}
   \item Domänenbeschreibung: \url{../domaene/index.md}
   \item Data Understanding und EDA: \url{../daten/m1-data-understanding.md}
   \item Vollständige EDA-Dokumentation: \url{../daten/eda.md}
-  \item Datenpipeline: \url{../daten/pipeline.md}
-  \item Baseline-Ergebnisse: \url{../modelle/ansaetze/baseline.md}
+  \item Datenpipeline: \url{../daten/pipeline.md}, Begründungen:
+        \url{../daten/pipeline-entscheidungen.md}
+  \item Metriken und Validierung: \url{../domaene/ml-aufgabe.md}
+  \item Baseline-Ergebnisse: \url{../modelle/ansaetze/baseline.md}, Experiment-Log:
+        \url{../modelle/experimente.md}
+  \item Notebooks: \url{notebooks/01_jd_baseline.ipynb},
+        \url{notebooks/03_jd_pipeline_rundgang.ipynb}
   \item Offene Fragen an die Betreuung: \url{offene-fragen.md}
 \end{itemize}
 
