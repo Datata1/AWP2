@@ -74,3 +74,41 @@ Modelle einheitlich ausführen und in MLflow vergleichen: [Experimente & MLflow]
 `scoring=scorer(...)` ist nötig, weil sklearns Standard-Score keine zwei Zielspalten kennt.
 Für Modelle ohne `class_weight` gegen das Klassenungleichgewicht:
 [`balanced_sample_weight`][awp2.data.split.balanced_sample_weight].
+
+## 4. Modelle außerhalb von sklearn (z. B. neuronale Netze)
+
+Daten, Split, Folds und `evaluate()` hängen an keinem Framework. Nur `run()`, `tune()` und
+`build_preprocessor()` erwarten die **sklearn-Schnittstelle** – die hat aber jedes Modell, das
+in eine kleine Hülle (Wrapper) gepackt wird. Ein Netz in PyTorch, Keras o. Ä. läuft dann
+unverändert durch die Pipeline und wird in MLflow protokolliert:
+
+```python
+from sklearn.base import BaseEstimator, ClassifierMixin
+
+
+class SpectralLSTM(BaseEstimator, ClassifierMixin):
+    def __init__(self, hidden_size: int = 64, epochs: int = 50) -> None:
+        self.hidden_size = hidden_size   # Hyperparameter nur speichern → tune() kann sie setzen
+        self.epochs = epochs
+
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame) -> "SpectralLSTM":
+        ...  # Labels kodieren, Netz bauen und trainieren
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        ...  # Array der Form (n, 2): Spalten Crop, Stage
+```
+
+| Worauf achten | Warum |
+| --- | --- |
+| Alle Hyperparameter als Argumente von `__init__`, dort nur speichern | `tune()` kopiert das Modell mit `clone()` und setzt Werte über diese Namen |
+| `X` ist ein DataFrame aus Bändern **und** ggf. `AEZ`/`Month` | Für ein LSTM/1D-CNN die Bandspalten zur Sequenz `(n, Bänder, 1)` umformen; Metadaten getrennt einspeisen oder `use_meta=False` |
+| Skalierung einschalten (`PreprocessingConfig(scale=True)`) | Netze lernen auf unskalierten Reflektanzen schlecht |
+| Seed aus `awp2.config` im Framework setzen | Sonst ist jeder Lauf anders und Vergleiche sind wertlos |
+| Kleine Grids, `log_model=False` beim Ausprobieren | `tune()` trainiert jeden Kandidaten 5-mal; das Speichern großer Netze kostet Zeit |
+
+Für PyTorch nimmt [skorch](https://skorch.readthedocs.io/) den Trainings-Code ab; die zwei
+Zielspalten muss der Wrapper trotzdem selbst behandeln. Wer die Hülle nicht bauen will, kann
+auch ohne `run()` arbeiten: `load_split()`, Vorverarbeitung auf `X_train` fitten, eigenes
+Training, dann `evaluate()` – muss Tracking und das Verbot, auf der Validierung zu tunen, dann
+aber selbst sicherstellen.
