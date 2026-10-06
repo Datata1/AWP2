@@ -11,6 +11,7 @@
 \usepackage{array}
 \usepackage{float}
 \usepackage[section]{placeins}
+\usepackage{needspace}
 \usepackage{microtype}
 \usepackage[hidelinks]{hyperref}
 \usepackage{enumitem}
@@ -245,6 +246,8 @@ Einzelcode in Notebooks.
 \end{figure}
 
 
+% Heading, table caption and first row must start on the same page.
+\needspace{12\baselineskip}
 \subsection{Cleaning- und Preprocessing-Entscheidungen}
 
 
@@ -366,6 +369,7 @@ Random Forest & 0,890 & 0,873 & 0,870 & 0,862 & \textbf{0,743} & 0,708 & 0,878 \
 \end{figure}
 
 \subsection{Einordnung}
+\label{sec:einordnung}
 
 \begin{itemize}
   \item \textbf{Deutlich über Zufallsniveau}: Der Dummy liegt exakt beim Zufallsniveau
@@ -435,20 +439,57 @@ Ergebnisse, die das Team kennen soll, werden mit ihrer Run-ID im Experiment-Log
         Testdaten.
 \end{itemize}
 
-\section{Quellen im Projekt}
+\section{Dokumentation und Notebooks}
 
-\begin{itemize}
-  \item Domänenbeschreibung: \url{../domaene/index.md}
-  \item Data Understanding und EDA: \url{../daten/m1-data-understanding.md}
-  \item Vollständige EDA-Dokumentation: \url{../daten/eda.md}
-  \item Datenpipeline: \url{../daten/pipeline.md}, Begründungen:
-        \url{../daten/pipeline-entscheidungen.md}
-  \item Metriken und Validierung: \url{../domaene/ml-aufgabe.md}
-  \item Baseline-Ergebnisse: \url{../modelle/ansaetze/baseline.md}, Experiment-Log:
-        \url{../modelle/experimente.md}
-  \item Notebooks: \url{notebooks/01_jd_baseline.ipynb},
-        \url{notebooks/03_jd_pipeline_rundgang.ipynb}
-  \item Offene Fragen an die Betreuung: \url{offene-fragen.md}
-\end{itemize}
+Alle Inhalte dieses Berichts sind ausführlicher in der Projektdokumentation im Repository
+(\url{https://github.com/Datata1/AWP2}) beschrieben. Nach einmaligem \texttt{make setup} startet
+\texttt{make docs} die Dokumentation lokal unter \url{http://127.0.0.1:8000}.
+
+\begin{table}[H]
+\centering
+\caption{Bereiche der Projektdokumentation}
+\small
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+Bereich & Inhalt \\
+\midrule
+Projekt & Aufgabe, Bewertung, Zeitplan, offene Fragen an die Betreuung \\
+Domäne & Fernerkundung, Kulturpflanzen und Phänologie, ML-Aufgabe mit Metriken und Validierung,
+  Glossar \\
+Daten & EDA, Nutzung der Pipeline und Begründung jeder Pipeline-Entscheidung \\
+Modelle & Modellierungsansätze mit Ergebnissen (u.\,a.\ Baseline), Experiment-Log mit allen
+  verglichenen Läufen \\
+Entwicklung & Arbeitsweise im Team, Konventionen, Experiment-Tracking mit MLflow \\
+Referenz & API-Dokumentation des Projektcodes, erzeugt aus den Docstrings \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Die Notebooks liegen in \texttt{notebooks/} und benötigen die Pipeline-Artefakte
+(\texttt{make data}); \texttt{make lab} startet Jupyter, \texttt{make mlflow} die Oberfläche
+mit den protokollierten Läufen.
+
+\begin{table}[H]
+\centering
+\caption{Notebooks und ihr Zweck}
+\small
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+Notebook & Zweck \\
+\midrule
+\texttt{EDA} & Datenqualität (leere Bänder, Lücken, Duplikate), Train/Test-Vergleich,
+  Ähnlichkeiten, Klassenverteilung, Korrelation und PCA, Ausreißer; Abbildungen 1--4 \\
+\texttt{01\_duac1011\_eda} & Domänenbezogene EDA: Labels, Metadaten, Spektren und
+  Vegetationsindizes im fachlichen Kontext, Synthese der Cleaning-Empfehlungen
+  (Tabelle~\ref{tab:cleaning-entscheidungen}) \\
+\texttt{02\_duac1011\_eda-baseline} & Vergleich der Eingaben Spektren, Indizes und
+  \texttt{AEZ}/\texttt{Month} per Cross-Validation (Abschnitt~\ref{sec:einordnung}) \\
+\texttt{01\_jd\_baseline} & Baseline: Tuning, einmalige Holdout-Bewertung und Fehleranalyse
+  (Kapitel~4) \\
+\texttt{03\_jd\_pipeline\_rundgang} & Einstieg: die Pipeline Schritt für Schritt von den
+  Rohdaten bis zur Baseline und Testvorhersage (ca.\ 15\,s) \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \end{document}
