@@ -66,6 +66,7 @@ VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
 RANDOM_FOREST_N_ESTIMATORS = 300
+EXTRA_TREES_N_ESTIMATORS = 300
 SLUG_PATTERN = (
     r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: names of runs, approaches, experiments
 )

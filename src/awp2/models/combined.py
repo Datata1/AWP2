@@ -3,12 +3,13 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import (
     CROP_COL,
+    EXTRA_TREES_N_ESTIMATORS,
     LABEL_SEP,
     RANDOM_FOREST_N_ESTIMATORS,
     SEED,
@@ -84,6 +85,22 @@ def make_combined_random_forest() -> CombinedLabelClassifier:
     return CombinedLabelClassifier(
         RandomForestClassifier(
             n_estimators=RANDOM_FOREST_N_ESTIMATORS,
+            class_weight="balanced",
+            random_state=SEED,
+            n_jobs=-1,
+        )
+    )
+
+
+def make_combined_extra_trees() -> CombinedLabelClassifier:
+    """Create the Extra Trees classifier for the combined-label approach.
+
+    Returns:
+        Unfitted classifier with balanced class weights and the project seed.
+    """
+    return CombinedLabelClassifier(
+        ExtraTreesClassifier(
+            n_estimators=EXTRA_TREES_N_ESTIMATORS,
             class_weight="balanced",
             random_state=SEED,
             n_jobs=-1,
