@@ -146,6 +146,83 @@ Klassen wie der Random Forest; Spektren und Month werden dafür standardisiert.
 
 ![Häufigste Verwechslungen](../img/combined_svm_confusions.png)
 
+### RBF-SVM ohne Metadaten
+
+Notebook: `notebooks/03_duac1011_combined-svm-no-meta.ipynb`. Die SVM erhält nur skalierte
+Spektralbänder; AEZ und Month sind gegenüber der SVM-Referenz die einzige entfernte Information.
+
+- **Warum getestet?** Die Ablation misst den eigenständigen Beitrag des räumlichen und saisonalen
+    Kontexts, ohne Modellfamilie, Skalierung oder Suchraum zu verändern.
+- Die Suche `combined_svm_no_meta_search` (MLflow `0afa2b8e`) verglich dieselben neun
+    Kombinationen aus `C` und `gamma` wie die Referenz. Beste Einstellung blieb `C=10.0`,
+    `gamma=0.01`, aber die CV-BAcc kombiniert fiel von 0.834 auf 0.742.
+- Der einmalige Validierungslauf `combined_svm_no_meta` (MLflow `daa233c2`) erreicht BAcc 0.871
+    für Crop, 0.838 für Stage und **0.779 kombiniert**. Gegenüber der SVM mit Metadaten sinkt die
+    kombinierte BAcc um 0.066; die Hypothese zum eigenständigen Kontextbeitrag wird gestützt.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste kombinierte Verwechslungen sind
+    Mais/Critical → Mais/Late (16), Baumwolle/Emerge_VEarly → Baumwolle/Early_Mid (15) und
+    Mais/Emerge_VEarly → Soja/Emerge_VEarly (14).
+
+![Tuning der SVM ohne Metadaten](../img/combined_svm_no_meta_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_no_meta_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_no_meta_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_no_meta_confusions.png)
+
+### RBF-SVM mit Vegetationsindizes
+
+Notebook: `notebooks/04_duac1011_combined-svm-vegetation-indices.ipynb`. Die SVM erhält neben
+Spektren, AEZ und Month die vier aus Rohbändern abgeleiteten Indizes NDVI, NDRE, PRI und NDWI.
+
+- **Warum getestet?** Die Indizes verdichten für Vegetation relevante Bandverhältnisse und könnten
+    über die vollständigen Rohspektren hinaus zusätzliche Trenninformation liefern.
+- Die Suche `combined_svm_indices_search` (MLflow `43fc0e63`) verglich dieselben neun
+    Kombinationen aus `C` und `gamma` wie die Referenz. Beste Einstellung blieb `C=10.0`,
+    `gamma=0.01`; die CV-BAcc kombiniert stieg nur von 0.834 auf 0.835.
+- Der einmalige Validierungslauf `combined_svm_indices` (MLflow `2998aea0`) erreicht BAcc 0.914
+    für Crop, 0.886 für Stage und **0.842 kombiniert**. Die geringere Validierungs-BAcc gegenüber
+    der Referenz (0.845) stützt keine Übernahme der Indizes.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste kombinierte Verwechslungen sind
+    Baumwolle/Emerge_VEarly → Baumwolle/Early_Mid (15) und Soja/Critical →
+    Soja/Mature_Senesc (13).
+
+![Tuning der SVM mit Indizes](../img/combined_svm_indices_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_indices_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_indices_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_indices_confusions.png)
+
+### 1D-CNN
+
+Notebook: `notebooks/05_duac1011_combined-cnn.ipynb`. Die CNN erhält die skalierte
+Spektralfolge und die normierte Wellenlängenposition als zwei Kanäle; AEZ und Month gehen über
+einen getrennten Kontextzweig ein.
+
+- **Warum getestet?** Lokale Filter können spektrale Kanten und Absorptionsmuster lernen, welche
+    die tabellarische SVM nicht explizit als Nachbarschaft modelliert.
+- Die Suche `combined_cnn_search` (MLflow `d1cf7193`) verglich vier kleine Architekturen mit
+    8 oder 16 Filtern und Kernelbreite 5 oder 9. Beste Einstellung: 16 Filter, Kernelbreite 9,
+    maximal 30 Epochen mit Early Stopping, CV-BAcc kombiniert 0.611.
+- Der einmalige Validierungslauf `combined_cnn` (MLflow `1bd4f598`) erreicht BAcc 0.819 für
+    Crop, 0.712 für Stage und **0.626 kombiniert**. Das liegt deutlich unter der tabellarischen
+    RBF-SVM (0.845); die Hypothese wird nicht gestützt.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste kombinierte Verwechslungen sind
+    Soja/Critical → Mais/Critical (33), Winterweizen/Mature_Senesc → Baumwolle/Early_Mid (30)
+    und Mais/Critical → Mais/Late (28). Weitere sequenzielle Architekturen werden für M2 nicht
+    verfolgt.
+
+![Tuning der 1D-CNN](../img/combined_cnn_tuning.png)
+
+![Confusion Matrices](../img/combined_cnn_confusion.png)
+
+![Recall je Klasse](../img/combined_cnn_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_cnn_confusions.png)
+
 ### Extra Trees
 
 Notebook: `notebooks/02_duac1011_combined-extra-trees.ipynb`. Extra Trees lernt 23
@@ -171,8 +248,35 @@ kombinierte Klassen mit zufälligeren Baumaufteilungen als der Random Forest.
 
 ![Häufigste Verwechslungen](../img/combined_extra_trees_confusions.png)
 
+### HistGradientBoosting
+
+Notebook: `notebooks/02_duac1011_combined-hist-gradient-boosting.ipynb`. Der Klassifikator
+lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene Sample Weights.
+
+- **Warum getestet?** Additive Splits prüfen, ob wiederholtes Korrigieren von Fehlklassifikationen
+    die Spektralbänder besser nutzt als die unabhängigen Bäume von Random Forest und Extra Trees.
+- Die Suche `combined_hist_gradient_boosting_search` (MLflow `b26e8cc8`) verglich acht
+    Konfigurationen aus Lernrate, Blattanzahl und L2-Regularisierung. Beste Einstellung:
+    `learning_rate=0.1`, `max_leaf_nodes=15`, `l2_regularization=1.0`, CV-BAcc kombiniert 0.781.
+- Der einmalige Validierungslauf `combined_hist_gradient_boosting` (MLflow `6858b266`) erreicht
+    BAcc 0.885 für Crop, 0.881 für Stage und **0.777 kombiniert**. Das liegt unter Random Forest
+    (0.779), Extra Trees (0.804) und RBF-SVM (0.845); die Hypothese wird damit nicht gestützt.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Die häufigsten kombinierten Verwechslungen
+    sind Baumwolle/Emerge_VEarly → Baumwolle/Early_Mid (16) und Mais/Mature_Senesc →
+    Winterweizen/Emerge_VEarly (15).
+
+![Tuning von HistGradientBoosting](../img/combined_hist_gradient_boosting_tuning.png)
+
+![Confusion Matrices](../img/combined_hist_gradient_boosting_confusion.png)
+
+![Recall je Klasse](../img/combined_hist_gradient_boosting_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_hist_gradient_boosting_confusions.png)
+
 ## Fazit
 
-**Verglichen – vorläufig führend.** Die RBF-SVM verbessert die kombinierte BAcc gegenüber Random
-Forest und Extra Trees deutlich und verhindert weiterhin ungültige Paare. Gegen hierarchische
-und Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu vergleichen.
+**Verglichen – vorläufig führend.** Die RBF-SVM mit AEZ und Month verbessert die kombinierte BAcc
+gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, Random Forest, Extra Trees und
+HistGradientBoosting deutlich und verhindert weiterhin ungültige Paare. Gegen hierarchische und
+Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu vergleichen; weitere sequenzielle
+Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.
