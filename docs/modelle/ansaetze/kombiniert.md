@@ -34,6 +34,35 @@ Die Reihenfolge ist absichtlich konservativ: Mit rund 3.900 Trainingszeilen und 
 Klassen ist die tabellarische RBF-SVM bereits stark. Ein sequenzielles Netz ist ein begründeter
 Vergleich, aber keine Abkürzung zu besseren Ergebnissen.
 
+## Nächster Arbeitsplan: Optimierung der kombinierten Klasse
+
+Die erste Iteration ist abgeschlossen. Die RBF-SVM mit skalierten Spektren sowie AEZ und Month
+bleibt mit einer kombinierten BAcc von 0,845 die Referenz. Die folgenden Versuche testen nur
+offene, unterscheidbare Hypothesen. Pro Zeile entscheidet ausschließlich die CV auf dem
+Trainingsanteil; der gemeinsame Holdout wird für den gewählten Kandidaten genau einmal mit
+`run()` ausgewertet.
+
+| Reihenfolge | Hypothese | Klassifikator und Repräsentation | Kleine CV-Suche | Entscheidung nach dem Lauf |
+| --- | --- | --- | --- | --- |
+| 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | Nur bei höherer CV-BAcc kombiniert als 0,834 als neue SVM-Referenz bewerten. |
+| 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | Die Darstellung mit der besten CV-BAcc einzeln auf dem Holdout bewerten. |
+| 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | Nur weiterverfolgen, wenn die CV die beste Rohspektren-SVM klar übertrifft. |
+| 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | Nur bei CV-Gewinn eine Variante auf dem Holdout auswerten. |
+| 5 | Wenige fachlich definierte spektrale Kennwerte ergänzen die Rohbänder. | Beste tabellarische SVM, Red-Edge-Steigungen oder Regionsmerkmale | Eine feste, dokumentierte Merkmalsmenge je Hypothese | Behalten, wenn CV und einmalige Validierung die Referenz nicht widerlegen. |
+| 6 | Eine überwachte, kompakte Projektion nutzt die hohe Bandkorrelation besser. | PLS-Komponenten mit nachgelagertem linearen oder RBF-Klassifikator | Kleine Zahl vorab definierter Komponenten | Gegen die beste SVM-Repräsentation auf dem gemeinsamen Holdout einordnen. |
+| 7 | Boosting mit kategorialem Kontext ergänzt die bisherigen Baum-Ensembles. | CatBoost auf Rohbändern, AEZ und Month | Kleine Suche für Tiefe, Lernrate und L2-Regularisierung | Nur bei CV näher an der SVM als Extra Trees weiterverfolgen. |
+
+PCA, SNV, Ableitungen, Merkmalsbildung und PLS werden als Transformer in
+`awp2.preprocessing` umgesetzt und innerhalb jedes Trainingsfolds gefittet. Der Monat ist eine
+eigene Preprocessing-Variante. Er wird nicht zusammen mit weiteren neuen Merkmalen verändert,
+damit ein möglicher Gewinn zuordenbar bleibt.
+
+Die 1D-CNN erreicht eine kombinierte BAcc von 0,626 und wird nicht weiter variiert. RNN, GRU und
+Transformer sind für die geordnete Wellenlängenachse keine naheliegendere Alternative und bei
+der vorhandenen Stichprobengröße nicht Teil dieses Arbeitsplans. Eine weitere sequenzielle
+Architektur ist erst begründet, wenn eine Formtransformation wie SNV oder die erste Ableitung
+die tabellarische SVM in der CV klar verbessert.
+
 ### Erster Arbeitstag
 
 1. Issue übernehmen und den Branch `exp/<issue-nr>-combined-<idee>` anlegen; fehlen die
