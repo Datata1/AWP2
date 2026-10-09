@@ -55,7 +55,8 @@ class _ExperimentConfig(BaseModel):
     )
     preprocessing: PreprocessingConfig = Field(
         default_factory=PreprocessingConfig,
-        description="Preprocessing options – set scale=True for SVM, logistic regression, MLP.",
+        description="Preprocessing options – set use_spectral_standard_scale/minmax_scale "
+        "for SVM, logistic regression, MLP.",
     )
     balance_samples: bool = Field(
         default=False,

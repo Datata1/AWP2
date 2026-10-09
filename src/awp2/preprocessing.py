@@ -1,15 +1,16 @@
 """Preprocessing steps as sklearn transformers – always fitted on the training split only."""
 
 import re
+import warnings
 from typing import Self
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 from awp2.config import (
     AEZ_COL,
@@ -290,7 +291,7 @@ class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
             and np.equal(months, np.floor(months)).all()
         )
         if not valid:
-            raise ValueError(f"Month values must be integers in 1-12.")
+            raise ValueError("Month values must be integers in 1-12.")
         return X
 
     def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
@@ -319,8 +320,18 @@ class PreprocessingConfig(BaseModel):
     )
     scale: bool = Field(
         default=False,
-        description="Standardise spectra and month – on for SVM, logistic regression, MLP; "
-        "off for tree ensembles.",
+        description="Deprecated, will be removed soon – use use_spectral_standard_scale instead. "
+        "Kept for old runs: standardises spectra and month.",
+    )
+    use_spectral_standard_scale: bool = Field(
+        default=False,
+        description="Standardise spectral bands only (per-band mean/std from the training part); "
+        "leaves AEZ and Month untouched.",
+    )
+    use_spectral_minmax_scale: bool = Field(
+        default=False,
+        description="Scale spectral bands to [0, 1] per band from the training part; "
+        "leaves AEZ and Month untouched.",
     )
     use_vegetation_indices: bool = Field(
         default=False,
@@ -339,6 +350,23 @@ class PreprocessingConfig(BaseModel):
         ),
     )
 
+    @model_validator(mode="after")
+    def _check_scaler_options(self) -> Self:
+        """Reject ambiguous scaler combinations.
+
+        Returns:
+            The validated configuration.
+
+        Raises:
+            ValueError: If both spectral scalers or a spectral scaler together with the
+                deprecated ``scale`` flag are enabled.
+        """
+        if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
+            raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
+        if self.scale and (self.use_spectral_standard_scale or self.use_spectral_minmax_scale):
+            raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
+        return self
+
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
     """Build the standard preprocessing as one sklearn transformer.
@@ -355,24 +383,33 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     Example:
         ```python
         model = Pipeline([
-            ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+            ("preprocess", build_preprocessor(PreprocessingConfig(
+                use_spectral_standard_scale=True
+            ))),
             ("model", SVC()),
         ])
         ```
     """
     config = config or PreprocessingConfig()
+    if config.scale:
+        warnings.warn(
+            "PreprocessingConfig(scale=...) is deprecated and will be removed soon; "
+            "use use_spectral_standard_scale instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     spectra: list[tuple[str, BaseEstimator]] = [
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
     if config.use_vegetation_indices:
         spectra.append(("vegetation_indices", AddVegetationIndices()))
-    if config.scale:
-        spectra.append(("scale", StandardScaler()))
+    if config.use_spectral_standard_scale or config.scale:
+        spectra.append(("standard_scale", StandardScaler()))
+    elif config.use_spectral_minmax_scale:
+        spectra.append(("minmax_scale", MinMaxScaler()))
 
-    transformers: list[tuple[str, BaseEstimator | str, object]] = [
-        ("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN))
-    ]
+    transformers: list[tuple[str, BaseEstimator | str, object]] = []
     if config.use_meta:
         transformers.append(
             ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [AEZ_COL])
@@ -386,5 +423,6 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             transformers.append(
                 ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL])
             )
+    transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
