@@ -25,16 +25,9 @@ Follow `docs/modelle/ansatz-entwickeln.md`. Code and comments in English, docume
 
 ## 3. Tune on the training part
 ```python
-tuned = tune(
-    model,
-    TuneConfig(
-        name="<name>_search",
-        approach="<approach>",
-        description="<what is searched and why>",
-        param_grid={...},
-        preprocessing=PreprocessingConfig(...),
-    ),
-)
+tuned = tune(model, TuneConfig(name="<name>_search", approach="<approach>",
+                               description="<what is searched and why>",
+                               param_grid={...}, preprocessing=PreprocessingConfig(...)))
 ```
 Keep grids small and meaningful. Decide only by the CV score (`tuned.best_score`).
 
