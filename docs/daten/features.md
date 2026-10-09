@@ -26,7 +26,7 @@ Details zum Ablauf stehen in der [Pipeline](pipeline.md) und in der
 | --- | --- | --- |
 | Verfügbare Spektralbänder | **Feste Referenz.** 131 von 198 Bändern enthalten mindestens eine Messung. Mittelwerte unterscheiden sich nach Kultur und teils nach Stadium; einzelne Bereiche überlappen aber. | Rohspektren sind die Baseline für jede weitere Merkmalsmenge. Vollständig leere Bänder sind keine Eingaben. |
 | `AEZ` | **Kontextmerkmal.** Die Crop-Anteile unterscheiden sich deutlich zwischen den Zonen. | One-Hot-kodiert und stets gegen die Variante ohne Metadaten vergleichen. |
-| `Month` | **Kontextmerkmal.** Innerhalb einer Kultur konzentrieren sich Stadien oft auf wenige Monate. | Numerisch als Referenz verwenden und eine zyklische Kodierung separat testen. |
+| `Month` | **Kontextmerkmal.** Innerhalb einer Kultur konzentrieren sich Stadien oft auf wenige Monate. | Numerisch bleibt Referenz: CV 0,852 vor zyklisch 0,849 und One-Hot 0,848; der Validierungslauf mit Numeric erreicht 0,859 und verbessert die SVM-Referenz nicht. |
 
 Die EDA beschreibt die vollständigen Befunde zu Datenqualität, Spektren und Metadaten in
 [Explorative Datenanalyse](eda.md). `AEZ` und `Month` können zulässige Information sein, aber
@@ -48,7 +48,7 @@ gemeinsamen Split, nicht als allgemeine Rangfolge aller denkbaren Merkmale.
 
 | Kandidat | Daten- und Domänenbezug | Konkrete, falsifizierbare Prüfung | Wichtige Grenze |
 | --- | --- | --- | --- |
-| Zyklischer Monat | Monate liegen auf einem Jahreskreis. `Month` ist bisher nur als Zahl 5 bis 10 vertreten. | Rohspektren + One-Hot-`AEZ` + `Month` gegen dieselbe Variante mit $\sin(2\pi \cdot Month / 12)$ und $\cos(2\pi \cdot Month / 12)$ per CV vergleichen. | Nur sechs aufeinanderfolgende Monate sind beobachtet; ein Nutzen ist nicht selbstverständlich. |
+| Monatskodierung | Monate liegen auf einem Jahreskreis, im Datensatz sind aber nur sechs aufeinanderfolgende Monate vertreten. | **Abgeschlossen:** Numerisch, One-Hot und Sinus/Cosinus wurden mit gleicher RBF-SVM-Suche verglichen. | Numeric gewinnt knapp die CV, doch der einmalige Validierungslauf liegt unter der SVM-Referenz; die numerische Darstellung bleibt daher unverändert. |
 | EVI | EVI kombiniert NIR, Rot und Blau; die passenden verfügbaren Bänder liegen nahe bei `X854`, `X671` und `X468`. | Rohspektren plus die vorab festgelegten Indizes einschließlich EVI gegen Rohspektren vergleichen. | Die Reflektanzwerte müssen vor der EVI-Berechnung von Prozent auf Anteile umgerechnet werden. |
 | Red-Edge-Steigung | Zwischen ungefähr 680 und 750 nm steigt die Vegetationsreflektanz häufig stark an. Die EDA sieht Stage-Unterschiede am Übergang zu NIR. | Wenige vorab definierte Differenzen oder Steigungen nur zwischen kontinuierlich verfügbaren Bändern in diesem Bereich als zusätzliche Spalten prüfen. | Der Verlauf kann auch von Bodenanteil, Aufnahmebedingungen und Kultur beeinflusst sein. |
 | Vorab definierte Bandverhältnisse | Die Projektbeschreibung nennt Band-Ratios als Feature Engineering. Verhältnisse können spektrale Kontraste verdichten. | Eine kleine, fachlich begründete Liste, etwa NIR/Rot oder NIR/SWIR, gegen Rohbänder vergleichen. | Nicht alle möglichen Bandpaare durchsuchen: Das würde zufällige Treffer und Overfitting begünstigen. |
@@ -76,9 +76,8 @@ Feature Selection ausdrücklich als mögliche Varianten.
 1. Rohspektren ohne Metadaten als Referenz beibehalten.
 2. Rohspektren mit `AEZ` und `Month` berichten, aber die Kontextabhängigkeit transparent
    machen.
-3. Als nächsten einzelnen Kandidaten die zyklische Monatskodierung testen.
-4. Danach genau eine kleine spektrale Hypothese wählen: EVI **oder** Red-Edge-Steigungen.
-5. Erst wenn diese Varianten verglichen sind, PCA oder trainingsfold-basierte Bandauswahl für
+3. Danach genau eine kleine spektrale Hypothese wählen: EVI **oder** Red-Edge-Steigungen.
+4. Erst wenn diese Varianten verglichen sind, PCA oder trainingsfold-basierte Bandauswahl für
    weitere Modelle prüfen.
 
 Jede Variante folgt demselben Ablauf: `tune()` sucht Parameter und Merkmalskonfigurationen

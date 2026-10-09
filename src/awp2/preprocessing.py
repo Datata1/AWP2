@@ -16,6 +16,12 @@ from awp2.config import (
     BAND_PATTERN,
     BAND_PREFIX,
     MONTH_COL,
+    MONTH_COS_COL,
+    MONTH_ENCODING_CYCLICAL,
+    MONTH_ENCODING_NUMERIC,
+    MONTH_ENCODING_ONE_HOT,
+    MONTH_RANGE,
+    MONTH_SIN_COL,
     NDRE_RED_EDGE_BAND,
     NDVI_NIR_BAND,
     NDVI_RED_BAND,
@@ -24,6 +30,7 @@ from awp2.config import (
     PRI_SECOND_BAND,
     VEGETATION_INDEX_BANDS,
     VEGETATION_INDEX_NAMES,
+    MonthEncoding,
 )
 from awp2.data import wavelengths
 
@@ -136,6 +143,60 @@ def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
     return filled.set_axis(spectra.columns, axis=1)
 
 
+class _CyclicalMonthEncoder(TransformerMixin, BaseEstimator):
+    """Represent calendar month by its position on the annual cycle."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the monthly feature and store sklearn-compatible metadata.
+
+        Args:
+            X: Single-column frame with the project Month feature.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            This fitted transformer.
+
+        Raises:
+            ValueError: If the input is not exactly the project Month column.
+        """
+        self._check(X)
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Encode Month as sine and cosine values.
+
+        Args:
+            X: Single-column frame with the project Month feature.
+
+        Returns:
+            Frame with the sine and cosine representation of Month.
+        """
+        X = self._check(X)
+        angle = 2 * np.pi * X[MONTH_COL] / MONTH_RANGE[1]
+        return pd.DataFrame(
+            {MONTH_SIN_COL: np.sin(angle), MONTH_COS_COL: np.cos(angle)}, index=X.index
+        )
+
+    @staticmethod
+    def _check(X: pd.DataFrame) -> pd.DataFrame:
+        if not isinstance(X, pd.DataFrame) or list(X.columns) != [MONTH_COL]:
+            raise ValueError(f"Expected a DataFrame with the {MONTH_COL!r} column.")
+        return X
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return stable names for the cyclic month features.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            Names of the sine and cosine month features.
+        """
+        return np.asarray([MONTH_SIN_COL, MONTH_COS_COL], dtype=object)
+
+
 class AddVegetationIndices(_BandTransformer):
     """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
 
@@ -207,6 +268,23 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
     )
+    month_encoding: MonthEncoding = Field(
+        default=MONTH_ENCODING_NUMERIC,
+        description="Encode Month numerically, as one-hot categories, or as sine/cosine cycle.",
+    )
+
+
+def _month_transformer(config: PreprocessingConfig) -> BaseEstimator | str:
+    if config.month_encoding == MONTH_ENCODING_NUMERIC:
+        return StandardScaler() if config.scale else "passthrough"
+    if config.month_encoding == MONTH_ENCODING_ONE_HOT:
+        return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    if config.month_encoding == MONTH_ENCODING_CYCLICAL:
+        encoded: list[tuple[str, BaseEstimator]] = [("encode", _CyclicalMonthEncoder())]
+        if config.scale:
+            encoded.append(("scale", StandardScaler()))
+        return Pipeline(encoded)
+    raise ValueError(f"Unsupported month encoding: {config.month_encoding}")
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
@@ -245,7 +323,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     if config.use_meta:
         transformers += [
             ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [AEZ_COL]),
-            ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL]),
+            ("month", _month_transformer(config), [MONTH_COL]),
         ]
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")

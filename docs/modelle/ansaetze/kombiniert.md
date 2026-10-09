@@ -46,7 +46,7 @@ Trainingsanteil; der gemeinsame Holdout wird für den gewählten Kandidaten gena
 | Reihenfolge | Hypothese | Klassifikator und Repräsentation | Kleine CV-Suche | Entscheidung nach dem Lauf |
 | --- | --- | --- | --- | --- |
 | 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | **Abgeschlossen:** CV-BAcc 0,847 und Validierungs-BAcc 0,866; neue Referenz. |
-| 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | Die Darstellung mit der besten CV-BAcc einzeln auf dem Holdout bewerten. |
+| 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | **Abgeschlossen:** Numeric gewinnt CV 0,852, erreicht aber nur 0,859 auf der Validierung; Referenz bleibt unverändert. |
 | 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | Nur weiterverfolgen, wenn die CV die beste Rohspektren-SVM klar übertrifft. |
 | 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | Nur bei CV-Gewinn eine Variante auf dem Holdout auswerten. |
 | 5 | Wenige fachlich definierte spektrale Kennwerte ergänzen die Rohbänder. | Beste tabellarische SVM, Red-Edge-Steigungen oder Regionsmerkmale | Eine feste, dokumentierte Merkmalsmenge je Hypothese | Behalten, wenn CV und einmalige Validierung die Referenz nicht widerlegen. |
@@ -99,9 +99,9 @@ getrennte Versuche:
 | Indizes | `use_vegetation_indices=True` | Testet NDVI, NDRE, PRI und NDWI zusätzlich zu den Bändern | Gegen dieselbe Basiskonfiguration ohne Indizes vergleichen. |
 | Spätere Glättung/Bandauswahl | neues Feld in `PreprocessingConfig` und Transformer in `awp2.preprocessing` | Kann Rauschen oder Redundanz senken | Erst eine fachliche Hypothese und einen kleinen Vergleich definieren; niemals Features vor dem CV fitten. |
 
-Month bleibt zunächst numerisch, AEZ wird One-Hot-kodiert. Eine zyklische Month-Kodierung ist
-eine weitere, getrennte Preprocessing-Hypothese und darf nicht still in ein anderes Experiment
-einfließen.
+Month bleibt numerisch, AEZ wird One-Hot-kodiert. One-Hot und zyklische Month-Kodierung wurden
+als getrennte Hypothese verglichen, erreichen aber weder in der CV noch auf der Validierung einen
+nachvollziehbaren Gewinn.
 
 ### Dokumentations-Checkliste je Versuch
 
@@ -202,6 +202,31 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 ![Recall je Klasse](../img/combined_svm_expanded_recall.png)
 
 ![Häufigste Verwechslungen](../img/combined_svm_expanded_confusions.png)
+
+### RBF-SVM: Monatskodierung
+
+Notebook: `notebooks/07_duac1011_combined-svm-month-encoding.ipynb`. Die Spektren, AEZ und die
+RBF-SVM bleiben unverändert; ausschließlich die Darstellung von Month wird verglichen.
+
+- **Warum getestet?** Der lineare Abstand zwischen Monaten beschreibt Saisonzyklen nicht
+    zwingend passend. Deshalb vergleichen drei getrennte CV-Suchen die numerische, One-Hot- und
+    Sinus/Cosinus-Kodierung.
+- Die numerische Kodierung gewinnt mit `C=300.0`, `gamma=0.001` und CV-BAcc kombiniert 0.852
+    knapp vor zyklisch (0.849) und One-Hot (0.848). Die Unterschiede sind klein.
+- Der einmalige Validierungslauf `combined_svm_month_encoding` (MLflow `f2cdddb3`) erreicht
+    BAcc 0.925 für Crop, 0.904 für Stage und **0.859 kombiniert**. Das liegt 0.008 unter der
+    Referenz; die Hypothese wird nicht gestützt und die numerische Referenzkonfiguration bleibt
+    unverändert.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste Verwechslungen bleiben
+    Winterweizen → Baumwolle (35), Soja → Mais (32) und Critical → Mature_Senesc (23).
+
+![Tuning der Month-Kodierung](../img/combined_svm_month_encoding_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_month_encoding_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_month_encoding_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_month_encoding_confusions.png)
 
 ### RBF-SVM ohne Metadaten
 
