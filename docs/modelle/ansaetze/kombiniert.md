@@ -18,7 +18,8 @@ Baustein und Recherche: #54, Entwurf #55.
 ## Arbeitsplan für M2
 
 Ziel ist nicht, möglichst viele Modelle auszuprobieren, sondern die derzeit beste Referenz
-`combined_svm` (BAcc kombiniert 0.845) mit wenigen, unterscheidbaren Hypothesen zu prüfen.
+`combined_svm_expanded` (BAcc kombiniert 0.866) mit wenigen, unterscheidbaren Hypothesen zu
+prüfen.
 Jede Zeile ist ein eigenes Experiment: Die Entscheidung über Hyperparameter erfolgt nur anhand
 der CV auf dem Trainingsanteil; die Validierung wird danach genau einmal verwendet.
 
@@ -37,14 +38,14 @@ Vergleich, aber keine Abkürzung zu besseren Ergebnissen.
 ## Nächster Arbeitsplan: Optimierung der kombinierten Klasse
 
 Die erste Iteration ist abgeschlossen. Die RBF-SVM mit skalierten Spektren sowie AEZ und Month
-bleibt mit einer kombinierten BAcc von 0,845 die Referenz. Die folgenden Versuche testen nur
+bleibt mit einer kombinierten BAcc von 0,866 die Referenz. Die folgenden Versuche testen nur
 offene, unterscheidbare Hypothesen. Pro Zeile entscheidet ausschließlich die CV auf dem
 Trainingsanteil; der gemeinsame Holdout wird für den gewählten Kandidaten genau einmal mit
 `run()` ausgewertet.
 
 | Reihenfolge | Hypothese | Klassifikator und Repräsentation | Kleine CV-Suche | Entscheidung nach dem Lauf |
 | --- | --- | --- | --- | --- |
-| 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | Nur bei höherer CV-BAcc kombiniert als 0,834 als neue SVM-Referenz bewerten. |
+| 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | **Abgeschlossen:** CV-BAcc 0,847 und Validierungs-BAcc 0,866; neue Referenz. |
 | 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | Die Darstellung mit der besten CV-BAcc einzeln auf dem Holdout bewerten. |
 | 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | Nur weiterverfolgen, wenn die CV die beste Rohspektren-SVM klar übertrifft. |
 | 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | Nur bei CV-Gewinn eine Variante auf dem Holdout auswerten. |
@@ -174,6 +175,33 @@ Klassen wie der Random Forest; Spektren und Month werden dafür standardisiert.
 ![Recall je Klasse](../img/combined_svm_recall.png)
 
 ![Häufigste Verwechslungen](../img/combined_svm_confusions.png)
+
+### RBF-SVM: Erweiterte Suche
+
+Notebook: `notebooks/06_duac1011_combined-svm-expanded-search.ipynb`. Die Vorverarbeitung ist
+identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegenden Werte von
+`C` und `gamma`.
+
+- **Warum getestet?** Die frühere Suche gewann bei `C=10.0` und `gamma=0.01`, jeweils am Rand
+    ihres Suchraums. Die erweiterte Suche prüft, ob eine stärkere Regularisierungsaufhebung oder
+    ein breiterer Kernel die kombinierten Klassen besser trennt.
+- Die Suche `combined_svm_expanded_search` (MLflow `0dea8124`) verglich zwölf Kombinationen.
+    Beste Einstellung: `C=100.0`, `gamma=0.003`, CV-BAcc kombiniert 0.847 gegenüber 0.834 für
+    die bisherige SVM.
+- Der einmalige Validierungslauf `combined_svm_expanded` (MLflow `65232eab`) erreicht BAcc
+    0.931 für Crop, 0.906 für Stage und **0.866 kombiniert**. Damit verbessert er die bisherige
+    SVM-Referenz um 0.021 und wird die neue Referenz des kombinierten Ansatzes.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Schwächster Crop-Recall bleibt Winterweizen
+    (0.85); schwächster Stage-Recall bleibt Mature_Senesc (0.84). Häufigste Verwechslungen sind
+    Winterweizen → Baumwolle (30), Soja → Mais (25) und Critical → Mature_Senesc (19).
+
+![Tuning der erweiterten RBF-SVM](../img/combined_svm_expanded_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_expanded_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_expanded_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_expanded_confusions.png)
 
 ### RBF-SVM ohne Metadaten
 
