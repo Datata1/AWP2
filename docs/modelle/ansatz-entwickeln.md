@@ -40,7 +40,7 @@ tuned = tune(
         param_grid={"max_depth": [5, 15, None], "min_samples_leaf": [1, 5]},
     ),
 )
-tuned.best_params, tuned.best_score   # beste Einstellung und ihr CV-Score
+tuned.best_params, tuned.best_score  # beste Einstellung und ihr CV-Score
 ```
 
 `tune()` probiert jede Kombination per 5-facher Cross-Validation **nur auf dem Train-Teil**
