@@ -57,6 +57,11 @@ Die lineare Interpolation einzelner Bandlücken ist standardmäßig auf Stützb�
 15 nm Abstand begrenzt. Bei größeren Abständen wird der nähere Messwert übernommen; die Grenze
 lässt sich über `PreprocessingConfig(max_interpolation_gap_nm=...)` anpassen.
 
+`AEZ` wird one-hot-kodiert. Standardmäßig ersetzt die zyklische Kodierung den numerischen
+`Month` durch `Month_sin` und `Month_cos` mit einer Jahresperiode von 12 Monaten. Bei
+`scale=True` werden diese beiden Merkmale mit dem Trainingsfold skaliert. Für den Vergleich mit
+der numerischen Monatszahl kann `PreprocessingConfig(use_cyclic_month=False)` gesetzt werden.
+
 ## 3. Tunen
 
 Hyperparameter nur per Cross-Validation auf dem Train-Teil tunen – der 30-%-Holdout ist für

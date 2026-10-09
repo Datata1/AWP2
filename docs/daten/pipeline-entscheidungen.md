@@ -35,7 +35,7 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | --- | --- |
 | 67 komplett leere Bänder entfernen → 131 Bänder | Keine Information (Wasserabsorption/Randbänder, siehe [EDA](eda.md)) |
 | Einzelne Lücken spektral auffüllen | Linear nach Wellenlänge interpolieren, wenn die beiden gemessenen Stützbänder höchstens 15 nm auseinanderliegen; sonst den näheren Stützwert übernehmen. Am Spektralrand ebenfalls den nächsten Messwert verwenden. Vollständig leere Spektren werden mit den im Training bestimmten Bandmedianen gefüllt. Die Grenze ist über `PreprocessingConfig(max_interpolation_gap_nm=...)` konfigurierbar. Nach der Duplikatbereinigung betrifft die Imputation 43 Trainings- und 11 Testzeilen; in den Rohdaten sind es 44 Trainingszeilen. |
-| `AEZ` und `Month` optional als Features | Laut Aufgabe erlaubt; abschaltbar, um ihren Nutzen zu messen |
+| `AEZ` und Monat als Kontextmerkmale | `AEZ` wird one-hot-kodiert. `Month` wird standardmäßig durch `Month_sin` und `Month_cos` mit Jahresperiode 12 ersetzt; `use_cyclic_month=False` behält die numerische Monatszahl. Bei `scale=True` werden beide zyklischen Merkmale innerhalb des Trainingsfolds skaliert. Kontextmerkmale sind laut Aufgabe erlaubt, können aber Orts- oder Kalenderabhängigkeit abbilden; daher ihren Nutzen und die Monatskodierung vergleichen. |
 | Skalierung optional | Nötig für SVM, logistische Regression, MLP; für Baum-Modelle überflüssig |
 | Optionen als pydantic-`PreprocessingConfig` | Tippfehler oder falsche Typen (`scale="yes"`) fallen sofort auf |
 
