@@ -53,6 +53,10 @@ metrics.bacc_combined
 | Vorverarbeitung: [`build_preprocessor`][awp2.preprocessing.build_preprocessor] | Zusätzliche Schritte → neues Feld in [`PreprocessingConfig`][awp2.preprocessing.PreprocessingConfig] |
 | Bewertung: [`evaluate`][awp2.evaluation.evaluate] → [`Metrics`][awp2.evaluation.Metrics] | Tuning, Begründung in [Ansätze](../modelle/ansaetze/index.md), Zeile im [Experiment-Log](../modelle/experimente.md) |
 
+Die lineare Interpolation einzelner Bandlücken ist standardmäßig auf Stützbänder mit höchstens
+15 nm Abstand begrenzt. Bei größeren Abständen wird der nähere Messwert übernommen; die Grenze
+lässt sich über `PreprocessingConfig(max_interpolation_gap_nm=...)` anpassen.
+
 ## 3. Tunen
 
 Hyperparameter nur per Cross-Validation auf dem Train-Teil tunen – der 30-%-Holdout ist für

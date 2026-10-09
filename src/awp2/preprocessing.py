@@ -92,12 +92,21 @@ class DropEmptyBands(_BandTransformer):
 class InterpolateBands(_BandTransformer):
     """Fill missing band values per spectrum along the wavelength.
 
-    - Between two measured bands: linear interpolation by wavelength (neighbouring bands are
-      strongly correlated, so this beats a column mean).
+    - Between nearby measured bands: linear interpolation by wavelength.
+    - Across wider gaps: use the nearest measured band to avoid interpolating across missing
+      spectral regions.
     - At the edges of a spectrum: value of the nearest measured band (spectra differ a lot in
       brightness, so the neighbour is a better estimate than a global median).
     - Spectrum without any value: training median per band.
     """
+
+    def __init__(self, max_interpolation_gap_nm: int = 15) -> None:
+        """Initialize the maximum wavelength span for linear interpolation.
+
+        Args:
+            max_interpolation_gap_nm: Maximum distance between measured endpoints in nm.
+        """
+        self.max_interpolation_gap_nm = max_interpolation_gap_nm
 
     def fit(self, X: pd.DataFrame, y: object = None) -> Self:
         """Store the training medians as last-resort fallback.
@@ -108,8 +117,13 @@ class InterpolateBands(_BandTransformer):
 
         Returns:
             The fitted transformer.
+
+        Raises:
+            ValueError: If the maximum interpolation gap is not positive.
         """
         X = self._check(X)
+        if self.max_interpolation_gap_nm <= 0:
+            raise ValueError("max_interpolation_gap_nm must be positive")
         self._set_input(X)
         self.medians_ = X.median()
         self.feature_names_out_ = list(X.columns)
@@ -127,13 +141,52 @@ class InterpolateBands(_BandTransformer):
         X = self._check(X)
         if not X.isna().any().any():
             return X
-        return _interpolate_along_wavelength(X).fillna(self.medians_)
+        return _interpolate_along_wavelength(X, self.max_interpolation_gap_nm).fillna(self.medians_)
 
 
-def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
-    by_wavelength = spectra.set_axis(wavelengths(spectra), axis=1)
-    filled = by_wavelength.T.interpolate(method="index", limit_direction="both").T
-    return filled.set_axis(spectra.columns, axis=1)
+def _interpolate_along_wavelength(
+    spectra: pd.DataFrame, max_interpolation_gap_nm: int
+) -> pd.DataFrame:
+    wavelength_values = np.asarray(wavelengths(spectra))
+    values = spectra.to_numpy(dtype=float, na_value=np.nan, copy=True)
+
+    for row in values:
+        measured_indices = np.flatnonzero(~np.isnan(row))
+        if measured_indices.size == 0:
+            continue
+
+        for missing_index in np.flatnonzero(np.isnan(row)):
+            insertion_point = np.searchsorted(measured_indices, missing_index)
+            left_position = insertion_point - 1
+            right_position = insertion_point
+            has_left = left_position >= 0
+            has_right = right_position < measured_indices.size
+
+            if has_left and has_right:
+                left_index = measured_indices[left_position]
+                right_index = measured_indices[right_position]
+                left_wavelength = wavelength_values[left_index]
+                right_wavelength = wavelength_values[right_index]
+                if right_wavelength - left_wavelength <= max_interpolation_gap_nm:
+                    fraction = (wavelength_values[missing_index] - left_wavelength) / (
+                        right_wavelength - left_wavelength
+                    )
+                    row[missing_index] = row[left_index] + fraction * (
+                        row[right_index] - row[left_index]
+                    )
+                elif (
+                    wavelength_values[missing_index] - left_wavelength
+                    <= right_wavelength - wavelength_values[missing_index]
+                ):
+                    row[missing_index] = row[left_index]
+                else:
+                    row[missing_index] = row[right_index]
+            elif has_left:
+                row[missing_index] = row[measured_indices[left_position]]
+            else:
+                row[missing_index] = row[measured_indices[right_position]]
+
+    return pd.DataFrame(values, index=spectra.index, columns=spectra.columns)
 
 
 class AddVegetationIndices(_BandTransformer):
@@ -207,6 +260,14 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
     )
+    max_interpolation_gap_nm: int = Field(
+        default=15,
+        gt=0,
+        description=(
+            "Maximum wavelength span for linear interpolation; wider gaps use the nearest "
+            "measured band."
+        ),
+    )
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
@@ -232,7 +293,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     config = config or PreprocessingConfig()
     spectra: list[tuple[str, BaseEstimator]] = [
         ("drop_empty", DropEmptyBands()),
-        ("interpolate", InterpolateBands()),
+        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
     if config.use_vegetation_indices:
         spectra.append(("vegetation_indices", AddVegetationIndices()))
