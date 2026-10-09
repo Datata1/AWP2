@@ -9,6 +9,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
@@ -25,6 +26,7 @@ from awp2.config import (
     NDWI_SWIR_BAND,
     PRI_FIRST_BAND,
     PRI_SECOND_BAND,
+    SEED,
     VEGETATION_INDEX_BANDS,
     VEGETATION_INDEX_NAMES,
 )
@@ -333,6 +335,12 @@ class PreprocessingConfig(BaseModel):
         description="Scale spectral bands to [0, 1] per band from the training part; "
         "leaves AEZ and Month untouched.",
     )
+    spectral_pca_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Reduce the (standardised) spectral bands to this many principal components; "
+        "None keeps all bands. Requires use_spectral_standard_scale.",
+    )
     use_vegetation_indices: bool = Field(
         default=False,
         description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
@@ -358,13 +366,16 @@ class PreprocessingConfig(BaseModel):
             The validated configuration.
 
         Raises:
-            ValueError: If both spectral scalers or a spectral scaler together with the
-                deprecated ``scale`` flag are enabled.
+            ValueError: If both spectral scalers, a spectral scaler together with the
+                deprecated ``scale`` flag, or PCA without the spectral standard scaler
+                are requested.
         """
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
             raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
         if self.scale and (self.use_spectral_standard_scale or self.use_spectral_minmax_scale):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
+        if self.spectral_pca_components is not None and not self.use_spectral_standard_scale:
+            raise ValueError("spectral_pca_components requires use_spectral_standard_scale=True")
         return self
 
 
@@ -408,6 +419,10 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         spectra.append(("standard_scale", StandardScaler()))
     elif config.use_spectral_minmax_scale:
         spectra.append(("minmax_scale", MinMaxScaler()))
+    if config.spectral_pca_components is not None:
+        spectra.append(
+            ("pca", PCA(n_components=config.spectral_pca_components, random_state=SEED))
+        )
 
     transformers: list[tuple[str, BaseEstimator | str, object]] = []
     if config.use_meta:
