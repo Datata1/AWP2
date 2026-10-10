@@ -18,3 +18,12 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-08 | combined_hist_gradient_boosting | duac1011 | Kombinierte Klasse | 0.885 | 0.881 | 0.777 | 0.773 | 0.891 | 6858b266 | HistGradientBoosting auf 23 kombinierten Klassen mit gewichteten Samples; Tuning `combined_hist_gradient_boosting_search` (b26e8cc8), CV 0.781, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_expanded | duac1011 | Kombinierte Klasse | 0.931 | 0.906 | 0.866 | 0.830 | 0.909 | 65232eab | RBF-SVM mit erweiterter Suche; Tuning `combined_svm_expanded_search` (0dea8124), CV 0.847, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_month_encoding | duac1011 | Kombinierte Klasse | 0.925 | 0.904 | 0.859 | 0.817 | 0.903 | f2cdddb3 | Numeric Month gewinnt CV 0.852 vor zyklisch 0.849 und One-Hot 0.848, bleibt aber unter der RBF-SVM-Referenz; keine ungültigen Paare |
+
+## CV-only Analysen
+
+Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Validierungsmetriken und
+ändern keine Referenz.
+
+| Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
