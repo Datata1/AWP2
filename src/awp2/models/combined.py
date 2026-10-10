@@ -127,6 +127,6 @@ def make_combined_svm() -> CombinedLabelClassifier:
 
     Returns:
         Unfitted classifier with balanced class weights. Scale its features through
-            ``PreprocessingConfig(scale=True)`` before fitting.
+            ``PreprocessingConfig(use_spectral_standard_scale=True)`` before fitting.
     """
     return CombinedLabelClassifier(SVC(class_weight="balanced"))
