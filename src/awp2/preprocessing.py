@@ -8,6 +8,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -207,6 +208,12 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
     )
+    pca_components: int | None = Field(
+        default=None,
+        ge=1,
+        description="Replace scaled spectral bands with this many PCA components; metadata "
+        "bypasses PCA.",
+    )
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
@@ -238,6 +245,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         spectra.append(("vegetation_indices", AddVegetationIndices()))
     if config.scale:
         spectra.append(("scale", StandardScaler()))
+    if config.pca_components is not None:
+        spectra.append(("pca", PCA(n_components=config.pca_components, svd_solver="full")))
 
     transformers: list[tuple[str, BaseEstimator | str, object]] = [
         ("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN))

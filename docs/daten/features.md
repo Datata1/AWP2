@@ -40,9 +40,12 @@ belegt deshalb keine robuste spektrale Klassifikation.
 | Rohspektren | CV Balanced Accuracy kombiniert: 0,570. | Bleibt die unverzichtbare Referenz. |
 | Rohspektren + `AEZ` + `Month` | CV Balanced Accuracy kombiniert: 0,750. | Der stärkste beobachtete Zugewinn, aber mit Risiko einer Orts- oder Kalenderabhängigkeit. |
 | Rohspektren + NDVI, NDRE, PRI, NDWI | CV Balanced Accuracy kombiniert: 0,590. | Für diesen Random Forest kein klarer Zusatznutzen gegenüber Rohspektren. Nicht blind übernehmen; für andere Modelle oder eine kompakte Merkmalsmenge separat prüfen. |
+| PCA-Spektren + `AEZ` + `Month` | Die kombinierte RBF-SVM wählt per CV 40 PCA-Komponenten (BAcc 0,854). | Die einmalige Validierungs-BAcc von 0,856 liegt unter Rohspektren (0,866); PCA wird nicht übernommen. |
 
-Die Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md) dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen
-gemeinsamen Split, nicht als allgemeine Rangfolge aller denkbaren Merkmale.
+Die ersten drei Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md)
+dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen gemeinsamen Split,
+nicht als allgemeine Rangfolge aller denkbaren Merkmale. Das PCA-Ergebnis steht beim
+[kombinierten Ansatz](../modelle/ansaetze/kombiniert.md#rbf-svm-mit-pca-auf-spektralbandern).
 
 ## Kandidaten für weitere, getrennte Vergleiche
 
@@ -53,7 +56,7 @@ gemeinsamen Split, nicht als allgemeine Rangfolge aller denkbaren Merkmale.
 | Red-Edge-Steigung | Zwischen ungefähr 680 und 750 nm steigt die Vegetationsreflektanz häufig stark an. Die EDA sieht Stage-Unterschiede am Übergang zu NIR. | Wenige vorab definierte Differenzen oder Steigungen nur zwischen kontinuierlich verfügbaren Bändern in diesem Bereich als zusätzliche Spalten prüfen. | Der Verlauf kann auch von Bodenanteil, Aufnahmebedingungen und Kultur beeinflusst sein. |
 | Vorab definierte Bandverhältnisse | Die Projektbeschreibung nennt Band-Ratios als Feature Engineering. Verhältnisse können spektrale Kontraste verdichten. | Eine kleine, fachlich begründete Liste, etwa NIR/Rot oder NIR/SWIR, gegen Rohbänder vergleichen. | Nicht alle möglichen Bandpaare durchsuchen: Das würde zufällige Treffer und Overfitting begünstigen. |
 | Regionsmerkmale für VIS, Red Edge, NIR und SWIR | Diese Bereiche stehen für unterschiedliche Teile des Vegetationsspektrums. Mittelwert, Spannweite oder lokale Steigung können sie kompakt zusammenfassen. | Eine wenige Kennzahlen umfassende, vorab festgelegte Merkmalsmenge gegen Rohspektren und gegen Indizes vergleichen. | Regionen müssen nur verfügbare, physikalisch zusammenhängende Bänder enthalten; große Lücken werden nicht überbrückt. |
-| PCA | Benachbarte Bänder sind stark redundant; zwei Komponenten erklären in der EDA mehr als 90 % der Spektralvarianz. | Rohbänder gegen vorab festgelegte PCA-Komponentenzahlen vergleichen, besonders für skalierungsempfindliche Modelle. | PCA ist keine fachlich interpretierbare Bandwahl und wird pro Trainingsfold gelernt. |
+| PCA | Benachbarte Bänder sind stark redundant; zwei Komponenten erklären in der EDA mehr als 90 % der Spektralvarianz. | Für die kombinierte RBF-SVM wurden 20, 40 und 80 Komponenten nur auf dem Trainingsanteil verglichen. | 40 Komponenten gewannen knapp die CV, blieben aber auf der Validierung hinter Rohspektren; PCA wird pro Trainingsfold gelernt und nicht übernommen. |
 | Überwachte Bandauswahl | Die EDA zeigt univariate Klassenunterschiede an einzelnen Wellenlängen. | Eine kleine Anzahl von Bändern ausschließlich innerhalb jedes Trainingsfolds auswählen und gegen Rohbänder vergleichen. | Ein hoher EDA-F-Wert ist kein Leistungsnachweis; Auswahl auf allen Daten wäre Leakage. |
 
 Die fachliche Motivation für sichtbares Licht, Red Edge, NIR, SWIR und die Vegetationsindizes
@@ -78,8 +81,9 @@ Feature Selection ausdrücklich als mögliche Varianten.
    machen.
 3. Als nächsten einzelnen Kandidaten die zyklische Monatskodierung testen.
 4. Danach genau eine kleine spektrale Hypothese wählen: EVI **oder** Red-Edge-Steigungen.
-5. Erst wenn diese Varianten verglichen sind, PCA oder trainingsfold-basierte Bandauswahl für
-   weitere Modelle prüfen.
+5. PCA ist für die kombinierte RBF-SVM geprüft und nicht übernommen; als nächste spektrale
+  Hypothese eine vorab festgelegte Formtransformation oder trainingsfold-basierte Bandauswahl
+  wählen.
 
 Jede Variante folgt demselben Ablauf: `tune()` sucht Parameter und Merkmalskonfigurationen
 innerhalb der Cross-Validation auf dem Trainingsanteil; `run()` bewertet ausschließlich den

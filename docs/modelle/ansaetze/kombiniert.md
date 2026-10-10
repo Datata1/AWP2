@@ -47,7 +47,7 @@ Trainingsanteil; der gemeinsame Holdout wird für den gewählten Kandidaten gena
 | --- | --- | --- | --- | --- |
 | 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | **Abgeschlossen:** CV-BAcc 0,847 und Validierungs-BAcc 0,866; neue Referenz. |
 | 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | Die Darstellung mit der besten CV-BAcc einzeln auf dem Holdout bewerten. |
-| 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | Nur weiterverfolgen, wenn die CV die beste Rohspektren-SVM klar übertrifft. |
+| 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | **Abgeschlossen:** 40 Komponenten gewinnen die CV mit 0,854, erreichen auf der Validierung aber nur 0,856; Rohspektren bleiben Referenz. |
 | 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | Nur bei CV-Gewinn eine Variante auf dem Holdout auswerten. |
 | 5 | Wenige fachlich definierte spektrale Kennwerte ergänzen die Rohbänder. | Beste tabellarische SVM, Red-Edge-Steigungen oder Regionsmerkmale | Eine feste, dokumentierte Merkmalsmenge je Hypothese | Behalten, wenn CV und einmalige Validierung die Referenz nicht widerlegen. |
 | 6 | Eine überwachte, kompakte Projektion nutzt die hohe Bandkorrelation besser. | PLS-Komponenten mit nachgelagertem linearen oder RBF-Klassifikator | Kleine Zahl vorab definierter Komponenten | Gegen die beste SVM-Repräsentation auf dem gemeinsamen Holdout einordnen. |
@@ -97,6 +97,7 @@ getrennte Versuche:
 | Baum-Ensembles | `scale=False`, `use_meta=True` | Nichtlineare Interaktionen ohne Skalierung | Klassengewichte oder Sample Weights gegen die ungleichen kombinierten Klassen einsetzen. |
 | Kontext-Ablation | `use_meta=False` | Misst den reinen Beitrag der Spektren | Nie anhand eines anderen Splits vergleichen. |
 | Indizes | `use_vegetation_indices=True` | Testet NDVI, NDRE, PRI und NDWI zusätzlich zu den Bändern | Gegen dieselbe Basiskonfiguration ohne Indizes vergleichen. |
+| PCA auf Spektren | `scale=True`, `pca_components=40`, `use_meta=True` | Verdichtet korrelierte Spektralbänder, ohne AEZ und Month zu projizieren | CV-Gewinner der PCA-Suche; auf der Validierung unter der Rohspektren-Referenz, daher nicht übernehmen. |
 | Spätere Glättung/Bandauswahl | neues Feld in `PreprocessingConfig` und Transformer in `awp2.preprocessing` | Kann Rauschen oder Redundanz senken | Erst eine fachliche Hypothese und einen kleinen Vergleich definieren; niemals Features vor dem CV fitten. |
 
 Month bleibt zunächst numerisch, AEZ wird One-Hot-kodiert. Eine zyklische Month-Kodierung ist
@@ -202,6 +203,33 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 ![Recall je Klasse](../img/combined_svm_expanded_recall.png)
 
 ![Häufigste Verwechslungen](../img/combined_svm_expanded_confusions.png)
+
+### RBF-SVM mit PCA auf Spektralbändern
+
+Notebook: `notebooks/07_duac1011_combined-svm-pca.ipynb`. PCA reduziert ausschließlich die
+skalierten Spektralbänder; AEZ und Month werden im parallelen Metadatenzweig unverändert an die
+SVM übergeben.
+
+- **Warum getestet?** Benachbarte Wellenlängen sind stark korreliert. Die PCA prüft, ob eine
+    kompaktere, unkorrelierte Spektralrepräsentation die Distanzen des RBF-Kernels verbessert.
+- Die drei getrennten CV-Suchen mit 20, 40 und 80 Komponenten erreichten als jeweilige Gewinner
+    BAcc kombiniert von 0,853, 0,854 und 0,852. Insgesamt gewinnt 40 Komponenten mit
+    `C=300.0`, `gamma=0.001` und CV-BAcc 0,854.
+- Der einmalige Validierungslauf `combined_svm_pca` (MLflow `45c69d81`) erreicht BAcc 0,924 für
+    Crop, 0,901 für Stage und **0,856 kombiniert**. Trotz des kleinen CV-Gewinns liegt er 0,010
+    unter der Rohspektren-Referenz (0,866); die PCA-Variante wird nicht übernommen.
+- Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste Verwechslungen sind
+    Winterweizen → Baumwolle (35), Soja → Mais (32) und Critical → Mature_Senesc (22).
+
+![PCA gegen Rohspektren](../img/combined_svm_pca_comparison.png)
+
+![Tuning der PCA-SVM](../img/combined_svm_pca_tuning.png)
+
+![Confusion Matrices](../img/combined_svm_pca_confusion.png)
+
+![Recall je Klasse](../img/combined_svm_pca_recall.png)
+
+![Häufigste Verwechslungen](../img/combined_svm_pca_confusions.png)
 
 ### RBF-SVM ohne Metadaten
 
@@ -332,8 +360,8 @@ lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene S
 
 ## Fazit
 
-**Verglichen – vorläufig führend.** Die RBF-SVM mit AEZ und Month verbessert die kombinierte BAcc
-gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, Random Forest, Extra Trees und
-HistGradientBoosting deutlich und verhindert weiterhin ungültige Paare. Gegen hierarchische und
-Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu vergleichen; weitere sequenzielle
-Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.
+**Verglichen – vorläufig führend.** Die RBF-SVM mit Rohspektren, AEZ und Month verbessert die
+kombinierte BAcc gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, der PCA-Variante,
+Random Forest, Extra Trees und HistGradientBoosting deutlich und verhindert weiterhin ungültige
+Paare. Gegen hierarchische und Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu
+vergleichen; weitere sequenzielle Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.
