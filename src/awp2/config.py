@@ -30,6 +30,8 @@ CROP_COL = "Crop"
 STAGE_COL = "Stage"
 AEZ_COL = "AEZ"
 MONTH_COL = "Month"
+MONTH_SIN_COL = "Month_sin"
+MONTH_COS_COL = "Month_cos"
 TARGET_COLS = (CROP_COL, STAGE_COL)
 META_COLS = (AEZ_COL, MONTH_COL)
 BAND_PREFIX = "X"
@@ -49,6 +51,9 @@ VEGETATION_INDEX_BANDS = (
     NDWI_SWIR_BAND,
 )
 VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
+
+# Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
+SAVGOL_SPLIT_GAP_NM = 20
 
 AEZ_RANGE = (1, 20)
 MONTH_RANGE = (1, 12)
