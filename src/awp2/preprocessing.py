@@ -194,6 +194,45 @@ def _interpolate_along_wavelength(
     return pd.DataFrame(values, index=spectra.index, columns=spectra.columns)
 
 
+class StandardNormalVariate(_BandTransformer):
+    """Per-spectrum scatter correction: zero mean and unit variance across the bands.
+
+    Runs right after interpolation on the measured reflectance spectrum, i.e. before
+    index engineering, scaling and PCA.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the band columns; no statistics are fitted (the correction is per row).
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        self.feature_names_out_ = list(X.columns)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Centre each spectrum to zero mean and unit variance across its bands.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` with each row standardised; constant spectra become all zeros.
+        """
+        X = self._check(X)
+        values = X.to_numpy(dtype=float, copy=True)
+        stds = values.std(axis=1)
+        stds[stds == 0.0] = 1.0
+        corrected = (values - values.mean(axis=1, keepdims=True)) / stds[:, None]
+        return pd.DataFrame(corrected, index=X.index, columns=X.columns)
+
+
 class AddVegetationIndices(_BandTransformer):
     """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
 
@@ -335,6 +374,11 @@ class PreprocessingConfig(BaseModel):
         description="Scale spectral bands to [0, 1] per band from the training part; "
         "leaves AEZ and Month untouched.",
     )
+    use_spectral_snv: bool = Field(
+        default=False,
+        description="Apply Standard Normal Variate scatter correction per spectrum (zero mean, "
+        "unit variance across bands); applied after interpolation, before indices and scaling.",
+    )
     spectral_pca_components: int | None = Field(
         default=None,
         gt=0,
@@ -413,6 +457,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
+    if config.use_spectral_snv:
+        spectra.append(("snv", StandardNormalVariate()))
     if config.use_vegetation_indices:
         spectra.append(("vegetation_indices", AddVegetationIndices()))
     if config.use_spectral_standard_scale or config.scale:
