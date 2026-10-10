@@ -191,6 +191,10 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 - Der einmalige Validierungslauf `combined_svm_expanded` (MLflow `65232eab`) erreicht BAcc
     0.931 für Crop, 0.906 für Stage und **0.866 kombiniert**. Damit verbessert er die bisherige
     SVM-Referenz um 0.021 und wird die neue Referenz des kombinierten Ansatzes.
+- Die anschließende CV-only-Sensitivitätsanalyse `combined_svm_wide_cv_search` (MLflow
+    `01903fad`) verglich 25 Kombinationen und erreichte mit `C=300.0`, `gamma=0.001` eine
+    CV-BAcc kombiniert von 0.853. Der Validierungssplit blieb dabei unberührt; die Suche ändert
+    deshalb weder die Referenz noch ihre dokumentierten Holdout-Metriken.
 - Alle vorhergesagten Crop/Stage-Paare sind gültig. Schwächster Crop-Recall bleibt Winterweizen
     (0.85); schwächster Stage-Recall bleibt Mature_Senesc (0.84). Häufigste Verwechslungen sind
     Winterweizen → Baumwolle (30), Soja → Mais (25) und Critical → Mature_Senesc (19).
