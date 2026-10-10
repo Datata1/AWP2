@@ -37,6 +37,10 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | Einzelne Lücken spektral auffüllen | Linear nach Wellenlänge interpolieren, wenn die beiden gemessenen Stützbänder höchstens 15 nm auseinanderliegen; sonst den näheren Stützwert übernehmen. Am Spektralrand ebenfalls den nächsten Messwert verwenden. Vollständig leere Spektren werden mit den im Training bestimmten Bandmedianen gefüllt. Die Grenze ist über `PreprocessingConfig(max_interpolation_gap_nm=...)` konfigurierbar. Nach der Duplikatbereinigung betrifft die Imputation 43 Trainings- und 11 Testzeilen; in den Rohdaten sind es 44 Trainingszeilen. |
 | `AEZ` und Monat als Kontextmerkmale | `AEZ` wird one-hot-kodiert. `Month` wird standardmäßig durch `Month_sin` und `Month_cos` mit Jahresperiode 12 ersetzt; `use_cyclic_month=False` behält die numerische Monatszahl. Bei `scale=True` werden beide zyklischen Merkmale innerhalb des Trainingsfolds skaliert. Kontextmerkmale sind laut Aufgabe erlaubt, können aber Orts- oder Kalenderabhängigkeit abbilden; daher ihren Nutzen und die Monatskodierung vergleichen. |
 | Skalierung optional | Nötig für SVM, logistische Regression, MLP; für Baum-Modelle überflüssig |
+| Höchstens ein Reduktionsverfahren gleichzeitig | Sonst ist der Anteil der Verfahren am Score nicht trennbar; jedes Verfahren läuft gegen PCA |
+| NMF/OSP auf rohen Spektren | NMF braucht Nicht-Negativität (Reflektanz, multiplikative Updates), OSP die physikalischen Endmember – Standardisierung oder SNV würden beides zerstören |
+| DBN als gestapelte Bernoulli-RBMs aus sklearn | Volles DBN-Training (Fine-Tuning, CAE) braucht PyTorch/Keras; für den Methodenvergleich genügen RBM-Merkmale auf Min-Max-skalierten Bändern |
+| Zentrierung als Alternative zur Standardisierung | Zentrierung normiert keine Varianzen (schonender als Standardisierung); LPP läuft zusätzlich auch auf rohen Bändern |
 | Optionen als pydantic-`PreprocessingConfig` | Tippfehler oder falsche Typen (`scale="yes"`) fallen sofort auf |
 
 ## Klassenungleichgewicht

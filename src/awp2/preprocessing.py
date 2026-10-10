@@ -7,10 +7,13 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from scipy.linalg import eigh
 from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
-from sklearn.decomposition import PCA
+from sklearn.decomposition import NMF, PCA, FastICA
+from sklearn.neighbors import kneighbors_graph
+from sklearn.neural_network import BernoulliRBM
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
@@ -305,6 +308,246 @@ class StandardNormalVariate(_BandTransformer):
         return pd.DataFrame(corrected, index=X.index, columns=X.columns)
 
 
+class OrthogonalSubspaceProjection(_BandTransformer):
+    """Unsupervised OSP by automatic target generation: iterative endmember signatures.
+
+    Each round projects the training spectra onto the orthogonal complement of the
+    endmembers found so far and picks the highest-energy pixel as the next endmember.
+    New spectra are projected onto the endmembers. Runs on raw spectra, so it must not
+    combine with scaling.
+    """
+
+    def __init__(self, n_components: int) -> None:
+        """Set the number of endmembers.
+
+        Args:
+            n_components: Number of endmember signatures to extract.
+        """
+        self.n_components = n_components
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Extract endmembers greedily from the training spectra.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the component count is not positive or exceeds the bands.
+        """
+        X = self._check(X)
+        if self.n_components < 1:
+            raise ValueError("n_components must be positive")
+        if self.n_components > X.shape[1]:
+            raise ValueError("n_components must not exceed the bands")
+        self._set_input(X)
+        values = X.to_numpy(dtype=float)
+        found = np.zeros((X.shape[1], 0))
+        for _ in range(self.n_components):
+            if found.shape[1]:
+                projector = np.eye(X.shape[1]) - found @ np.linalg.pinv(found)
+            else:
+                projector = np.eye(X.shape[1])
+            energies = ((values @ projector) ** 2).sum(axis=1)
+            found = np.column_stack([found, values[np.argmax(energies)]])
+        self.endmembers_ = found
+        self.feature_names_out_ = [f"osp{position}" for position in range(self.n_components)]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Project spectra onto the fitted endmembers.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            Endmember projections, one ``osp<i>`` column each.
+        """
+        values = self._check(X).to_numpy(dtype=float, copy=True)
+        return pd.DataFrame(
+            values @ self.endmembers_, index=X.index, columns=self.feature_names_out_
+        )
+
+
+class VerySparseRandomProjection(_BandTransformer):
+    """Achlioptas very sparse random projection of mean-centered spectra.
+
+    Entries are ``±sqrt(c)`` with probability ``1/(2c)`` each and zero otherwise, with
+    ``c`` as the square root of the band count. The projection is data-independent; the
+    training mean is the only fitted statistic, so centering holds for new spectra too.
+    """
+
+    def __init__(self, n_components: int) -> None:
+        """Set the output size.
+
+        Args:
+            n_components: Number of random components.
+        """
+        self.n_components = n_components
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Store the training mean and draw the fixed projection matrix.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the component count is not positive.
+        """
+        X = self._check(X)
+        if self.n_components < 1:
+            raise ValueError("n_components must be positive")
+        self._set_input(X)
+        self.mean_ = X.to_numpy(dtype=float).mean(axis=0)
+        sparsity = float(np.sqrt(X.shape[1]))
+        draw = np.random.default_rng(SEED).random((X.shape[1], self.n_components))
+        self.matrix_ = np.where(
+            draw < 1 / (2 * sparsity), 1.0, np.where(draw < 1 / sparsity, -1.0, 0.0)
+        ) * np.sqrt(sparsity)
+        self.feature_names_out_ = [f"vsrp{position}" for position in range(self.n_components)]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Center spectra with the training mean and apply the fixed projection.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            Random components, one ``vsrp<i>`` column each.
+        """
+        values = self._check(X).to_numpy(dtype=float, copy=True)
+        return pd.DataFrame(
+            (values - self.mean_) @ self.matrix_, index=X.index, columns=self.feature_names_out_
+        )
+
+
+class LocalityPreservingProjection(_BandTransformer):
+    """Linear locality-preserving reduction of the spectral bands.
+
+    Builds a symmetric binary k-nearest-neighbour graph over the training spectra and keeps
+    the projection that best preserves neighbour relations (smallest eigenvectors of the
+    generalized problem ``XLX'a = lXDX'a``). New spectra transform linearly, so validation
+    data needs no graph of its own.
+    """
+
+    def __init__(self, n_components: int, n_neighbors: int) -> None:
+        """Set the output size and the neighbourhood size.
+
+        Args:
+            n_components: Number of preserved components.
+            n_neighbors: Neighbours per spectrum for the adjacency graph.
+        """
+        self.n_components = n_components
+        self.n_neighbors = n_neighbors
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Build the neighbourhood graph and solve for the preserving projection.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the component or neighbour counts are not positive.
+        """
+        X = self._check(X)
+        if self.n_components < 1 or self.n_neighbors < 1:
+            raise ValueError("n_components and n_neighbors must be positive")
+        self._set_input(X)
+        values = X.to_numpy(dtype=float)
+        graph = kneighbors_graph(values, self.n_neighbors, include_self=False)
+        adjacency = graph.maximum(graph.T)
+        degrees = np.asarray(adjacency.sum(axis=1)).ravel()
+        spread = values * degrees[:, None] - adjacency @ values
+        left = spread.T @ values
+        right = (values * degrees[:, None]).T @ values
+        _, eigenvectors = eigh(left, right, subset_by_index=[0, self.n_components - 1])
+        self.projection_ = eigenvectors
+        self.feature_names_out_ = [f"lpp{position}" for position in range(self.n_components)]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Project spectra onto the fitted preserving components.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            Preserved components, one ``lpp<i>`` column each.
+        """
+        values = self._check(X).to_numpy(dtype=float, copy=True)
+        return pd.DataFrame(
+            values @ self.projection_, index=X.index, columns=self.feature_names_out_
+        )
+
+
+class DeepBeliefFeatures(_BandTransformer):
+    """DBN-style features from greedily stacked BernoulliRBMs.
+
+    Each layer is trained on the hidden probabilities of the previous one. Visible units
+    assume ``[0, 1]`` input, hence the min-max scaler requirement.
+    """
+
+    def __init__(self, hidden_layers: tuple[int, ...]) -> None:
+        """Set the stacked architecture.
+
+        Args:
+            hidden_layers: Hidden units per layer; the last entry is the output size.
+        """
+        self.hidden_layers = hidden_layers
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Train the stacked machines greedily, bottom layer first.
+
+        Args:
+            X: Band columns of the training part, scaled to ``[0, 1]``.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the architecture is empty or holds non-positive sizes.
+        """
+        X = self._check(X)
+        if not self.hidden_layers or any(size < 1 for size in self.hidden_layers):
+            raise ValueError("hidden_layers must hold at least one positive size")
+        self._set_input(X)
+        activations = X.to_numpy(dtype=float)
+        self.rbms_ = []
+        for size in self.hidden_layers:
+            machine = BernoulliRBM(n_components=size, random_state=SEED)
+            activations = machine.fit_transform(activations)
+            self.rbms_.append(machine)
+        self.feature_names_out_ = [f"dbn{position}" for position in range(self.hidden_layers[-1])]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Propagate spectra through the stacked machines.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            Top-layer hidden probabilities, one ``dbn<i>`` column each.
+        """
+        activations = self._check(X).to_numpy(dtype=float, copy=True)
+        for machine in self.rbms_:
+            activations = machine.transform(activations)
+        return pd.DataFrame(activations, index=X.index, columns=self.feature_names_out_)
+
+
 class AddVegetationIndices(_BandTransformer):
     """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
 
@@ -451,6 +694,11 @@ class PreprocessingConfig(BaseModel):
         description="Apply Standard Normal Variate scatter correction per spectrum (zero mean, "
         "unit variance across bands); applied after interpolation, before indices and scaling.",
     )
+    use_spectral_centering: bool = Field(
+        default=False,
+        description="Subtract the per-band training mean without variance scaling "
+        "(paper-faithful PCA input); mutually exclusive with the scalers.",
+    )
     use_savgol: bool = Field(
         default=False,
         description="Smooth spectra with a Savitzky-Golay filter after interpolation, one "
@@ -467,8 +715,50 @@ class PreprocessingConfig(BaseModel):
     spectral_pca_components: int | None = Field(
         default=None,
         gt=0,
-        description="Reduce the (standardised) spectral bands to this many principal components; "
-        "None keeps all bands. Requires use_spectral_standard_scale.",
+        description="Reduce the spectral bands to this many principal components; "
+        "None keeps all bands. Requires use_spectral_standard_scale or use_spectral_centering.",
+    )
+    spectral_ica_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Independent components of the spectral bands; "
+        "None disables the method. Requires use_spectral_standard_scale or use_spectral_centering.",
+    )
+    spectral_nmf_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Non-negative parts of the raw spectra (multiplicative updates); "
+        "None disables the method. Needs non-negative input: must not combine with "
+        "savgol, snv, scalers or indices.",
+    )
+    spectral_osp_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Automatic target generation: iterative endmember signatures of the raw "
+        "spectra; None disables the method. Must not combine with snv, scalers or indices.",
+    )
+    spectral_lpp_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Locality-preserving components of the spectral bands; "
+        "None disables the method. Requires spectral_lpp_neighbors.",
+    )
+    spectral_lpp_neighbors: int | None = Field(
+        default=None,
+        gt=0,
+        description="Neighbours per spectrum for the LPP adjacency graph; "
+        "required with spectral_lpp_components.",
+    )
+    spectral_vsrp_components: int | None = Field(
+        default=None,
+        gt=0,
+        description="Very sparse random projection of mean-centered spectra; "
+        "None disables the method. Needs no scaler.",
+    )
+    spectral_dbn_layers: tuple[int, ...] | None = Field(
+        default=None,
+        description="Stacked BernoulliRBM architecture, e.g. (64, 20); the last entry is the "
+        "output size. Requires use_spectral_minmax_scale for [0, 1] input.",
     )
     use_vegetation_indices: bool = Field(
         default=False,
@@ -495,18 +785,81 @@ class PreprocessingConfig(BaseModel):
             The validated configuration.
 
         Raises:
-            ValueError: If both spectral scalers, a spectral scaler together with the
-                deprecated ``scale`` flag, or PCA without the spectral standard scaler
-                are requested; if Savitzky-Golay arguments are set without ``use_savgol``
-                or missing with it; or if the Savitzky-Golay window is not odd and above
-                the polynomial degree.
+            ValueError: If more than one reduction method is selected; if centering,
+                scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
+                if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
+                arguments are set without their method or missing with it.
         """
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
             raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
+        if self.use_spectral_centering and (
+            self.scale or self.use_spectral_standard_scale or self.use_spectral_minmax_scale
+        ):
+            raise ValueError("use_spectral_centering must not combine with scalers")
         if self.scale and (self.use_spectral_standard_scale or self.use_spectral_minmax_scale):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
-        if self.spectral_pca_components is not None and not self.use_spectral_standard_scale:
-            raise ValueError("spectral_pca_components requires use_spectral_standard_scale=True")
+        reductions = [
+            self.spectral_pca_components,
+            self.spectral_ica_components,
+            self.spectral_nmf_components,
+            self.spectral_osp_components,
+            self.spectral_lpp_components,
+            self.spectral_vsrp_components,
+        ]
+        if sum(selected is not None for selected in reductions) + (
+            self.spectral_dbn_layers is not None
+        ) > 1:
+            raise ValueError("use at most one dimensionality reduction method")
+        needs_centering = (
+            self.spectral_pca_components,
+            self.spectral_ica_components,
+        )
+        if any(selected is not None for selected in needs_centering):
+            if not (self.use_spectral_standard_scale or self.use_spectral_centering):
+                raise ValueError(
+                    "pca/ica reduction requires use_spectral_standard_scale or "
+                    "use_spectral_centering"
+                )
+        if self.spectral_nmf_components is not None and (
+            self.scale
+            or self.use_spectral_standard_scale
+            or self.use_spectral_minmax_scale
+            or self.use_spectral_centering
+            or self.use_spectral_snv
+            or self.use_savgol
+            or self.use_vegetation_indices
+        ):
+            raise ValueError(
+                "nmf reduction needs raw spectra: must not combine with savgol, snv, "
+                "scalers or vegetation indices"
+            )
+        if self.spectral_osp_components is not None and (
+            self.scale
+            or self.use_spectral_standard_scale
+            or self.use_spectral_minmax_scale
+            or self.use_spectral_centering
+            or self.use_spectral_snv
+            or self.use_vegetation_indices
+        ):
+            raise ValueError(
+                "osp reduction needs raw spectra: must not combine with snv, "
+                "scalers or vegetation indices"
+            )
+        if self.spectral_lpp_components is None and self.spectral_lpp_neighbors is not None:
+            raise ValueError("spectral_lpp_neighbors requires spectral_lpp_components")
+        if self.spectral_lpp_components is not None and self.spectral_lpp_neighbors is None:
+            raise ValueError("spectral_lpp_components requires spectral_lpp_neighbors")
+        if self.spectral_lpp_components is not None and self.use_vegetation_indices:
+            raise ValueError("lpp reduction must not combine with vegetation indices")
+        if self.spectral_dbn_layers is not None:
+            if not self.use_spectral_minmax_scale:
+                raise ValueError("dbn reduction requires use_spectral_minmax_scale=True")
+            if self.use_vegetation_indices:
+                raise ValueError("dbn reduction must not combine with vegetation indices")
+            if len(self.spectral_dbn_layers) == 0 or any(
+                size < 1 for size in self.spectral_dbn_layers
+            ):
+                raise ValueError("spectral_dbn_layers must hold at least one positive size")
         if self.use_savgol:
             if self.savgol_window_length is None or self.savgol_polyorder is None:
                 raise ValueError("use_savgol requires savgol_window_length and savgol_polyorder")
@@ -568,10 +921,32 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         spectra.append(("standard_scale", StandardScaler()))
     elif config.use_spectral_minmax_scale:
         spectra.append(("minmax_scale", MinMaxScaler()))
-    if config.spectral_pca_components is not None:
+    elif config.use_spectral_centering:
+        spectra.append(("centering", StandardScaler(with_mean=True, with_std=False)))
+    pca_components = config.spectral_pca_components
+    ica_components = config.spectral_ica_components
+    nmf_components = config.spectral_nmf_components
+    osp_components = config.spectral_osp_components
+    lpp_components = config.spectral_lpp_components
+    vsrp_components = config.spectral_vsrp_components
+    dbn_layers = config.spectral_dbn_layers
+    if pca_components is not None:
+        spectra.append(("pca", PCA(n_components=pca_components, random_state=SEED)))
+    elif ica_components is not None:
+        spectra.append(("ica", FastICA(n_components=ica_components, random_state=SEED)))
+    elif nmf_components is not None:
+        spectra.append(("nmf", NMF(n_components=nmf_components, random_state=SEED, solver="mu")))
+    elif osp_components is not None:
+        spectra.append(("osp", OrthogonalSubspaceProjection(osp_components)))
+    elif lpp_components is not None:
+        assert config.spectral_lpp_neighbors is not None
         spectra.append(
-            ("pca", PCA(n_components=config.spectral_pca_components, random_state=SEED))
+            ("lpp", LocalityPreservingProjection(lpp_components, config.spectral_lpp_neighbors))
         )
+    elif vsrp_components is not None:
+        spectra.append(("vsrp", VerySparseRandomProjection(vsrp_components)))
+    elif dbn_layers is not None:
+        spectra.append(("dbn", DeepBeliefFeatures(dbn_layers)))
 
     transformers: list[tuple[str, BaseEstimator | str, object]] = []
     if config.use_meta:
