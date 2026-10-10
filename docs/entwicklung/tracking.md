@@ -37,9 +37,9 @@ result = run(
         preprocessing=PreprocessingConfig(use_meta=True),
     ),
 )
-result.metrics.bacc_combined   # Score
-result.run_id                  # Lauf in MLflow
-result.model_uri               # gespeichertes Modell, z. B. für Vorhersagen
+result.metrics.bacc_combined  # Score
+result.run_id  # Lauf in MLflow
+result.model_uri  # gespeichertes Modell, z. B. für Vorhersagen
 ```
 
 | Option in `RunConfig` | Standard | Wirkung |
@@ -91,7 +91,7 @@ from awp2.config import MLFLOW_TRACKING_URI
 from awp2.data import load_test
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-model = mlflow.sklearn.load_model(result.model_uri)   # oder "models:/<Model-ID>" aus dem Tab Models
+model = mlflow.sklearn.load_model(result.model_uri)  # oder "models:/<Model-ID>" aus dem Tab Models
 model.predict(load_test())
 ```
 
