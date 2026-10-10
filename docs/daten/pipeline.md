@@ -36,10 +36,12 @@ from awp2.evaluation import as_target_frame, evaluate
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 split = load_split()
-model = Pipeline([
-    ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
-    ("model", DummyClassifier(strategy="most_frequent")),  # ← euer Ansatz
-])
+model = Pipeline(
+    [
+        ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+        ("model", DummyClassifier(strategy="most_frequent")),  # ← euer Ansatz
+    ]
+)
 model.fit(split.X_train, split.y_train)
 y_pred = as_target_frame(model.predict(split.X_val), split.y_val.index)
 
@@ -102,8 +104,12 @@ from sklearn.model_selection import GridSearchCV
 from awp2.data import load_folds
 from awp2.evaluation import scorer
 
-search = GridSearchCV(model, {"model__strategy": ["most_frequent", "stratified"]},
-                      scoring=scorer("bacc_combined"), cv=load_folds())
+search = GridSearchCV(
+    model,
+    {"model__strategy": ["most_frequent", "stratified"]},
+    scoring=scorer("bacc_combined"),
+    cv=load_folds(),
+)
 search.fit(split.X_train, split.y_train)
 ```
 
@@ -126,15 +132,16 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 class SpectralLSTM(BaseEstimator, ClassifierMixin):
     def __init__(self, hidden_size: int = 64, epochs: int = 50) -> None:
-        self.hidden_size = hidden_size   # Hyperparameter nur speichern → tune() kann sie setzen
+        self.hidden_size = hidden_size  # Hyperparameter nur speichern → tune() kann sie setzen
         self.epochs = epochs
 
     def fit(self, X: pd.DataFrame, y: pd.DataFrame) -> "SpectralLSTM":
         ...  # Labels kodieren, Netz bauen und trainieren
         return self
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
-        ...  # Array der Form (n, 2): Spalten Crop, Stage
+    def predict(
+        self, X: pd.DataFrame
+    ) -> np.ndarray: ...  # Array der Form (n, 2): Spalten Crop, Stage
 ```
 
 | Worauf achten | Warum |
