@@ -263,7 +263,10 @@ class SavitzkyGolaySmoothing(_BandTransformer):
         for start, end in self.segments_:
             if end - start >= self.window_length:
                 values[:, start:end] = savgol_filter(
-                    values[:, start:end], self.window_length, self.polyorder, axis=1,
+                    values[:, start:end],
+                    self.window_length,
+                    self.polyorder,
+                    axis=1,
                     mode="interp",
                 )
         return pd.DataFrame(values, index=X.index, columns=X.columns)
@@ -806,9 +809,11 @@ class PreprocessingConfig(BaseModel):
             self.spectral_lpp_components,
             self.spectral_vsrp_components,
         ]
-        if sum(selected is not None for selected in reductions) + (
-            self.spectral_dbn_layers is not None
-        ) > 1:
+        if (
+            sum(selected is not None for selected in reductions)
+            + (self.spectral_dbn_layers is not None)
+            > 1
+        ):
             raise ValueError("use at most one dimensionality reduction method")
         needs_centering = (
             self.spectral_pca_components,
@@ -909,9 +914,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     if config.use_savgol:
         assert config.savgol_window_length is not None and config.savgol_polyorder is not None
         spectra.append(
-            ("savgol", SavitzkyGolaySmoothing(
-                config.savgol_window_length, config.savgol_polyorder
-            ))
+            ("savgol", SavitzkyGolaySmoothing(config.savgol_window_length, config.savgol_polyorder))
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
