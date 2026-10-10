@@ -48,7 +48,7 @@ Trainingsanteil; der gemeinsame Holdout wird für den gewählten Kandidaten gena
 | 1 | Die bisherige SVM-Suche hat ihr Optimum am Rand noch nicht erreicht. | RBF-SVM, skalierte Spektren, AEZ und Month | `C`: 3, 10, 30, 100; `gamma`: 0,003, 0,01, 0,03 | **Abgeschlossen:** CV-BAcc 0,847 und Validierungs-BAcc 0,866; neue Referenz. |
 | 2 | Eine andere Darstellung des Monats bildet die saisonale Information besser ab. | Beste SVM aus 1, Rohspektren und AEZ | Numerisch gegen One-Hot sowie sin/cos für Month | Die Darstellung mit der besten CV-BAcc einzeln auf dem Holdout bewerten. |
 | 3 | Redundante, korrelierte Bänder erschweren den Abstand im RBF-Kernel. | Beste SVM aus 1--2, PCA nur für Spektren; AEZ und Month getrennt | 20, 40, 80 PCA-Komponenten | Nur weiterverfolgen, wenn die CV die beste Rohspektren-SVM klar übertrifft. |
-| 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | Nur bei CV-Gewinn eine Variante auf dem Holdout auswerten. |
+| 4 | Die Kurvenform trennt Klassen besser als die absolute Helligkeit. | Beste tabellarische SVM, SNV oder erste Ableitung als getrennte Variante | Keine breite Suche: je eine vorab definierte Transformation | **SNV abgeschlossen:** CV-BAcc 0,823 gegenüber 0,847 für Rohspektren; kein Holdout-Lauf. Eine erste Ableitung bleibt eine getrennte Hypothese. |
 | 5 | Wenige fachlich definierte spektrale Kennwerte ergänzen die Rohbänder. | Beste tabellarische SVM, Red-Edge-Steigungen oder Regionsmerkmale | Eine feste, dokumentierte Merkmalsmenge je Hypothese | Behalten, wenn CV und einmalige Validierung die Referenz nicht widerlegen. |
 | 6 | Eine überwachte, kompakte Projektion nutzt die hohe Bandkorrelation besser. | PLS-Komponenten mit nachgelagertem linearen oder RBF-Klassifikator | Kleine Zahl vorab definierter Komponenten | Gegen die beste SVM-Repräsentation auf dem gemeinsamen Holdout einordnen. |
 | 7 | Boosting mit kategorialem Kontext ergänzt die bisherigen Baum-Ensembles. | CatBoost auf Rohbändern, AEZ und Month | Kleine Suche für Tiefe, Lernrate und L2-Regularisierung | Nur bei CV näher an der SVM als Extra Trees weiterverfolgen. |
@@ -97,6 +97,7 @@ getrennte Versuche:
 | Baum-Ensembles | `scale=False`, `use_meta=True` | Nichtlineare Interaktionen ohne Skalierung | Klassengewichte oder Sample Weights gegen die ungleichen kombinierten Klassen einsetzen. |
 | Kontext-Ablation | `use_meta=False` | Misst den reinen Beitrag der Spektren | Nie anhand eines anderen Splits vergleichen. |
 | Indizes | `use_vegetation_indices=True` | Testet NDVI, NDRE, PRI und NDWI zusätzlich zu den Bändern | Gegen dieselbe Basiskonfiguration ohne Indizes vergleichen. |
+| SNV | `scale=True`, `use_snv=True`, `use_meta=True` | Hebt die Form jedes Spektrums gegenüber seinem Helligkeitsniveau hervor | CV-BAcc 0,823 liegt unter Rohspektren (0,847); kein Holdout-Lauf. |
 | Spätere Glättung/Bandauswahl | neues Feld in `PreprocessingConfig` und Transformer in `awp2.preprocessing` | Kann Rauschen oder Redundanz senken | Erst eine fachliche Hypothese und einen kleinen Vergleich definieren; niemals Features vor dem CV fitten. |
 
 Month bleibt zunächst numerisch, AEZ wird One-Hot-kodiert. Eine zyklische Month-Kodierung ist
@@ -202,6 +203,24 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 ![Recall je Klasse](../img/combined_svm_expanded_recall.png)
 
 ![Häufigste Verwechslungen](../img/combined_svm_expanded_confusions.png)
+
+### RBF-SVM mit Standard Normal Variate
+
+Notebook: `notebooks/08_duac1011_combined-svm-snv.ipynb`. SNV normalisiert jedes interpolierte
+Spektrum auf Mittelwert null und Standardabweichung eins; AEZ und Month bleiben im separaten
+Metadatenzweig.
+
+- **Warum getestet?** Die Transformation prüft, ob die Form der Spektralkurve die kombinierten
+    Klassen robuster trennt, wenn absolute Reflektanzunterschiede abgeschwächt werden.
+- Die feste Referenz-SVM mit `C=100.0` und `gamma=0.003` erreicht mit SNV im Tuning-Lauf
+    `combined_svm_snv_search` (MLflow `c1851329`) nur eine CV-BAcc kombiniert von 0,823.
+- Das liegt 0,024 unter der Rohspektren-Referenz (0,847). Der vorher festgelegte
+    Entscheidungsregel folgend wurde der gemeinsame Holdout nicht bewertet; SNV wird nicht
+    übernommen.
+- Absolute Helligkeits- und Niveauunterschiede enthalten hier offenbar trennrelevante
+    Information, die SNV bewusst entfernt.
+
+![CV-Score der RBF-SVM mit SNV](../img/combined_svm_snv_tuning.png)
 
 ### RBF-SVM ohne Metadaten
 
@@ -333,7 +352,7 @@ lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene S
 ## Fazit
 
 **Verglichen – vorläufig führend.** Die RBF-SVM mit AEZ und Month verbessert die kombinierte BAcc
-gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, Random Forest, Extra Trees und
+gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, SNV, Random Forest, Extra Trees und
 HistGradientBoosting deutlich und verhindert weiterhin ungültige Paare. Gegen hierarchische und
 Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu vergleichen; weitere sequenzielle
 Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.

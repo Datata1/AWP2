@@ -136,6 +136,43 @@ def _interpolate_along_wavelength(spectra: pd.DataFrame) -> pd.DataFrame:
     return filled.set_axis(spectra.columns, axis=1)
 
 
+class StandardNormalVariate(_BandTransformer):
+    """Normalise each spectrum to zero mean and unit standard deviation."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Record the spectral input schema.
+
+        Args:
+            X: Complete band columns after missing-value processing.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            This fitted transformer.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        self.feature_names_out_ = list(X.columns)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Apply Standard Normal Variate to each spectrum.
+
+        Args:
+            X: Complete band columns with the fitted schema.
+
+        Returns:
+            Spectra with zero row mean and unit row standard deviation.
+
+        Raises:
+            ValueError: If a spectrum has no variation across its bands.
+        """
+        X = self._check(X)
+        row_std = X.std(axis=1)
+        if row_std.eq(0).any():
+            raise ValueError("Standard Normal Variate requires variation across every spectrum.")
+        return X.sub(X.mean(axis=1), axis=0).div(row_std, axis=0)
+
+
 class AddVegetationIndices(_BandTransformer):
     """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
 
@@ -207,6 +244,10 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
     )
+    use_snv: bool = Field(
+        default=False,
+        description="Normalise each interpolated spectrum with Standard Normal Variate.",
+    )
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
@@ -234,6 +275,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands()),
     ]
+    if config.use_snv:
+        spectra.append(("snv", StandardNormalVariate()))
     if config.use_vegetation_indices:
         spectra.append(("vegetation_indices", AddVegetationIndices()))
     if config.scale:

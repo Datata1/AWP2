@@ -17,3 +17,12 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-08 | combined_extra_trees | duac1011 | Kombinierte Klasse | 0.886 | 0.895 | 0.804 | 0.796 | 0.897 | 78877676 | Extra Trees auf 23 kombinierten Klassen; Tuning `combined_extra_trees_search` (915736b9), CV 0.812, keine ungültigen Paare |
 | 2026-10-08 | combined_hist_gradient_boosting | duac1011 | Kombinierte Klasse | 0.885 | 0.881 | 0.777 | 0.773 | 0.891 | 6858b266 | HistGradientBoosting auf 23 kombinierten Klassen mit gewichteten Samples; Tuning `combined_hist_gradient_boosting_search` (b26e8cc8), CV 0.781, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_expanded | duac1011 | Kombinierte Klasse | 0.931 | 0.906 | 0.866 | 0.830 | 0.909 | 65232eab | RBF-SVM mit erweiterter Suche; Tuning `combined_svm_expanded_search` (0dea8124), CV 0.847, keine ungültigen Paare |
+
+## CV-only Versuche ohne Holdout
+
+Diese Versuche blieben unter der CV-Referenz und wurden deshalb nicht auf dem gemeinsamen
+Validierungssplit bewertet.
+
+| Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-10 | combined_svm_snv_search | duac1011 | Kombinierte Klasse | 0.823 | c1851329 | SNV nur auf interpolierten Spektren; 0.024 unter der Rohspektren-Referenz, kein Holdout-Lauf |

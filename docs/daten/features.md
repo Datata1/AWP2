@@ -35,14 +35,17 @@ belegt deshalb keine robuste spektrale Klassifikation.
 
 ## Bereits untersuchte Merkmalsmengen
 
-| Merkmalsmenge | Beobachtung im EDA-Random-Forest | Konsequenz |
+| Merkmalsmenge | Beobachtung | Konsequenz |
 | --- | --- | --- |
 | Rohspektren | CV Balanced Accuracy kombiniert: 0,570. | Bleibt die unverzichtbare Referenz. |
 | Rohspektren + `AEZ` + `Month` | CV Balanced Accuracy kombiniert: 0,750. | Der stärkste beobachtete Zugewinn, aber mit Risiko einer Orts- oder Kalenderabhängigkeit. |
 | Rohspektren + NDVI, NDRE, PRI, NDWI | CV Balanced Accuracy kombiniert: 0,590. | Für diesen Random Forest kein klarer Zusatznutzen gegenüber Rohspektren. Nicht blind übernehmen; für andere Modelle oder eine kompakte Merkmalsmenge separat prüfen. |
+| SNV-Spektren + `AEZ` + `Month` | Für die kombinierte RBF-SVM: CV BAcc kombiniert 0,823 bei `C=100.0`, `gamma=0.003`. | Unter Rohspektren (0,847); der Holdout blieb deshalb unberührt und SNV wird nicht übernommen. |
 
-Die Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md) dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen
-gemeinsamen Split, nicht als allgemeine Rangfolge aller denkbaren Merkmale.
+Die ersten drei Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md)
+dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen gemeinsamen Split,
+nicht als allgemeine Rangfolge aller denkbaren Merkmale. Das SNV-Ergebnis steht beim
+[kombinierten Ansatz](../modelle/ansaetze/kombiniert.md#rbf-svm-mit-standard-normal-variate).
 
 ## Kandidaten für weitere, getrennte Vergleiche
 
