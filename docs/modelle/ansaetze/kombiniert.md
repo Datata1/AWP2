@@ -213,14 +213,13 @@ Notebook: `notebooks/07_duac1011_combined-svm-month-encoding.ipynb`. Die Spektre
 RBF-SVM bleiben unverändert; ausschließlich die Darstellung von Month wird verglichen.
 
 - **Warum getestet?** Der lineare Abstand zwischen Monaten beschreibt Saisonzyklen nicht
-    zwingend passend. Deshalb vergleichen drei getrennte CV-Suchen die numerische, One-Hot- und
-    Sinus/Cosinus-Kodierung.
-- Die numerische Kodierung gewinnt mit `C=300.0`, `gamma=0.001` und CV-BAcc kombiniert 0.852
-    knapp vor zyklisch (0.849) und One-Hot (0.848). Die Unterschiede sind klein.
-- Der einmalige Validierungslauf `combined_svm_month_encoding` (MLflow `f2cdddb3`) erreicht
+    zwingend passend. Deshalb vergleichen zwei getrennte CV-Suchen die offiziell implementierten
+    numerischen und Sinus/Cosinus-Kodierungen.
+- Die numerische Kodierung gewinnt mit `C=300.0`, `gamma=0.001` und CV-BAcc kombiniert 0.8517
+    knapp vor zyklisch (0.8494). Der Unterschied ist klein.
+- Der einmalige Validierungslauf `combined_svm_month_encoding` (MLflow `19e76d99`) erreicht
     BAcc 0.925 für Crop, 0.904 für Stage und **0.859 kombiniert**. Das liegt 0.008 unter der
-    Referenz; die Hypothese wird nicht gestützt und die numerische Referenzkonfiguration bleibt
-    unverändert.
+    Referenz; die Hypothese wird nicht gestützt und die RBF-SVM-Referenz bleibt bestehen.
 - Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste Verwechslungen bleiben
     Winterweizen → Baumwolle (35), Soja → Mais (32) und Critical → Mature_Senesc (23).
 
