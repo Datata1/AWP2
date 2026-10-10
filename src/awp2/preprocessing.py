@@ -7,6 +7,7 @@ from typing import Self
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.decomposition import PCA
@@ -26,6 +27,7 @@ from awp2.config import (
     NDWI_SWIR_BAND,
     PRI_FIRST_BAND,
     PRI_SECOND_BAND,
+    SAVGOL_SPLIT_GAP_NM,
     SEED,
     VEGETATION_INDEX_BANDS,
     VEGETATION_INDEX_NAMES,
@@ -192,6 +194,76 @@ def _interpolate_along_wavelength(
                 row[missing_index] = row[measured_indices[right_position]]
 
     return pd.DataFrame(values, index=spectra.index, columns=spectra.columns)
+
+
+def _contiguous_segments(wavelength_values: np.ndarray) -> list[tuple[int, int]]:
+    bounds = [0]
+    for position in range(1, len(wavelength_values)):
+        if wavelength_values[position] - wavelength_values[position - 1] > SAVGOL_SPLIT_GAP_NM:
+            bounds.append(position)
+    bounds.append(len(wavelength_values))
+    return list(zip(bounds[:-1], bounds[1:], strict=True))
+
+
+class SavitzkyGolaySmoothing(_BandTransformer):
+    """Smooth each spectrum with a Savitzky-Golay filter, one wavelength segment at a time.
+
+    Deleted band blocks leave wide gaps between the surviving bands; smoothing across them
+    would smear real measurements with distant neighbours, so each contiguous segment is
+    filtered independently with a single vectorised call over all spectra.
+    """
+
+    def __init__(self, window_length: int, polyorder: int) -> None:
+        """Set the filter size and polynomial degree.
+
+        Args:
+            window_length: Window size in bands (odd).
+            polyorder: Degree of the fitted polynomial.
+        """
+        self.window_length = window_length
+        self.polyorder = polyorder
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the parameters and record the smoothing segments.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the window is not odd and at least 3, or the polynomial degree
+                is not below the window.
+        """
+        X = self._check(X)
+        if self.window_length < 3 or self.window_length % 2 == 0:
+            raise ValueError("window_length must be odd and at least 3")
+        if not 0 <= self.polyorder < self.window_length:
+            raise ValueError("polyorder must satisfy 0 <= polyorder < window_length")
+        self._set_input(X)
+        self.segments_ = _contiguous_segments(np.asarray(wavelengths(X)))
+        self.feature_names_out_ = list(X.columns)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Smooth every segment; segments shorter than the window pass through untouched.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` with smoothed band values.
+        """
+        values = self._check(X).to_numpy(dtype=float, copy=True)
+        for start, end in self.segments_:
+            if end - start >= self.window_length:
+                values[:, start:end] = savgol_filter(
+                    values[:, start:end], self.window_length, self.polyorder, axis=1,
+                    mode="interp",
+                )
+        return pd.DataFrame(values, index=X.index, columns=X.columns)
 
 
 class StandardNormalVariate(_BandTransformer):
@@ -379,6 +451,19 @@ class PreprocessingConfig(BaseModel):
         description="Apply Standard Normal Variate scatter correction per spectrum (zero mean, "
         "unit variance across bands); applied after interpolation, before indices and scaling.",
     )
+    use_savgol: bool = Field(
+        default=False,
+        description="Smooth spectra with a Savitzky-Golay filter after interpolation, one "
+        "wavelength segment at a time.",
+    )
+    savgol_window_length: int | None = Field(
+        default=None,
+        description="Savitzky-Golay window size in bands (odd); required with use_savgol.",
+    )
+    savgol_polyorder: int | None = Field(
+        default=None,
+        description="Savitzky-Golay polynomial degree; required with use_savgol.",
+    )
     spectral_pca_components: int | None = Field(
         default=None,
         gt=0,
@@ -403,8 +488,8 @@ class PreprocessingConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _check_scaler_options(self) -> Self:
-        """Reject ambiguous scaler combinations.
+    def _check_options(self) -> Self:
+        """Reject ambiguous or incomplete preprocessing combinations.
 
         Returns:
             The validated configuration.
@@ -412,7 +497,9 @@ class PreprocessingConfig(BaseModel):
         Raises:
             ValueError: If both spectral scalers, a spectral scaler together with the
                 deprecated ``scale`` flag, or PCA without the spectral standard scaler
-                are requested.
+                are requested; if Savitzky-Golay arguments are set without ``use_savgol``
+                or missing with it; or if the Savitzky-Golay window is not odd and above
+                the polynomial degree.
         """
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
             raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
@@ -420,6 +507,15 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
         if self.spectral_pca_components is not None and not self.use_spectral_standard_scale:
             raise ValueError("spectral_pca_components requires use_spectral_standard_scale=True")
+        if self.use_savgol:
+            if self.savgol_window_length is None or self.savgol_polyorder is None:
+                raise ValueError("use_savgol requires savgol_window_length and savgol_polyorder")
+            if self.savgol_window_length < 3 or self.savgol_window_length % 2 == 0:
+                raise ValueError("savgol_window_length must be odd and at least 3")
+            if not 0 <= self.savgol_polyorder < self.savgol_window_length:
+                raise ValueError("savgol_polyorder must satisfy 0 <= polyorder < window_length")
+        elif self.savgol_window_length is not None or self.savgol_polyorder is not None:
+            raise ValueError("savgol_window_length/polyorder require use_savgol=True")
         return self
 
 
@@ -457,6 +553,13 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
+    if config.use_savgol:
+        assert config.savgol_window_length is not None and config.savgol_polyorder is not None
+        spectra.append(
+            ("savgol", SavitzkyGolaySmoothing(
+                config.savgol_window_length, config.savgol_polyorder
+            ))
+        )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
     if config.use_vegetation_indices:

@@ -52,6 +52,9 @@ VEGETATION_INDEX_BANDS = (
 )
 VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
 
+# Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
+SAVGOL_SPLIT_GAP_NM = 20
+
 AEZ_RANGE = (1, 20)
 MONTH_RANGE = (1, 12)
 
