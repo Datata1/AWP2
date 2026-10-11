@@ -17,6 +17,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-08 | combined_extra_trees | duac1011 | Kombinierte Klasse | 0.886 | 0.895 | 0.804 | 0.796 | 0.897 | 78877676 | Extra Trees auf 23 kombinierten Klassen; Tuning `combined_extra_trees_search` (915736b9), CV 0.812, keine ungültigen Paare |
 | 2026-10-08 | combined_hist_gradient_boosting | duac1011 | Kombinierte Klasse | 0.885 | 0.881 | 0.777 | 0.773 | 0.891 | 6858b266 | HistGradientBoosting auf 23 kombinierten Klassen mit gewichteten Samples; Tuning `combined_hist_gradient_boosting_search` (b26e8cc8), CV 0.781, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_expanded | duac1011 | Kombinierte Klasse | 0.931 | 0.906 | 0.866 | 0.830 | 0.909 | 65232eab | RBF-SVM mit erweiterter Suche; Tuning `combined_svm_expanded_search` (0dea8124), CV 0.847, keine ungültigen Paare |
+| 2026-10-11 | multi_task_mlp | Achim Duong | Multi-Task | 0.909 | 0.879 | 0.722 | 0.586 | 0.867 | 7495ab54 | Tabellarisches Multi-Task-MLP, zwei gemeinsame Schichten mit 64 Einheiten und Dropout 0,2; Tuning `multi_task_mlp_search` (9272d3e0), CV 0.701, 1,25 % unbekannte Paare |
 
 ## CV-only Analysen
 
@@ -26,3 +27,7 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
+| 2026-10-11 | multi_task_mlp_weight_decay_search | Achim Duong | Multi-Task | 0.698 | c9d28534 | L2-Regularisierung; bestes `weight_decay=1e-5`, unter der ursprünglichen MLP-CV von 0.701 |
+| 2026-10-11 | multi_task_mlp_vegetationsindizes_search | Achim Duong | Multi-Task | 0.703 | 5c0df446 | NDVI, NDRE, PRI und NDWI; nur 0.002 über der ursprünglichen MLP-CV |
+| 2026-10-11 | multi_task_mlp_pca_20_search | Achim Duong | Multi-Task | 0.720 | c7b5f71 | PCA-20 auf standardisierten Spektren; bester Kandidat des CV-only-Screenings |
+| 2026-10-11 | multi_task_mlp_savitzky_golay_search | Achim Duong | Multi-Task | 0.690 | b2108fd | Savitzky-Golay, Fenster 7 und Ordnung 2; unter der ursprünglichen MLP-CV |

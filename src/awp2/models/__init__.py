@@ -8,9 +8,11 @@ from awp2.models.combined import (
     make_combined_random_forest,
     make_combined_svm,
 )
+from awp2.models.multi_task import MultiTaskMLPClassifier
 
 __all__ = [
     "CombinedLabelClassifier",
+    "MultiTaskMLPClassifier",
     "SpectralCNNClassifier",
     "make_combined_extra_trees",
     "make_combined_hist_gradient_boosting",

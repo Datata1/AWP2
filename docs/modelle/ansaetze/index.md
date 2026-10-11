@@ -19,7 +19,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
 | [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm` (BAcc kombiniert 0.845) | vorläufig führend; gegen weitere Ansätze vergleichen |
 | [Hierarchisch](hierarchisch.md) | offen | – | | |
-| [Multi-Task](multi-task.md) | offen | – | | |
+| [Multi-Task](multi-task.md) | in Arbeit | Tabellarisches MLP | `multi_task_mlp` (BAcc kombiniert 0.722) | Tabellarisches MLP unter SVM-Referenz; getrenntes MLP als Kontrolle ausstehend |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.
 
@@ -33,6 +33,7 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | Dummy | [0.044](baseline.md#dummy) | | | | |
 | Random Forest | [0.743](baseline.md#random-forest) | | [0.779](kombiniert.md#random-forest) | | |
 | RBF-SVM | | | [**0.845**](kombiniert.md#rbf-svm) | | |
+| Multi-Task-MLP | | | | | [0.722](multi-task.md#tabellarisches-multi-task-mlp) |
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.
