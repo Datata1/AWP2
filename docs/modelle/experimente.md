@@ -18,6 +18,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-08 | combined_hist_gradient_boosting | duac1011 | Kombinierte Klasse | 0.885 | 0.881 | 0.777 | 0.773 | 0.891 | 6858b266 | HistGradientBoosting auf 23 kombinierten Klassen mit gewichteten Samples; Tuning `combined_hist_gradient_boosting_search` (b26e8cc8), CV 0.781, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_expanded | duac1011 | Kombinierte Klasse | 0.931 | 0.906 | 0.866 | 0.830 | 0.909 | 65232eab | RBF-SVM mit erweiterter Suche; Tuning `combined_svm_expanded_search` (0dea8124), CV 0.847, keine ungültigen Paare |
 | 2026-10-11 | multi_task_mlp | Achim Duong | Multi-Task | 0.909 | 0.879 | 0.722 | 0.586 | 0.867 | 7495ab54 | Tabellarisches Multi-Task-MLP, zwei gemeinsame Schichten mit 64 Einheiten und Dropout 0,2; Tuning `multi_task_mlp_search` (9272d3e0), CV 0.701, 1,25 % unbekannte Paare |
+| 2026-10-11 | multi_task_mlp_pca20 | Achim Duong | Multi-Task | 0.922 | 0.901 | 0.762 | 0.624 | 0.889 | e63bc6ed | PCA-20 auf standardisierten Spektren, keine L2-Regularisierung; Tuning `multi_task_mlp_pca_20_weight_decay_search` (a405f40f), CV 0.722, 1,01 % unbekannte Paare |
 
 ## CV-only Analysen
 
@@ -30,4 +31,5 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | 2026-10-11 | multi_task_mlp_weight_decay_search | Achim Duong | Multi-Task | 0.698 | c9d28534 | L2-Regularisierung; bestes `weight_decay=1e-5`, unter der ursprünglichen MLP-CV von 0.701 |
 | 2026-10-11 | multi_task_mlp_vegetationsindizes_search | Achim Duong | Multi-Task | 0.703 | 5c0df446 | NDVI, NDRE, PRI und NDWI; nur 0.002 über der ursprünglichen MLP-CV |
 | 2026-10-11 | multi_task_mlp_pca_20_search | Achim Duong | Multi-Task | 0.720 | c7b5f71 | PCA-20 auf standardisierten Spektren; bester Kandidat des CV-only-Screenings |
+| 2026-10-11 | multi_task_mlp_pca_20_weight_decay_search | Achim Duong | Multi-Task | 0.722 | a405f40f | PCA-20: `weight_decay=0.0` gewinnt gegen `1e-5` (0.720); nur der CV-Gewinner geht in die einmalige Holdout-Bewertung. |
 | 2026-10-11 | multi_task_mlp_savitzky_golay_search | Achim Duong | Multi-Task | 0.690 | b2108fd | Savitzky-Golay, Fenster 7 und Ordnung 2; unter der ursprünglichen MLP-CV |

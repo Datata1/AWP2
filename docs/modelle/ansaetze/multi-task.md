@@ -43,8 +43,8 @@ helfen. Label-Logik, Vorverarbeitung und Sequenzarchitektur bleiben dabei unver�
 | 1 | Ist ein Multi-Task-Modell mit der gemeinsamen Pipeline technisch möglich? | **Abgeschlossen:** `MultiTaskMLPClassifier` mit gemeinsamem MLP-Teil und je einem Crop- und Stage-Head in `src/awp2/models/`. `fit()` erhält beide Zielspalten, `predict()` gibt sie wieder zurück. | Unit-Tests bestätigen Zielvertrag, Pipeline-Integration, Klonbarkeit und die Validierung ungültiger Zielspalten. |
 | 2 | Hilft das Teilen von Schichten überhaupt? | Multi-Task-MLP gegen zwei getrennte MLPs mit derselben Vorverarbeitung und vergleichbarer Modellgröße vergleichen. Die Multi-Task-Startvariante nutzt gleiche Gewichtung für Crop- und Stage-Loss. | Nur die CV-BAcc kombiniert entscheidet, ob gemeinsames Lernen einen plausiblen Nutzen zeigt. |
 | 3 | Welche kleine MLP-Konfiguration ist auf den Trainingsfolds am besten? | **Abgeschlossen:** Acht Kombinationen aus Breite/Tiefe und Dropout mit `tune()` vergleichen; die Lernrate bleibt fest. Klassenungleichgewicht in beiden Heads berücksichtigen. | Zwei Schichten mit 64 Einheiten und Dropout 0,2 gewinnen mit CV-BAcc kombiniert 0,701. |
-| 4 | Generalisiert der CV-Gewinner? | **Abgeschlossen:** Den CV-Gewinner einmal mit `run()` auf dem gemeinsamen Holdout bewerten. | BAcc Crop/Stage/kombiniert: 0,909 / 0,879 / 0,722; unter der RBF-SVM-Referenz von 0,866. |
-| 5 | Entstehen problematische Paarvorhersagen? | **Abgeschlossen:** `invalid_combinations` des Holdout-Laufs auswerten. | 1,25 % der Vorhersagen sind im Trainingsanteil nicht beobachtete Paare; eine Paar-Beschränkung bleibt eine eigene Folgehypothese. |
+| 4 | Generalisiert der beste CV-Kandidat? | **Abgeschlossen:** PCA-20 mit `weight_decay=0.0` auf den Trainingsfolds auswählen und einmal mit `run()` auf dem gemeinsamen Holdout bewerten. | BAcc Crop/Stage/kombiniert: 0,922 / 0,901 / 0,762; weiterhin unter der RBF-SVM-Referenz von 0,866. |
+| 5 | Entstehen problematische Paarvorhersagen? | **Abgeschlossen:** `invalid_combinations` des PCA-Holdout-Laufs auswerten. | 1,01 % der Vorhersagen sind im Trainingsanteil nicht beobachtete Paare; eine Paar-Beschränkung bleibt eine eigene Folgehypothese. |
 
 LSTM, GRU und Transformer sind keine Varianten dieses ersten Vergleichs. Sie testen zusätzlich,
 ob die Reihenfolge der Wellenlängen gegenüber der tabellarischen Darstellung hilft. Erst wenn das
@@ -80,14 +80,19 @@ AEZ wird One-Hot-kodiert und Month zyklisch kodiert.
 - Der einmalige Validierungslauf `multi_task_mlp` (MLflow `7495ab54`) erreicht BAcc 0,909 für
         Crop, 0,879 für Stage und **0,722 kombiniert**. Macro-F1 beträgt 0,865 für Crop, 0,843 für
         Stage und 0,586 kombiniert; der Samples-F1 beträgt 0,867.
-- Die kombinierte BAcc bleibt 0,144 unter der RBF-SVM-Referenz (0,866). Der erste tabellarische
-        Multi-Task-Kandidat ist damit keine konkurrenzfähige Referenz.
-- 1,25 % der Vorhersagen bilden nicht im Trainingsanteil beobachtete Crop/Stage-Paare. Das
+- Die PCA-20-Variante ohne L2-Regularisierung erreicht als einmaliger Validierungslauf
+        `multi_task_mlp_pca20` (MLflow `e63bc6ed`) BAcc 0,922 für Crop, 0,901 für Stage und
+        **0,762 kombiniert**. Macro-F1 beträgt 0,884 für Crop, 0,876 für Stage und 0,624
+        kombiniert; der Samples-F1 beträgt 0,889.
+- Gegenüber dem Ausgangs-MLP steigt die kombinierte BAcc um 0,040 und das kombinierte Macro-F1
+        um 0,038. Die kombinierte BAcc bleibt jedoch 0,104 unter der RBF-SVM-Referenz (0,866).
+- 1,01 % der PCA-Vorhersagen bilden nicht im Trainingsanteil beobachtete Crop/Stage-Paare. Das
         Modell darf diese Paare in dieser ersten Variante noch erzeugen; eine Beschränkung wäre eine
         getrennt zu bewertende Dekodierungsvariante.
-- Schwächste Klassen sind Soja mit Recall 0,84 und Mature_Senesc mit Recall 0,73. Am häufigsten
-        verwechselt das Modell Soja → Mais (42) sowie Critical → Mature_Senesc (37); beide Muster
-        entsprechen den bekannten, spektral ähnlichen Kultur- und Stadiumsgruppen.
+- Im PCA-Lauf erreichen Rice und Harvest Recall 1,00. Schwächste Klassen sind Corn und Soybean
+        mit je 0,88 sowie Mature_Senesc mit 0,80. Am häufigsten verwechselt das Modell Corn →
+        Soybean (43) sowie Critical → Mature_Senesc (35); beide Muster entsprechen den bekannten,
+        spektral ähnlichen Kultur- und Stadiumsgruppen.
 
 #### CV-only: Regularisierung und Preprocessing
 
@@ -102,8 +107,9 @@ Holdout-Metrik oder Referenz.
 - Savitzky-Golay-Glättung mit Fenster 7 und Ordnung 2 erreicht 0,690 (MLflow `b2108fd`) und
         wird verworfen.
 - PCA-20 auf standardisierten Spektren erreicht 0,720 (MLflow `c7b5f71`) und verbessert die
-        ursprüngliche MLP-CV um 0,019. Diese Variante ist der einzige Kandidat aus dem Screening für
-        eine später klar getrennte einmalige Holdout-Bewertung.
+        ursprüngliche MLP-CV um 0,019. Die anschließende Auswahl zwischen keiner und schwacher
+        L2-Regularisierung gewinnt `weight_decay=0.0` mit 0,722 ± 0,026 gegenüber 0,720 ± 0,026
+        für `1e-5` (MLflow `a405f40f`). Nur diese Konfiguration wird auf dem Holdout bewertet.
 
 ![CV-Suche des Multi-Task-MLP](../img/multi_task_mlp_tuning.png)
 
@@ -113,9 +119,18 @@ Holdout-Metrik oder Referenz.
 
 ![Häufigste Verwechslungen des Multi-Task-MLP](../img/multi_task_mlp_confusions.png)
 
+#### PCA-20-Diagnostik
+
+![CV-Auswahl der PCA-20-Variante](../img/multi_task_mlp_pca20_tuning.png)
+
+![Confusion Matrices der PCA-20-Variante](../img/multi_task_mlp_pca20_confusion.png)
+
+![Recall je Klasse der PCA-20-Variante](../img/multi_task_mlp_pca20_recall.png)
+
+![Häufigste Verwechslungen der PCA-20-Variante](../img/multi_task_mlp_pca20_confusions.png)
+
 ## Fazit
 
-**In Arbeit.** Das tabellarische Multi-Task-MLP zeigt, dass die gemeinsame Repräsentation
-technisch und evaluativ funktioniert, erreicht aber die kombinierte SVM-Referenz nicht. Ein
-getrenntes MLP bleibt die notwendige Kontrollvariante, bevor der Nutzen geteilter Schichten
-beurteilt werden kann.
+**In Arbeit.** PCA-20 verbessert den tabellarischen Multi-Task-MLP klar gegenüber dem
+Ausgangsmodell, erreicht aber die kombinierte SVM-Referenz nicht. Ein getrenntes MLP bleibt die
+notwendige Kontrollvariante, bevor der Nutzen geteilter Schichten beurteilt werden kann.
