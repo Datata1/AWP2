@@ -26,3 +26,4 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
+| 2026-10-11 | combined_svm_snv_search | duac1011 | Kombinierte Klasse | 0.823 | 01484f93 | Offizielle SNV-Implementierung mit `use_spectral_snv`; feste Referenzparameter, unter der Rohspektren-Referenz, kein Holdout-Lauf. |
