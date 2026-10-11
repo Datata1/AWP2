@@ -18,11 +18,11 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-08 | combined_hist_gradient_boosting | duac1011 | Kombinierte Klasse | 0.885 | 0.881 | 0.777 | 0.773 | 0.891 | 6858b266 | HistGradientBoosting auf 23 kombinierten Klassen mit gewichteten Samples; Tuning `combined_hist_gradient_boosting_search` (b26e8cc8), CV 0.781, keine ungültigen Paare |
 | 2026-10-09 | combined_svm_expanded | duac1011 | Kombinierte Klasse | 0.931 | 0.906 | 0.866 | 0.830 | 0.909 | 65232eab | RBF-SVM mit erweiterter Suche; Tuning `combined_svm_expanded_search` (0dea8124), CV 0.847, keine ungültigen Paare |
 
-## CV-only Versuche ohne Holdout
+## CV-only Analysen
 
-Diese Versuche blieben unter der CV-Referenz und wurden deshalb nicht auf dem gemeinsamen
-Validierungssplit bewertet.
+Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Validierungsmetriken und
+ändern keine Referenz.
 
 | Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-10 | combined_svm_snv_search | duac1011 | Kombinierte Klasse | 0.823 | c1851329 | SNV nur auf interpolierten Spektren; 0.024 unter der Rohspektren-Referenz, kein Holdout-Lauf |
+| 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
