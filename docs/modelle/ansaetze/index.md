@@ -18,7 +18,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
 | [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm` (BAcc kombiniert 0.845) | vorläufig führend; gegen weitere Ansätze vergleichen |
-| [Hierarchisch](hierarchisch.md) | offen | – | | |
+| [Hierarchisch](hierarchisch.md) | in Arbeit | – | | |
 | [Multi-Task](multi-task.md) | offen | – | | |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.

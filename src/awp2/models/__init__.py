@@ -8,13 +8,21 @@ from awp2.models.combined import (
     make_combined_random_forest,
     make_combined_svm,
 )
+from awp2.models.hierarchical import (
+    HierarchicalClassifier,
+    make_hierarchical_extra_trees,
+    make_hierarchical_svm,
+)
 
 __all__ = [
     "CombinedLabelClassifier",
+    "HierarchicalClassifier",
     "SpectralCNNClassifier",
     "make_combined_extra_trees",
     "make_combined_hist_gradient_boosting",
     "make_combined_random_forest",
     "make_combined_spectral_cnn",
     "make_combined_svm",
+    "make_hierarchical_extra_trees",
+    "make_hierarchical_svm",
 ]
