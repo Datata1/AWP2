@@ -310,3 +310,33 @@ def plot_recall_comparison(
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     return fig
+
+
+def plot_error_rate_by(
+    errors: Mapping[str, pd.Series],
+    groups: pd.Series,
+    xlabel: str | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Compare how the error rate of several models changes over a context such as month or AEZ.
+
+    Args:
+        errors: Per model a boolean Series (``True`` = wrong), aligned with ``groups``.
+        groups: Context value per sample, e.g. ``X_val["Month"]``.
+        xlabel: Label of the x axis; the name of ``groups`` if omitted.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one group of bars per context value, its sample count in the tick label.
+    """
+    table = pd.DataFrame({label: error.groupby(groups).mean() for label, error in errors.items()})
+    counts = groups.value_counts()
+    table.index = [f"{value}\n(n={counts[value]})" for value in table.index]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(max(6, 0.9 * len(table) + 2), 4))
+    table.plot.bar(ax=ax, rot=0, width=0.8)
+    ax.set_xlabel(xlabel or str(groups.name))
+    ax.set_ylabel("Fehlerrate")
+    ax.legend(fontsize="small")
+    ax.grid(axis="y", alpha=0.3)
+    return ax
