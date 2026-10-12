@@ -362,6 +362,41 @@ geladen, nichts neu trainiert.
   HistGradientBoosting (91), MLP (70). Ausgerechnet das schwache kNN ergänzt die SVM am meisten;
   wie viele richtige SVM-Zeilen ein Modell dabei verdirbt, zeigt diese Zählung nicht.
 
+### Feature Engineering: Bodenindizes und AEZ × Monat
+
+Notebook: `notebooks/20_jd_feature_engineering.ipynb` (#114). Zwei neue Optionen der
+Vorverarbeitung, abgeleitet aus der [Fehleranalyse](../fehleranalyse.md): Bodenindizes NDTI und BSI
+(`use_soil_indices`) für das Bodensignal an den Saisonrändern und ein Indikator je Kombination aus
+AEZ und Monat (`use_aez_month`). Beide Zweige werden wie die Spektren skaliert (#119). Basis ist
+die hierarchische RBF-SVM aus #87, je Variante eine kleine Suche über `gamma`.
+
+| Variante | CV (bestes `gamma`) | Gewinn | Gewinn bei festem `gamma` | MLflow |
+| --- | --- | --- | --- | --- |
+| Basis | 0.8393 | – | – | `5d6b1b65` |
+| Bodenindizes | 0.8391 | −0.0003 | −0.0003 | `22a5997c` |
+| AEZ × Monat | 0.8440 | +0.0047 | +0.0022 | `cb8fc655` |
+| Bodenindizes + AEZ × Monat | 0.8445 | +0.0051 | +0.0041 | `51c9936a` |
+
+![Feature Engineering je Variante](../img/hierarchical_feature_engineering.png)
+
+- **Keine belastbare Verbesserung.** Bodenindizes allein bringen nichts. AEZ × Monat allein bleibt
+  mit +0.0047 unter `MIN_CV_GAIN`; mit festem `gamma` sind es nur +0.0022. Die Kombination liegt
+  mit +0.0051 um 0.0001 über der Schwelle – als beste von drei Varianten und obwohl die
+  Bodenindizes allein nichts beitragen; das ist an der Rauschgrenze.
+- **Hinweis auf den Saisonrand:** Auf dem Trainingsteil (out-of-fold) sinken die Kulturfehler im
+  Mai mit AEZ × Monat von 25,4 % auf 22,1 % (Kombination: 22,8 %); die übrigen Monate ändern sich
+  kaum.
+- Die Kombination wurde einmal bewertet: `hierarchical_fe_soil_aez_month` (MLflow `7006c1d4`)
+  erreicht Crop 0.930, Stage 0.905, **kombiniert 0.846** (`hierarchical_svm` 0.844). Auf der
+  Validierung ist der Unterschied nicht signifikant (McNemar 21 zu 17, p = 0.63; Kulturfehler
+  gleich 8,65 %). Ein Probelauf gegen einen Wegwerf-MLflow-Speicher hatte die Bewertung schon
+  einmal ausgeführt (dasselbe deterministische Modell).
+- **Vermutung, nicht isoliert:** Ob der kleine Effekt aus der Kombination AEZ × Monat stammt oder
+  nur daraus, dass der Kontext im RBF-Abstand mehr Gewicht bekommt (32 zusätzliche
+  0/1-Merkmale), zeigt dieser Versuch nicht.
+
+![Kulturfehler nach Monat je Variante](../img/hierarchical_feature_engineering_month.png)
+
 ## Fazit
 
 **Stand nach #87–#89 und #98–#104:** Hierarchisch mit RBF-SVM auf beiden Stufen
@@ -383,3 +418,6 @@ Gegen die kombinierte SVM mit gleicher Vorverarbeitung liegt er in der CV knapp 
   einer 96,2 % der Zeilen, die SVM 87,7 %). Ein Ensemble aus SVM und den auf dem Trainingsteil
   komplementärsten Modellen (kNN, logistische Regression, Extra Trees) ist der naheliegende
   nächste Versuch – per CV zu prüfen.
+- **Merkmale für die Saisonränder (#114):** keine belastbare Verbesserung – Bodenindizes bringen
+  nichts, AEZ × Monat nur einen Hinweis auf weniger Kulturfehler im Mai (CV +0.005 an der
+  Schwelle, Validierung 0.846 vs. 0.844, nicht signifikant).
