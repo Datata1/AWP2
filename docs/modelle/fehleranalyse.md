@@ -157,6 +157,21 @@ Mais → Soja (22), Soja → Mais (22), Mais → Winterweizen (16), Soja → Win
   kleiner, sodass sich die Kulturen besser trennen. **Vermutung:** Früh bestimmt der Boden
   zwischen den Reihen einen großen Teil des Signals.
 
+## Alle hierarchischen Klassifikatoren
+
+Ergänzt in #104 (`notebooks/17_jd_hierarchical_vergleich.ipynb`): neun hierarchische
+Klassifikatoren, siehe [Vergleich aller Klassifikatoren](ansaetze/hierarchisch.md#vergleich-aller-klassifikatoren).
+
+- In allen neun liegt der größere Teil der Fehler bei der Kultur (8,6–23 % falsche Kultur,
+  4–8 % nur Stadium falsch) – der Befund oben gilt modellunabhängig.
+- Mindestens ein Klassifikator trifft auf dem Trainingsteil (out-of-fold) 96,2 % der Zeilen
+  (SVM 87,7 %), auf der Validierung 95,9 % (SVM 87,1 %). 228 der 319 Kulturfehler der SVM auf dem
+  Trainingsteil trifft ein anderes Modell – am häufigsten kNN, logistische Regression und Extra
+  Trees. Die Obergrenze ist nicht erreichbar, zeigt aber, dass die Modelle unterschiedliche
+  Fehler machen.
+- Mit mehr Modellen sinkt die Zahl der Zeilen, die *alle* falsch haben, zwangsläufig; sie ist
+  daher kein Maß für die Modelle selbst.
+
 ## Folgerungen
 
 Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet die CV.
@@ -171,3 +186,6 @@ Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet
 - **Hierarchisch** profitiert direkt von einer besseren Kulturstufe (Oracle-Kultur 0.939), ein
   vergleichbarer Oracle-Wert für den kombinierten Ansatz fehlt aber – welcher Ansatz mehr
   gewinnen würde, ist offen.
+- **Ensemble:** Die hierarchischen Klassifikatoren ergänzen sich stark; ein Ensemble aus SVM und
+  den auf dem Trainingsteil komplementärsten Modellen (kNN, logistische Regression, Extra Trees)
+  ist eine begründete Hypothese für die CV.

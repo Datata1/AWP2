@@ -290,12 +290,13 @@ Notebook: `notebooks/15_jd_hierarchical_mlp.ipynb` (#102). Kleines neuronales Ne
 (`MLPClassifier`) je Stufe mit frühem Stoppen und ausgeglichenen Gewichten
 (`balance_samples=True`, je Stufe umskaliert).
 
-- Suche `hierarchical_mlp_search` (16 Kandidaten): beide Stufen zwei Schichten (256, 128)
-  (Rasterrand), Kultur `alpha=0.01`, Stadium `alpha=0.1` – **CV 0.789** (SVM 0.839).
+- Suche `hierarchical_mlp_search` (16 Kandidaten, je zwei Werte pro Parameter – jede Wahl liegt
+  am Rasterrand): beide Stufen zwei Schichten (256, 128), Kultur `alpha=0.01`, Stadium
+  `alpha=0.1` – **CV 0.789** (SVM 0.839).
 - Validierung `hierarchical_mlp` (MLflow `5aa76d10`): Crop 0.893, Stage 0.838, **kombiniert
   0.787**; keine ungültigen Paare. McNemar gegen die SVM: 175 zu 30 Zeilen.
-- Bester Klassifikator nach der SVM. Anders als die linearen Modelle verliert das MLP auch beim
-  Stadium: 8 % nur Stadium falsch (SVM 4 %), mit wahrer Kultur 0.892 – die Stadium-Netze haben
+- Nach CV auf Platz 4 der Serie (hinter SVM, Extra Trees → SVM und Extra Trees). Anders als die
+  linearen Modelle verliert das MLP auch beim Stadium: 8 % nur Stadium falsch (SVM 4 %), mit wahrer Kultur 0.892 – die Stadium-Netze haben
   je Kultur nur 66 bis 1 467 Zeilen.
 
 ![MLP: Fehlerzerlegung](../img/hierarchical_mlp_breakdown.png)
@@ -310,28 +311,75 @@ kleine Suche über die Lernrate je Stufe.
   **CV 0.783** (SVM 0.839).
 - Validierung `hierarchical_hgb` (MLflow `6cc2984f`): Crop 0.901, Stage 0.871, **kombiniert
   0.795**; keine ungültigen Paare. McNemar gegen die SVM: 105 zu 62 Zeilen (p ≈ 0.001).
-- Bester Nicht-SVM-Wert auf der Validierung und besser als HistGradientBoosting im kombinierten
-  Ansatz (0.777) – für Boosting hilft die Zerlegung. Abstand zur SVM vor allem bei der Kultur
-  (11 % vs. 9 % falsch); mit wahrer Kultur 0.898.
+- In der CV gleichauf mit HistGradientBoosting im kombinierten Ansatz (0.783 vs. 0.781,
+  `combined_hist_gradient_boosting_search`) – die Zerlegung hilft dem Boosting nicht messbar; der
+  Vorsprung auf der Validierung (0.795 vs. 0.777) ist eine einzelne Zahl. Abstand zur SVM vor
+  allem bei der Kultur (11 % vs. 9 % falsch); mit wahrer Kultur 0.898.
 
 ![HistGradientBoosting: Fehlerzerlegung](../img/hierarchical_hgb_breakdown.png)
 
+### Vergleich aller Klassifikatoren
+
+Notebook: `notebooks/17_jd_hierarchical_vergleich.ipynb` (#104). Alle Bewertungsläufe aus MLflow
+geladen, nichts neu trainiert.
+
+| Klassifikator | CV | Validierung | Kultur falsch | nur Stadium falsch | Oracle-Kultur |
+| --- | --- | --- | --- | --- | --- |
+| [RBF-SVM → RBF-SVM](#rbf-svm-rbf-svm) | **0.839** | **0.844** | **8,6 %** | **4,3 %** | 0.939 |
+| [Extra Trees → RBF-SVM](#extra-trees-rbf-svm) | 0.811 | 0.801 | 10,5 % | 4,3 % | 0.939 |
+| [Extra Trees](#extra-trees-extra-trees) | 0.797 | 0.785 | 10,5 % | 4,9 % | 0.922 |
+| [MLP](#mlp-mlp) | 0.789 | 0.787 | 13,2 % | 8,4 % | 0.892 |
+| [HistGradientBoosting](#histgradientboosting-histgradientboosting) | 0.783 | 0.795 | 10,9 % | 4,6 % | 0.898 |
+| [Logistische Regression](#logistische-regression-logistische-regression) | 0.747 | 0.759 | 14,0 % | 4,7 % | 0.920 |
+| [kNN](#knn-knn) | 0.742 | 0.704 | 14,3 % | 6,9 % | 0.839 |
+| [PLS-DA](#pls-da-pls-da) | 0.678 | 0.686 | 19,9 % | 7,9 % | 0.898 |
+| [LDA](#lda-lda) | 0.657 | 0.676 | 23,3 % | 7,2 % | 0.901 |
+
+![Alle hierarchischen Klassifikatoren](../img/hierarchical_vergleich.png)
+
+![Fehlerzerlegung aller Klassifikatoren](../img/hierarchical_vergleich_zerlegung.png)
+
+- **Die RBF-SVM gewinnt auf beiden Stufen:** wenigste Kulturfehler und (gleichauf mit
+  Extra Trees → RBF-SVM, das dieselbe Stadium-SVM nutzt) wenigste reine Stadiumfehler.
+- **Mischung der Stufen hilft nicht:** In der CV-Suche `hierarchical_mixed_search` (MLflow
+  `050b8253`, 12 Kombinationen; frühere identische Läufe `947439b4`, `033e9f5f`) gewinnt
+  SVM → SVM (0.839); jede andere Kultur- oder Stadiumstufe ist schlechter (beste Mischung
+  SVM → logistische Regression 0.827). Kein neuer Lauf.
+- **Lineare Modelle verlieren auf der Kulturstufe** (14–23 % falsche Kultur), sind beim Stadium
+  innerhalb einer Kultur aber brauchbar (Oracle-Kultur 0.90–0.92). **MLP und kNN** verlieren auch
+  beim Stadium.
+- **Die Modelle ergänzen sich** – auf dem Trainingsteil (out-of-fold) wie auf der Validierung:
+
+  | | Training (out-of-fold) | Validierung |
+  | --- | --- | --- |
+  | RBF-SVM richtig | 87,7 % | 87,1 % |
+  | mindestens ein Klassifikator richtig | 96,2 % | 95,9 % |
+  | Kulturfehler der SVM, die ein anderes Modell trifft | 228 von 319 | 104 von 145 |
+
+  Das ist eine Obergrenze, keine erreichbare Zahl (Extra Trees → RBF-SVM teilt zudem die
+  Stadium-SVM mit der Referenz). Welche Modelle die SVM-Kulturfehler auf dem Trainingsteil am
+  häufigsten treffen: kNN (121), logistische Regression (104), Extra Trees (97),
+  HistGradientBoosting (91), MLP (70). Ausgerechnet das schwache kNN ergänzt die SVM am meisten;
+  wie viele richtige SVM-Zeilen ein Modell dabei verdirbt, zeigt diese Zählung nicht.
+
 ## Fazit
 
-**Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,
-Validierung 0.844) liegt in der CV knapp hinter der kombinierten SVM mit gleicher
-Vorverarbeitung (0.839 vs. 0.845, im Rauschen) – gleichwertig, aber nicht besser.
+**Stand nach #87–#89 und #98–#104:** Hierarchisch mit RBF-SVM auf beiden Stufen
+(`hierarchical_svm`, CV 0.839, Validierung 0.844) ist der beste hierarchische Klassifikator.
+Gegen die kombinierte SVM mit gleicher Vorverarbeitung liegt er in der CV knapp dahinter
+(0.845); bei den Treffern unterscheiden sich beide nicht signifikant (McNemar p = 0.25).
 
-- **Engpass Kulturstufe:** Mit der wahren Kultur wären es 0.939; Kulturfehler pflanzen sich hart
-  ins Stadium fort.
-- **Weiches Routing (#88) hilft nicht** mit den kalibrierten SVM-Wahrscheinlichkeiten: Die
-  Kultur-SVM ist auch bei Fehlern so sicher, dass das Stadium sie kaum überstimmt.
-- **Tuning und Vorverarbeitung (#89) bringen keinen Gewinn** über das Rauschen; SNV schadet.
-- **Schwachstelle nach der Kultur:** die Stadium-Modelle von Baumwolle (0.84) und Soja (0.93),
-  vor allem Mature_Senesc.
-
-Im Vergleich der Ansätze ([Fehleranalyse](../fehleranalyse.md), #32) unterscheiden sich
-hierarchisch und kombiniert bei den Treffern nicht signifikant (McNemar p = 0.25); der
-BAcc-Abstand stammt aus wenigen kleinen Klassen. Die Kulturfehler liegen vor allem an den
-Saisonrändern (Mai/Juni, Oktober) – vermutlich, weil sich die Spektren der Kulturen dort ähnlicher
-werden.
+- **Engpass Kulturstufe:** Mit der wahren Kultur wären es 0.939; Kulturfehler pflanzen sich
+  hart ins Stadium fort. Weiches Routing (#88) hilft mit den kalibrierten
+  SVM-Wahrscheinlichkeiten nicht.
+- **Kein anderer Klassifikator und keine Mischung schlägt die SVM** – weder lineare Modelle (LDA,
+  logistische Regression, PLS-DA), noch kNN, MLP oder Boosting (#98–#104). Tuning und
+  Vorverarbeitung (#89) bringen keinen Gewinn über das Rauschen; SNV schadet.
+- **Fehlerquellen** ([Fehleranalyse](../fehleranalyse.md), #32): Kulturfehler an den
+  Saisonrändern (Mai/Juni, Oktober) und in AEZ 9; vermutlich werden sich die Spektren dort
+  ähnlicher. Nach der Kultur sind die Stadium-Modelle von Baumwolle (0.84) und Soja (0.93) die
+  Schwachstelle.
+- **Offene Idee:** Die Klassifikatoren ergänzen sich (auf dem Trainingsteil trifft mindestens
+  einer 96,2 % der Zeilen, die SVM 87,7 %). Ein Ensemble aus SVM und den auf dem Trainingsteil
+  komplementärsten Modellen (kNN, logistische Regression, Extra Trees) ist der naheliegende
+  nächste Versuch – per CV zu prüfen.

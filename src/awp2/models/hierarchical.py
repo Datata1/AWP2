@@ -56,6 +56,16 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
         self.stage_estimator = stage_estimator
         self.routing = routing
 
+    def __setstate__(self, state: dict) -> None:
+        """Restore a pickled classifier, e.g. one loaded from MLflow.
+
+        Args:
+            state: Attributes of the pickled object.
+        """
+        # models stored before routing existed were all fitted with hard routing
+        state.setdefault("routing", HARD_ROUTING)
+        super().__setstate__(state)
+
     def fit(
         self,
         X: pd.DataFrame,

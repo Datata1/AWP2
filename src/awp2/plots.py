@@ -268,7 +268,9 @@ def plot_error_breakdown(
             ax.bar_label(container, labels=labels, label_type="center", fontsize="small")
     ax.set_xlim(0, 1)
     ax.set_xlabel("Anteil der Zeilen")
-    ax.legend(fontsize="small", loc="lower left", bbox_to_anchor=(0, 1), ncol=len(table.columns))
+    ax.legend(
+        fontsize="small", loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(table.columns)
+    )
     ax.invert_yaxis()
     return ax
 

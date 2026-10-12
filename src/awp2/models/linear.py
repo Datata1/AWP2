@@ -29,7 +29,8 @@ class BalancedLinearDiscriminantAnalysis(LinearDiscriminantAnalysis):
         configured_priors = self.priors
         # the classes are only known here; the parameter is restored so clone/get_params see
         # the configured value
-        self.priors = np.full(len(np.unique(y)), 1 / len(np.unique(y)))
+        n_classes = len(np.unique(y))
+        self.priors = np.full(n_classes, 1 / n_classes)
         try:
             super().fit(X, y)
         finally:
