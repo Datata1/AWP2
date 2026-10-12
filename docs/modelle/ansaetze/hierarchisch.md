@@ -234,6 +234,20 @@ setzt gleiche Priors (wie `class_weight="balanced"`).
 
 ![LDA: Fehlerzerlegung](../img/hierarchical_lda_breakdown.png)
 
+### Logistische Regression → logistische Regression
+
+Notebook: `notebooks/12_jd_hierarchical_logreg.ipynb` (#99). Multinomiale logistische Regression
+mit `class_weight="balanced"` – die einfachste lineare Referenz mit Klassengewichten.
+
+- Suche `hierarchical_logreg_search` (16 Kandidaten): Kultur `C=10`, Stadium `C=100`
+  (Rasterrand, also schwache Regularisierung) – **CV 0.747** (SVM 0.839, LDA 0.657).
+- Validierung `hierarchical_logreg` (MLflow `78fbacd9`): Crop 0.887, Stage 0.831, **kombiniert
+  0.759**; keine ungültigen Paare. McNemar gegen die SVM: 164 zu 67 Zeilen (p ≈ 10⁻¹⁰).
+- Besser als LDA, aber derselbe Befund: 14 % falsche Kultur (SVM 9 %), mit wahrer Kultur 0.920.
+  Lineare Modelle verlieren vor allem auf der Kulturstufe.
+
+![Logistische Regression: Fehlerzerlegung](../img/hierarchical_logreg_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,

@@ -36,6 +36,7 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | Extra Trees | | | [0.804](kombiniert.md#extra-trees) | [0.785](hierarchisch.md#extra-trees-extra-trees) | |
 | Extra Trees → RBF-SVM | | | | [0.801](hierarchisch.md#extra-trees-rbf-svm) | |
 | LDA (gleiche Priors) | | | | [0.676](hierarchisch.md#lda-lda) | |
+| Logistische Regression | | | | [0.759](hierarchisch.md#logistische-regression-logistische-regression) | |
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.
