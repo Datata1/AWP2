@@ -36,7 +36,6 @@ from awp2.config import (
     SEED,
     VEGETATION_INDEX_BANDS,
     VEGETATION_INDEX_NAMES,
-    MonthEncoding,
 )
 from awp2.data import wavelengths
 
