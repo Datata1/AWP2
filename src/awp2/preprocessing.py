@@ -17,9 +17,12 @@ from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
+from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import (
     AEZ_COL,
+    AEZ_MONTH_PREFIX,
+    AEZ_MONTH_SEP,
     BAND_PATTERN,
     BAND_PREFIX,
     MEAN_ALBEDO_COL,
@@ -34,6 +37,11 @@ from awp2.config import (
     PRI_SECOND_BAND,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
+    SOIL_BLUE_BAND,
+    SOIL_INDEX_BANDS,
+    SOIL_INDEX_NAMES,
+    SOIL_SWIR1_BAND,
+    SOIL_SWIR2_BAND,
     VEGETATION_INDEX_BANDS,
     VEGETATION_INDEX_NAMES,
 )
@@ -780,6 +788,131 @@ class MeanAlbedo(TransformerMixin, BaseEstimator):
         return np.asarray([MEAN_ALBEDO_COL], dtype=object)
 
 
+class SoilIndices(TransformerMixin, BaseEstimator):
+    """Bare-soil indices NDTI and BSI from interpolated reflectance.
+
+    NDTI contrasts the two SWIR bands and responds to bare soil and crop residue; BSI combines
+    SWIR and red against NIR and blue and separates bare soil from vegetation. Both are ratios of
+    physical reflectance, so they run on interpolated bands, never on SNV output.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate that the required bands are present.
+
+        Args:
+            X: Band columns after interpolation.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a required band is unavailable.
+        """
+        bands = _BandTransformer._check(X)
+        missing = sorted(set(SOIL_INDEX_BANDS) - set(bands.columns))
+        if missing:
+            raise ValueError(f"Soil indices require unavailable bands: {missing}")
+        self.feature_names_in_ = np.asarray(bands.columns, dtype=object)
+        self.n_features_in_ = bands.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Return the two soil indices.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            Columns ``NDTI`` and ``BSI``.
+        """
+        bands = _BandTransformer._check(X)
+        blue, red, nir = bands[SOIL_BLUE_BAND], bands[NDVI_RED_BAND], bands[NDVI_NIR_BAND]
+        swir1, swir2 = bands[SOIL_SWIR1_BAND], bands[SOIL_SWIR2_BAND]
+        ndti, bsi = SOIL_INDEX_NAMES
+        return pd.DataFrame(
+            {
+                ndti: (swir1 - swir2) / (swir1 + swir2),
+                bsi: ((swir1 + red) - (nir + blue)) / ((swir1 + red) + (nir + blue)),
+            },
+            index=X.index,
+        )
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The two soil index names.
+        """
+        return np.asarray(SOIL_INDEX_NAMES, dtype=object)
+
+
+class AezMonthEncoder(TransformerMixin, BaseEstimator):
+    """One-hot encode each AEZ × month combination seen in training.
+
+    Crop errors cluster in particular regions at particular times of the season; one indicator
+    per combination makes that context explicit (and gives it more weight in distance-based
+    models than separate AEZ and month features). Combinations unseen in training get all zeros.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Record the observed combinations.
+
+        Args:
+            X: DataFrame with the ``AEZ`` and ``Month`` columns.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        combinations = self._combinations(X)
+        self.categories_ = np.asarray(sorted(combinations.unique()), dtype=object)
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Return one indicator column per training combination.
+
+        Args:
+            X: DataFrame with the ``AEZ`` and ``Month`` columns.
+
+        Returns:
+            One 0/1 column per combination, named ``aez_month_<AEZ>_<Month>``.
+        """
+        combinations = self._combinations(X).to_numpy()
+        indicators = (combinations[:, np.newaxis] == self.categories_).astype(float)
+        return pd.DataFrame(indicators, columns=self.get_feature_names_out(), index=X.index)
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            One name per training combination.
+        """
+        check_is_fitted(self, "categories_")
+        return np.asarray(
+            [f"{AEZ_MONTH_PREFIX}{AEZ_MONTH_SEP}{combination}" for combination in self.categories_],
+            dtype=object,
+        )
+
+    @staticmethod
+    def _combinations(X: pd.DataFrame) -> pd.Series:
+        if not isinstance(X, pd.DataFrame) or list(X.columns) != [AEZ_COL, MONTH_COL]:
+            raise ValueError(f"Expected a DataFrame with the columns {[AEZ_COL, MONTH_COL]}.")
+        return (
+            X[AEZ_COL].astype(int).astype(str)
+            + AEZ_MONTH_SEP
+            + X[MONTH_COL].astype(int).astype(str)
+        )
+
+
 class PreprocessingConfig(BaseModel):
     """Options of the standard preprocessing.
 
@@ -888,6 +1021,16 @@ class PreprocessingConfig(BaseModel):
         description="Compute EDA-defined NDVI, NDRE, PRI and NDWI from interpolated bands "
         "in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
     )
+    use_soil_indices: bool = Field(
+        default=False,
+        description="Compute the bare-soil indices NDTI and BSI from interpolated bands in a "
+        "parallel branch; min-max scaled with use_spectral_minmax_scale, else standardised.",
+    )
+    use_aez_month: bool = Field(
+        default=False,
+        description="One-hot encode each AEZ × month combination seen in training next to the "
+        "separate AEZ and month features; requires use_meta.",
+    )
     use_cyclic_month: bool = Field(
         default=True,
         description="Replace numeric Month with sine/cosine annual-cycle features.",
@@ -909,11 +1052,14 @@ class PreprocessingConfig(BaseModel):
             The validated configuration.
 
         Raises:
-            ValueError: If more than one reduction method is selected; if centering,
+            ValueError: If ``use_aez_month`` is set without ``use_meta``; if more than one
+                reduction method is selected; if centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
                 if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
                 arguments are set without their method or missing with it.
         """
+        if self.use_aez_month and not self.use_meta:
+            raise ValueError("use_aez_month requires use_meta")
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
             raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
         if self.use_spectral_centering and (
@@ -996,6 +1142,15 @@ class PreprocessingConfig(BaseModel):
         elif self.savgol_window_length is not None or self.savgol_polyorder is not None:
             raise ValueError("savgol_window_length/polyorder require use_savgol=True")
         return self
+
+
+def _extra_branch_scaler(config: PreprocessingConfig) -> StandardScaler | MinMaxScaler:
+    # extra feature branches must match the spectra's spread, else they dominate or vanish in
+    # distance-based models (#119); those run with standardised or min-max spectra, while
+    # centering or no scaler suit scale-free models such as trees
+    if config.use_spectral_minmax_scale:
+        return MinMaxScaler()
+    return StandardScaler()
 
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
@@ -1113,6 +1268,16 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                 make_column_selector(pattern=BAND_PATTERN),
             )
         )
+    if config.use_aez_month:
+        transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
+    if config.use_soil_indices:
+        soil: list[tuple[str, BaseEstimator]] = [
+            ("drop_empty", DropEmptyBands()),
+            ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+            ("soil", SoilIndices()),
+        ]
+        soil.append(("soil_scale", _extra_branch_scaler(config)))
+        transformers.append(("soil", Pipeline(soil), make_column_selector(pattern=BAND_PATTERN)))
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
@@ -1133,6 +1298,9 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         "cyclic": "Cyclic month encoding (sin/cos)",
         "month": "Standardize month",
         "scale": "Standardize month",
+        "soil": "Soil indices NDTI and BSI (from interpolated bands)",
+        "soil_scale": "Scale soil indices (min-max with min-max spectra, else standardise)",
+        "aez_month": "One-hot encode AEZ x month combinations",
     }
     if name in known:
         return known[name]
@@ -1169,6 +1337,8 @@ _BRANCH_LETTERS: dict[str, str] = {
     "albedo": "C",
     "indices": "D",
     "spectra": "E",
+    "soil": "F",
+    "aez_month": "G",
 }
 
 
@@ -1176,7 +1346,8 @@ def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
     r"""List the active preprocessing steps, grouped by independent branch.
 
     Reads the built transformer, so optional steps appear only when enabled. Each
-    branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra)
+    branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra, F: Soil
+    indices, G: AEZ x month)
     and steps are numbered per branch from 1, so the labels stay comparable across
     runs. Print the lines in the notebook to log which preprocessing a run used.
 
@@ -1271,9 +1442,7 @@ def _config_fields(*names: str) -> str:
 
 _META_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("aez", "aez", f"AEZ one-hot [{_config_fields('use_meta')}]", True),
-    _OptionNode(
-        "month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False
-    ),
+    _OptionNode("month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False),
     _OptionNode("month", "month", "Monat numerisch [use_cyclic_month = False]", False),
 )
 
@@ -1322,6 +1491,26 @@ _INDICES_NODES: tuple[_OptionNode, ...] = (
         True,
     ),
     _OptionNode("indices", "select", "Nur Indizes behalten", False),
+)
+
+_SOIL_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("soil", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "soil",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        False,
+    ),
+    _OptionNode(
+        "soil", "soil", f"Bodenindizes NDTI, BSI [{_config_fields('use_soil_indices')}]", True
+    ),
+    _OptionNode("soil", "soil_scale", "Skalieren (Min-Max wie Spektren, sonst Standard)", False),
+)
+
+_INTERACTION_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode(
+        "aez_month", "aez_month", f"AEZ × Monat one-hot [{_config_fields('use_aez_month')}]", True
+    ),
 )
 
 _SCALER_NODES: tuple[_OptionNode, ...] = (
@@ -1403,6 +1592,8 @@ def _diagram_steps() -> set[tuple[str, str]]:
         _META_NODES,
         _ALBEDO_NODES,
         _INDICES_NODES,
+        _SOIL_NODES,
+        _INTERACTION_NODES,
         _SPECTRA_PREFIX_NODES,
         _SCALER_NODES,
         _REDUCTION_NODES,
@@ -1435,6 +1626,8 @@ def pipeline_options_diagram() -> str:
     aez, cyclic, numeric = _META_NODES
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select = _INDICES_NODES
+    b_drop, b_inter, soil, soil_scale = _SOIL_NODES
+    (aez_month,) = _INTERACTION_NODES
     s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
@@ -1445,6 +1638,7 @@ def pipeline_options_diagram() -> str:
     diagram.append(_node_line(month_diamond))
     diagram.append(_node_line(cyclic))
     diagram.append(_node_line(numeric))
+    diagram.append(_node_line(aez_month))
     diagram.append("    end")
     diagram.append("    subgraph albedo")
     for node in _ALBEDO_NODES:
@@ -1452,6 +1646,10 @@ def pipeline_options_diagram() -> str:
     diagram.append("    end")
     diagram.append("    subgraph indizes")
     for node in _INDICES_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph boden")
+    for node in _SOIL_NODES:
         diagram.append(_node_line(node))
     diagram.append("    end")
     diagram.append("    subgraph spektren")
@@ -1485,6 +1683,12 @@ def pipeline_options_diagram() -> str:
     link("X", a_drop)
     link("X", i_drop)
     link("X", s_drop)
+    link("X", b_drop)
+    link("X", aez_month)
+    link(_node_id(b_drop), b_inter)
+    link(_node_id(b_inter), soil)
+    link(_node_id(soil), soil_scale)
+    link(_node_id(soil_scale), concat)
     link(_node_id(a_drop), a_inter)
     link(_node_id(a_inter), albedo)
     link(_node_id(i_drop), i_inter)
@@ -1500,7 +1704,7 @@ def pipeline_options_diagram() -> str:
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, albedo, select):
+    for node in (aez, cyclic, numeric, albedo, select, aez_month):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")

@@ -85,6 +85,7 @@ flowchart TD
         d_month{"Monat [use_meta]"}
         n_month_cyclic["Monat sin/cos [use_cyclic_month]"]
         n_month_month["Monat numerisch [use_cyclic_month = False]"]
+        n_aez_month_aez_month["AEZ × Monat one-hot [use_aez_month]"]
     end
     subgraph albedo
         n_albedo_drop_empty["Leere Bänder entfernen (immer)"]
@@ -96,6 +97,12 @@ flowchart TD
         n_indices_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
         n_indices_indices["Vegetationsindizes [use_vegetation_indices]"]
         n_indices_select["Nur Indizes behalten"]
+    end
+    subgraph boden
+        n_soil_drop_empty["Leere Bänder entfernen (immer)"]
+        n_soil_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_soil_soil["Bodenindizes NDTI, BSI [use_soil_indices]"]
+        n_soil_soil_scale["Skalieren (Min-Max wie Spektren, sonst Standard)"]
     end
     subgraph spektren
         n_spectra_drop_empty["Leere Bänder entfernen (immer)"]
@@ -129,6 +136,12 @@ flowchart TD
     X --> n_albedo_drop_empty
     X --> n_indices_drop_empty
     X --> n_spectra_drop_empty
+    X --> n_soil_drop_empty
+    X -.-> n_aez_month_aez_month
+    n_soil_drop_empty --> n_soil_interpolate
+    n_soil_interpolate -.-> n_soil_soil
+    n_soil_soil --> n_soil_soil_scale
+    n_soil_soil_scale --> d_concat
     n_albedo_drop_empty --> n_albedo_interpolate
     n_albedo_interpolate -.-> n_albedo_albedo
     n_indices_drop_empty --> n_indices_interpolate
@@ -167,6 +180,7 @@ flowchart TD
     n_month_month --> d_concat
     n_albedo_albedo --> d_concat
     n_indices_select --> d_concat
+    n_aez_month_aez_month --> d_concat
 ```
 <!-- pipeline-options-diagram:end -->
 

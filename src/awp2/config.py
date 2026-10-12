@@ -52,6 +52,14 @@ VEGETATION_INDEX_BANDS = (
     NDWI_SWIR_BAND,
 )
 VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
+SOIL_BLUE_BAND = "X478"
+SOIL_SWIR1_BAND = "X1649"
+SOIL_SWIR2_BAND = "X2214"
+# NDTI (van Deventer et al. 1997) and BSI (Rikimaru et al. 2002); red and NIR as for NDVI
+SOIL_INDEX_BANDS = (SOIL_BLUE_BAND, NDVI_RED_BAND, NDVI_NIR_BAND, SOIL_SWIR1_BAND, SOIL_SWIR2_BAND)
+SOIL_INDEX_NAMES = ("NDTI", "BSI")
+AEZ_MONTH_PREFIX = "aez_month"
+AEZ_MONTH_SEP = "_"
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
 SAVGOL_SPLIT_GAP_NM = 20
@@ -76,6 +84,8 @@ SEED = 42
 VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+# a CV gain below this is within the fold-to-fold noise of the reference (std about 0.010)
+MIN_CV_GAIN = 0.005
 RECALL_COL = "recall"
 SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
