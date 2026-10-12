@@ -62,6 +62,9 @@ Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
 CROPS: tuple[str, ...] = get_args(Crop)
 STAGES: tuple[str, ...] = get_args(Stage)
+# stages before and with a closed canopy, compared in the error analysis
+EARLY_STAGES: tuple[Stage, ...] = ("Emerge_VEarly", "Early_Mid")
+CLOSED_CANOPY_STAGES: tuple[Stage, ...] = ("Critical", "Late")
 Subset = Literal["train", "val"]
 TRAIN_SUBSET, VAL_SUBSET = get_args(Subset)
 Routing = Literal["hard", "soft"]

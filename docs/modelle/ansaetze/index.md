@@ -18,7 +18,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
 | [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm_expanded` (BAcc kombiniert 0.866) | vorläufig führend; gegen weitere Ansätze vergleichen |
-| [Hierarchisch](hierarchisch.md) | in Arbeit | RBF-SVM → RBF-SVM, Extra Trees → RBF-SVM, Extra Trees → Extra Trees | `hierarchical_svm` (BAcc kombiniert 0.844) | CV 0.839 vs. 0.845 (`combined_svm_cv_reference`, gleiche Vorverarbeitung) – knapp dahinter; Engpass ist die Kulturstufe, weiches Routing ohne Effekt (#88) |
+| [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM → RBF-SVM, Extra Trees → RBF-SVM, Extra Trees → Extra Trees | `hierarchical_svm` (BAcc kombiniert 0.844) | CV 0.839 vs. 0.845 (`combined_svm_cv_reference`, gleiche Vorverarbeitung) – knapp dahinter; Engpass ist die Kulturstufe, weiches Routing ohne Effekt (#88) |
 | [Multi-Task](multi-task.md) | offen | – | | |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.

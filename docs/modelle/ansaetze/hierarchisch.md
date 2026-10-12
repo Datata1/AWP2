@@ -230,4 +230,8 @@ Vorverarbeitung (0.839 vs. 0.845, im Rauschen) – gleichwertig, aber nicht bess
 - **Schwachstelle nach der Kultur:** die Stadium-Modelle von Baumwolle (0.84) und Soja (0.93),
   vor allem Mature_Senesc.
 
-Ursachen der Kultur- und Stadiumfehler im Vergleich der Ansätze: Fehleranalyse (#32).
+Im Vergleich der Ansätze ([Fehleranalyse](../fehleranalyse.md), #32) unterscheiden sich
+hierarchisch und kombiniert bei den Treffern nicht signifikant (McNemar p = 0.25); der
+BAcc-Abstand stammt aus wenigen kleinen Klassen. Die Kulturfehler liegen vor allem an den
+Saisonrändern (Mai/Juni, Oktober) – vermutlich, weil sich die Spektren der Kulturen dort ähnlicher
+werden.
