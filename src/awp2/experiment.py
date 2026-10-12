@@ -28,10 +28,11 @@ from awp2.evaluation import (
     plot_confusion_matrices,
     scorer,
 )
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor
+from awp2.preprocessing import PreprocessingConfig, build_preprocessor, describe_preprocessor
 from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
 
 _MODEL_STEP = "model"
+_PREPROCESS_STEP = "preprocess"
 
 
 class _ExperimentConfig(BaseModel):
@@ -143,7 +144,7 @@ class TuneResult:
 
 def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
     return Pipeline(
-        [("preprocess", build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
+        [(_PREPROCESS_STEP, build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
     )
 
 
@@ -151,6 +152,18 @@ def _fit_params(config: _ExperimentConfig, y_train: pd.DataFrame) -> dict[str, n
     if not config.balance_samples:
         return {}
     return {f"{_MODEL_STEP}__sample_weight": balanced_sample_weight(y_train)}
+
+
+def _pipeline_summary(config: _ExperimentConfig, pipeline: Pipeline | None = None) -> str:
+    preprocessor = (
+        pipeline.named_steps[_PREPROCESS_STEP]
+        if pipeline is not None
+        else build_preprocessor(config.preprocessing)
+    )
+    steps = " | ".join(describe_preprocessor(preprocessor))
+    if config.description:
+        return f"{config.description}\nPipeline: {steps}"
+    return f"Pipeline: {steps}"
 
 
 def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool]:
@@ -300,7 +313,7 @@ def _track_run(
             experiment=config.experiment,
             name=config.name,
             approach=config.approach,
-            description=config.description,
+            description=_pipeline_summary(config, pipeline),
             params={**_shared_params(config), **estimator_params(model, "model")},
             metrics=scores,
             train=pd.concat([split.X_train, split.y_train], axis=1),
@@ -325,7 +338,7 @@ def _track_tuning(
             experiment=config.experiment,
             name=config.name,
             approach=config.approach,
-            description=config.description,
+            description=_pipeline_summary(config),
             params={**_shared_params(config), **estimator_params(model, "model")},
             metric=config.metric,
             candidates=candidates,

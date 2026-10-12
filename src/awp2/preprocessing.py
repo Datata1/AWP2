@@ -968,3 +968,75 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
+
+
+def _describe_step(name: str, step: BaseEstimator | str) -> str:
+    if isinstance(step, str):
+        return f"Month {step}"
+    known: dict[str, str] = {
+        "drop_empty": "Drop empty bands",
+        "snv": "SNV scatter correction per spectrum",
+        "vegetation_indices": "Append NDVI, NDRE, PRI and NDWI",
+        "standard_scale": "Standardize bands (per-band mean and std)",
+        "minmax_scale": "Min-max scale bands to [0, 1]",
+        "centering": "Center bands (per-band mean)",
+        "aez": "One-hot encode AEZ",
+        "cyclic": "Cyclic month encoding (sin/cos)",
+        "month": "Standardize month",
+        "scale": "Standardize month",
+    }
+    if name in known:
+        return known[name]
+    if name == "interpolate" and isinstance(step, InterpolateBands):
+        return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "savgol" and isinstance(step, SavitzkyGolaySmoothing):
+        return (
+            f"Savitzky-Golay smoothing (window {step.window_length} bands, "
+            f"polyorder {step.polyorder})"
+        )
+    if name == "pca" and isinstance(step, PCA):
+        return f"PCA to {step.n_components} components"
+    if name == "ica" and isinstance(step, FastICA):
+        return f"ICA to {step.n_components} components"
+    if name == "nmf" and isinstance(step, NMF):
+        return f"NMF to {step.n_components} components"
+    if name == "osp" and isinstance(step, OrthogonalSubspaceProjection):
+        return f"OSP to {step.n_components} endmembers"
+    if name == "lpp" and isinstance(step, LocalityPreservingProjection):
+        return f"LPP to {step.n_components} components ({step.n_neighbors} neighbors)"
+    if name == "vsrp" and isinstance(step, VerySparseRandomProjection):
+        return f"VSRP to {step.n_components} components"
+    if name == "dbn" and isinstance(step, DeepBeliefFeatures):
+        layers = "x".join(str(size) for size in step.hidden_layers)
+        return f"DBN features ({layers})"
+    return type(step).__name__
+
+
+def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
+    r"""List the active preprocessing steps in execution order, numbered from 1.
+
+    Reads the built transformer, so optional steps appear only when enabled and the
+    numbering restarts at 1 for every run. Print the lines in the notebook to log which
+    preprocessing a run used.
+
+    Args:
+        preprocessor: Built by ``build_preprocessor`` (fitting is not required).
+
+    Returns:
+        One numbered description per active step, e.g. ``"3. PCA to 20 components"``.
+
+    Example:
+        ```python
+        print("\\n".join(describe_preprocessor(build_preprocessor(
+            PreprocessingConfig(use_meta=True, use_spectral_snv=True)
+        ))))
+        ```
+    """
+    lines: list[str] = []
+    for branch_name, transformer, _columns in preprocessor.transformers:
+        if isinstance(transformer, Pipeline):
+            for step_name, step in transformer.steps:
+                lines.append(_describe_step(step_name, step))
+        else:
+            lines.append(_describe_step(branch_name, transformer))
+    return [f"{position}. {text}" for position, text in enumerate(lines, start=1)]
