@@ -99,8 +99,8 @@ getrennte Versuche:
 | Indizes | `use_vegetation_indices=True` | Testet NDVI, NDRE, PRI und NDWI zusätzlich zu den Bändern | Gegen dieselbe Basiskonfiguration ohne Indizes vergleichen. |
 | Spätere Glättung/Bandauswahl | neues Feld in `PreprocessingConfig` und Transformer in `awp2.preprocessing` | Kann Rauschen oder Redundanz senken | Erst eine fachliche Hypothese und einen kleinen Vergleich definieren; niemals Features vor dem CV fitten. |
 
-Month bleibt numerisch, AEZ wird One-Hot-kodiert. One-Hot und zyklische Month-Kodierung wurden
-als getrennte Hypothese verglichen, erreichen aber weder in der CV noch auf der Validierung einen
+Month bleibt numerisch, AEZ wird One-Hot-kodiert. Die zyklische Month-Kodierung wurde als
+getrennte Hypothese verglichen, erreicht aber weder in der CV noch auf der Validierung einen
 nachvollziehbaren Gewinn.
 
 ### Dokumentations-Checkliste je Versuch

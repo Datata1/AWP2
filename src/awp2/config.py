@@ -30,14 +30,9 @@ CROP_COL = "Crop"
 STAGE_COL = "Stage"
 AEZ_COL = "AEZ"
 MONTH_COL = "Month"
-MONTH_SIN_COL = "Month_sin"
-MONTH_COS_COL = "Month_cos"
 MEAN_ALBEDO_COL = "mean_albedo"
 TARGET_COLS = (CROP_COL, STAGE_COL)
 META_COLS = (AEZ_COL, MONTH_COL)
-MONTH_ENCODING_NUMERIC = "numeric"
-MONTH_ENCODING_ONE_HOT = "one_hot"
-MONTH_ENCODING_CYCLICAL = "cyclical"
 MONTH_SIN_COL = f"{MONTH_COL}_sin"
 MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
@@ -66,7 +61,6 @@ MONTH_RANGE = (1, 12)
 
 Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
-MonthEncoding = Literal["numeric", "one_hot", "cyclical"]
 CROPS: tuple[str, ...] = get_args(Crop)
 STAGES: tuple[str, ...] = get_args(Stage)
 # stages before and with a closed canopy, compared in the error analysis
