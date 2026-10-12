@@ -63,16 +63,25 @@ Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
 CROPS: tuple[str, ...] = get_args(Crop)
 STAGES: tuple[str, ...] = get_args(Stage)
+# stages before and with a closed canopy, compared in the error analysis
+EARLY_STAGES: tuple[Stage, ...] = ("Emerge_VEarly", "Early_Mid")
+CLOSED_CANOPY_STAGES: tuple[Stage, ...] = ("Critical", "Late")
 Subset = Literal["train", "val"]
 TRAIN_SUBSET, VAL_SUBSET = get_args(Subset)
+Routing = Literal["hard", "soft"]
+HARD_ROUTING, SOFT_ROUTING = get_args(Routing)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
 VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+RECALL_COL = "recall"
+SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
 EXTRA_TREES_N_ESTIMATORS = 300
+LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on ~140 features
+MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 CNN_DEFAULT_FILTERS = 16
 CNN_DEFAULT_KERNEL_SIZE = 5
 CNN_DEFAULT_DROPOUT = 0.2

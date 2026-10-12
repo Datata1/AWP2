@@ -553,6 +553,19 @@ class DeepBeliefFeatures(_BandTransformer):
         return pd.DataFrame(activations, index=X.index, columns=self.feature_names_out_)
 
 
+def ndvi(bands: pd.DataFrame) -> pd.Series:
+    """Normalised difference vegetation index – a proxy for green vegetation cover.
+
+    Args:
+        bands: Reflectance with at least the columns ``NDVI_NIR_BAND`` and ``NDVI_RED_BAND``.
+
+    Returns:
+        NDVI per row, between -1 and 1 (bare soil about 0.1-0.2, dense canopy above 0.6).
+    """
+    nir, red = bands[NDVI_NIR_BAND], bands[NDVI_RED_BAND]
+    return (nir - red) / (nir + red)
+
+
 class AddVegetationIndices(_BandTransformer):
     """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
 
@@ -589,8 +602,7 @@ class AddVegetationIndices(_BandTransformer):
         X = self._check(X)
         indices = pd.DataFrame(
             {
-                "NDVI": (X[NDVI_NIR_BAND] - X[NDVI_RED_BAND])
-                / (X[NDVI_NIR_BAND] + X[NDVI_RED_BAND]),
+                "NDVI": ndvi(X),
                 "NDRE": (X[NDVI_NIR_BAND] - X[NDRE_RED_EDGE_BAND])
                 / (X[NDVI_NIR_BAND] + X[NDRE_RED_EDGE_BAND]),
                 "PRI": (X[PRI_FIRST_BAND] - X[PRI_SECOND_BAND])

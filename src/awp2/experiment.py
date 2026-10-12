@@ -298,6 +298,35 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     )
 
 
+def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig) -> pd.DataFrame:
+    """Predict every training row with preprocessing + ``model`` fitted on the other folds.
+
+    Uses the shared folds of the training part (``load_folds()``) and never touches the
+    validation part – for analysing errors before the single :func:`run`. Fits exactly like
+    :func:`tune`/:func:`run` (``config.preprocessing``, ``config.balance_samples``); nothing is
+    tracked.
+
+    Args:
+        model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
+        config: Configuration the model was tuned or evaluated with, e.g. ``TuneResult.config``.
+
+    Returns:
+        Out-of-fold predictions with the columns ``Crop`` and ``Stage``, in the row order of
+            ``load_split().y_train``.
+    """
+    split = load_split()
+    predictions = []
+    for fold in load_folds():
+        y_fold = split.y_train.iloc[fold.train]
+        pipeline = _pipeline(model, config.preprocessing)
+        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        fold_index = split.X_train.index[fold.val]
+        predictions.append(
+            as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)
+        )
+    return pd.concat(predictions).loc[split.y_train.index]
+
+
 def _track_run(
     config: RunConfig,
     model: BaseEstimator,

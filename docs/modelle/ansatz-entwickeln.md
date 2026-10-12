@@ -80,6 +80,15 @@ auf der Validierung (30 %). Das ist die Zahl, die zählt. Der Bewertungslauf ver
 Confusion Matrix und Modell; der Tuning-Lauf lässt sich aufklappen und zeigt alle Kandidaten.
 Die Confusion Matrix verrät, welche Klassen verwechselt werden – Stoff für die Fehleranalyse.
 
+Für die Fehleranalyse und den Vergleich zweier Ansätze auf derselben Validierung
+(`result.y_val`, `result.y_pred`):
+
+| Baustein | Frage |
+| --- | --- |
+| `error_breakdown()` + `plot_error_breakdown()` | Liegt der Fehler bei der Kultur oder nur beim Stadium? |
+| `recall_by_class()` + `plot_recall_comparison()` | Welche Crop/Stage-Paare gewinnt oder verliert ein Ansatz? |
+| `compare_predictions()` | Treffen zwei Ansätze verschieden oft richtig – mehr als Zufall? (McNemar auf kombinierte Treffer, **nicht** BAcc; seltene Klassen fallen kaum ins Gewicht) |
+
 ## 6. Festhalten und abgeben
 
 - Zeile im [Experiment-Log](experimente.md): Scores des Bewertungslaufs und die ersten 8 Zeichen
