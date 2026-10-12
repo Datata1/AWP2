@@ -35,6 +35,7 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | RBF-SVM | | | [**0.866**](kombiniert.md#rbf-svm-erweiterte-suche) | [0.844](hierarchisch.md#rbf-svm-rbf-svm) | |
 | Extra Trees | | | [0.804](kombiniert.md#extra-trees) | [0.785](hierarchisch.md#extra-trees-extra-trees) | |
 | Extra Trees → RBF-SVM | | | | [0.801](hierarchisch.md#extra-trees-rbf-svm) | |
+| LDA (gleiche Priors) | | | | [0.676](hierarchisch.md#lda-lda) | |
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.

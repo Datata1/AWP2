@@ -216,6 +216,24 @@ trotz nur 66 Zeilen perfekt. Eigene Hyperparameter je Kultur unterstützt
 - Auch für Bäume bringt die Zerlegung keinen Gewinn; die Stadium-Bäume sind mit Oracle-Kultur
   (0.922) schwächer als die Stadium-SVMs (0.939).
 
+### LDA → LDA
+
+Notebook: `notebooks/11_jd_hierarchical_lda.ipynb` (#98). Lineare Diskriminanzanalyse mit
+Shrinkage – ein Klassiker für stark korrelierte Spektralbänder. Plain LDA nimmt die
+Klassenhäufigkeiten als Priors und bevorzugt so häufige Klassen; `BalancedLinearDiscriminantAnalysis`
+setzt gleiche Priors (wie `class_weight="balanced"`).
+
+- Suche `hierarchical_lda_search` (16 Kandidaten): Kultur Shrinkage `auto`, Stadium 0.01
+  (Rasterrand) – **CV 0.657** (SVM 0.839).
+- Validierung `hierarchical_lda` (MLflow `2b5eb7dc`): Crop 0.822, Stage 0.768, **kombiniert
+  0.676**; keine ungültigen Paare. McNemar gegen die SVM: 340 zu 45 Zeilen (p < 10⁻⁵⁰).
+- **Engpass Kultur:** 23 % der Zeilen haben die falsche Kultur (SVM 9 %). Mit wahrer Kultur
+  erreicht LDA 0.901 (SVM 0.939) – eine lineare Grenze trennt die Stadien innerhalb einer Kultur
+  recht gut, die Kulturen untereinander nicht. Die Nichtlinearität der RBF-SVM zählt vor allem
+  auf der Kulturstufe.
+
+![LDA: Fehlerzerlegung](../img/hierarchical_lda_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,

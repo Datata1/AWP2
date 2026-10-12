@@ -22,6 +22,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-12 | hierarchical_et | Datata1 | Hierarchisch | 0.874 | 0.879 | 0.785 | 0.779 | 0.891 | 55dd4258 | Extra Trees → Extra Trees; Tuning `hierarchical_et_search` (95c88504), CV 0.797; keine ungültigen Paare |
 | 2026-10-12 | hierarchical_soft | Datata1 | Hierarchisch | 0.921 | 0.903 | 0.844 | 0.821 | 0.907 | 4868f97d | RBF-SVM → RBF-SVM mit kalibrierten Wahrscheinlichkeiten und weichem Routing; Tuning `hierarchical_soft_search` (9e7edd15), CV 0.840; gleiche Hyperparameter wie `hierarchical_svm`, ändert nur 2 von 3 912 Kulturentscheidungen (Training, out-of-fold) – Unentschieden; keine ungültigen Paare |
 | 2026-10-12 | hierarchical_svm_tuned | Datata1 | Hierarchisch | 0.920 | 0.898 | 0.839 | 0.820 | 0.906 | f2d755a7 | Erweitertes Raster (#89): Stadium `C=1000` statt 100; Tuning `hierarchical_svm_wide_search` (ed78855f), CV 0.840 ± 0.020 (Referenz 0.839 ± 0.010) – Gewinn im Rauschen, Lauf wegen fehlender Schwelle in Schritt 1 dennoch ausgeführt; keine ungültigen Paare. `hierarchical_svm` bleibt Referenz. |
+| 2026-10-12 | hierarchical_lda | Datata1 | Hierarchisch | 0.822 | 0.768 | 0.676 | 0.609 | 0.767 | 2b5eb7dc | LDA → LDA mit gleichen Priors (`BalancedLinearDiscriminantAnalysis`, lsqr); Kultur Shrinkage `auto`, Stadium 0.01; Tuning `hierarchical_lda_search`, CV 0.657; Kultur falsch 23 %, Oracle-Kultur 0.901; keine ungültigen Paare |
 
 ## CV-only Analysen
 
