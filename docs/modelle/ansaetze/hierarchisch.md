@@ -56,6 +56,11 @@ ohne messbaren Effekt) sowie Vorverarbeitung und gezieltes Tuning schwacher Kult
 
 ## Klassifikatoren
 
+Alle getunten Varianten liegen als Fabriken in `awp2.models.tuned` (z. B. `tuned_hierarchical_svm()`,
+Übersicht in `TUNED_HIERARCHIES`) – mit Vorverarbeitung, Gewichtung, Herkunfts-Lauf und CV-Score.
+`refit_untracked()` baut sie ohne MLflow nach und reproduziert die protokollierten
+Validierungswerte exakt; so laufen die Notebooks auch ohne den lokalen MLflow-Speicher.
+
 Notebook: `notebooks/07_jd_hierarchical.ipynb` (#87). Alle Varianten mit derselben
 Vorverarbeitung: standardisierte Spektren, AEZ one-hot, Monat zyklisch
 (`PreprocessingConfig(use_spectral_standard_scale=True)`). Die Referenz `combined_svm_expanded`
