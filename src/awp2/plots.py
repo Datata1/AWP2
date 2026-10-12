@@ -132,6 +132,41 @@ def plot_tuning_candidates(
     return ax
 
 
+def plot_cv_scores(
+    candidates: Mapping[str, pd.DataFrame],
+    reference: float | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Compare the best cross-validation score of several searches, e.g. preprocessing variants.
+
+    Args:
+        candidates: ``TuneResult.candidates`` per search, keyed by the label to show.
+        reference: CV score drawn as a dashed line, e.g. the variant everything is compared to.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one horizontal bar (best mean ± its std over the folds) per search, best on
+            top and the value written next to each bar.
+    """
+    best = pd.DataFrame(
+        {
+            label: table.loc[table["rank"].idxmin(), ["mean", "std"]]
+            for label, table in candidates.items()
+        }
+    ).T.sort_values("mean")
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 0.5 * len(best) + 1.5))
+    bars = ax.barh(best.index, best["mean"], xerr=best["std"], color="C0", capsize=3)
+    ax.bar_label(bars, fmt="%.3f", fontsize="small", padding=12)
+    if reference is not None:
+        ax.axvline(reference, color="black", linestyle="--", linewidth=1)
+    lower = (best["mean"] - best["std"]).min()
+    ax.set_xlim(max(0.0, lower - 0.02), min(1.0, (best["mean"] + best["std"]).max() + 0.03))
+    ax.set_xlabel("Bester CV-Score (Mittelwert ± Std über die Folds)")
+    ax.grid(axis="x", alpha=0.3)
+    return ax
+
+
 def plot_class_recall(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> plt.Figure:
     """Recall per class for crop and stage – which classes the model finds worst.
 
