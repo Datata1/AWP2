@@ -51,8 +51,8 @@ Stadien je Kultur im Trainingsteil:
 | Kultur- und Stadium-Stufe lassen sich getrennt analysieren und mit unterschiedlichen Klassifikatoren besetzen | Mehr Modelle; dieselben Hyperparameter für alle Stadium-Modelle sind ein Kompromiss |
 | Die Oracle-Kultur trennt Kultur- und Stadiumfehler sauber | Kein Wissensaustausch zwischen gleichen Stadien verschiedener Kulturen (z. B. Mais/Late und Soja/Late) |
 
-Geplante Gegenmaßnahmen: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung
-(#88) sowie Vorverarbeitung und gezieltes Tuning schwacher Kulturen (#89).
+Gegenmaßnahmen: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung (#88,
+in der CV abgelehnt) sowie Vorverarbeitung und gezieltes Tuning schwacher Kulturen (#89).
 
 ## Klassifikatoren
 
@@ -102,6 +102,29 @@ derselben Vorverarbeitung und demselben Raster **nur per CV** neu getunt
 
 ![Häufigste Verwechslungen](../img/hierarchical_confusions.png)
 
+### RBF-SVM → RBF-SVM, weiches Routing
+
+Notebook: `notebooks/08_jd_hierarchical_soft.ipynb` (#88). Statt der harten Kulturentscheidung
+gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
+(`HierarchicalClassifier(routing="soft")`, SVMs mit Platt-Wahrscheinlichkeiten).
+
+- Suche `hierarchical_soft_search` (36 Kandidaten, MLflow `f0b6fbb8`): `routing` hart/weich ×
+  Kultur-`C`/`gamma` × Stadium-`C` auf demselben Modell. Bestes weiches Routing **CV 0.828**,
+  bestes hartes 0.839 (identisch mit `hierarchical_svm`) – **weich abgelehnt**, daher keine
+  Validierung. (Ein Smoke-Test hatte weich vorab einmal auf der Validierung gesehen: 0.823; er
+  ging nicht in die Entscheidung ein.)
+- Out-of-fold auf dem Trainingsteil ändert weiches Routing nur 2,3 % der Kulturentscheidungen
+  und verschiebt sie zur häufigsten Kultur: Recall Mais 0.916 → 0.935, Baumwolle 0.918 → 0.887.
+  Reis wird nicht bevorzugt – die Vermutung „wenige Stadien ⇒ hohe P(Stadium | Kultur)“
+  bestätigt sich nicht.
+- Plausible Ursache: Die Platt-Wahrscheinlichkeiten werden ohne Klassengewichte kalibriert und
+  bringen die Klassenhäufigkeiten zurück, die `class_weight="balanced"` aus der Entscheidung
+  herausnimmt. Das argmax optimiert dann eher die Accuracy als die Balanced Accuracy.
+- Idee, falls weiter verfolgt: Wahrscheinlichkeiten durch die Klassenhäufigkeit teilen
+  (Prior-Korrektur) – eine eigene Hypothese, nicht Teil von #88.
+
+![Hart vs. weich](../img/hierarchical_soft_tuning.png)
+
 ### Extra Trees → RBF-SVM
 
 - Suche `hierarchical_et_svm_search` (24 Kandidaten, MLflow `c3f13a6e`): Kultur
@@ -128,6 +151,7 @@ derselben Vorverarbeitung und demselben Raster **nur per CV** neu getunt
 **Vorläufig (#87):** Hierarchisch mit RBF-SVM auf beiden Stufen liegt in der CV knapp hinter
 der kombinierten SVM (0.839 vs. 0.845, im Rauschen) – nicht besser. Die Stadium-Modelle sind stark (Oracle-Kultur 0.939); der
 Ansatz verliert fast alles an der Kulturstufe, deren Fehler sich hart ins Stadium fortpflanzen.
-Nächste Schritte: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung (#88),
-erweiterte SVM-Suche und Vorverarbeitung (#89), Ursachen der Kulturfehler in der Fehleranalyse
-(#32).
+Weiches Routing über Wahrscheinlichkeiten (#88) senkt die Fehlerfortpflanzung nicht: In der CV
+verliert es (0.828 vs. 0.839), weil die kalibrierten Wahrscheinlichkeiten Richtung häufigster
+Kultur verschieben. Hartes Routing bleibt. Nächste Schritte: erweiterte SVM-Suche und
+Vorverarbeitung (#89), Ursachen der Kulturfehler in der Fehleranalyse (#32).

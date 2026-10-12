@@ -8,7 +8,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_is_fitted
 
-from awp2.config import CROP_COL, EXTRA_TREES_N_ESTIMATORS, SEED, STAGE_COL, TARGET_COLS
+from awp2.config import (
+    CROP_COL,
+    EXTRA_TREES_N_ESTIMATORS,
+    HARD_ROUTING,
+    SEED,
+    SOFT_ROUTING,
+    STAGE_COL,
+    TARGET_COLS,
+    Routing,
+)
 from awp2.data import combined_label
 from awp2.evaluation import Metrics, evaluate
 
@@ -24,17 +33,27 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
     Args:
         crop_estimator: Unfitted classifier for the crop.
         stage_estimator: Unfitted classifier for the stage, cloned once per crop.
+        routing: ``"hard"`` lets the predicted crop pick the stage model; ``"soft"`` picks the
+            pair with the highest P(crop) · P(stage | crop), so a confident stage model can
+            overrule an uncertain crop. ``"soft"`` needs ``predict_proba`` on both levels.
     """
 
-    def __init__(self, crop_estimator: ClassifierMixin, stage_estimator: ClassifierMixin) -> None:
+    def __init__(
+        self,
+        crop_estimator: ClassifierMixin,
+        stage_estimator: ClassifierMixin,
+        routing: Routing = HARD_ROUTING,
+    ) -> None:
         """Initialise the hierarchy from two unfitted single-output classifiers.
 
         Args:
             crop_estimator: Classifier for the crop.
             stage_estimator: Classifier for the stage, cloned once per crop.
+            routing: How the crop decision reaches the stage, ``"hard"`` or ``"soft"``.
         """
         self.crop_estimator = crop_estimator
         self.stage_estimator = stage_estimator
+        self.routing = routing
 
     def fit(
         self,
@@ -58,8 +77,11 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
             This fitted classifier.
 
         Raises:
-            ValueError: If the target columns do not match the project contract.
+            ValueError: If the target columns do not match the project contract, ``routing`` is
+                unknown, or soft routing meets a classifier without ``predict_proba``.
         """
+        if self.routing not in (HARD_ROUTING, SOFT_ROUTING):
+            raise ValueError(f"Unknown routing {self.routing!r}.")
         if list(y.columns) != list(TARGET_COLS):
             raise ValueError(f"Expected target columns {list(TARGET_COLS)}, got {list(y.columns)}.")
         crops = y[CROP_COL].to_numpy()
@@ -74,11 +96,16 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
             self.stage_estimators_[crop] = clone(self.stage_estimator).fit(
                 X[is_crop], y.loc[is_crop, STAGE_COL], **_weight_params(crop_weights)
             )
+        if self.routing == SOFT_ROUTING and not all(
+            hasattr(model, "predict_proba")
+            for model in (self.crop_estimator_, *self.stage_estimators_.values())
+        ):
+            raise ValueError("Soft routing needs predict_proba, e.g. SVC(probability=True).")
         self.classes_ = np.unique(combined_label(y).to_numpy())
         return self
 
     def predict(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Predict the crop and then the stage within the predicted crop.
+        """Predict crop and stage according to ``routing``.
 
         Args:
             X: Model features.
@@ -87,8 +114,21 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
             Predicted targets with the columns ``Crop`` and ``Stage``.
         """
         check_is_fitted(self, "crop_estimator_")
+        if self.routing == SOFT_ROUTING:
+            return self._predict_soft(X)
         crop = pd.Series(self.crop_estimator_.predict(X), index=X.index, name=CROP_COL)
         return pd.concat([crop, self.predict_stage(X, crop)], axis=1)
+
+    def _predict_soft(self, X: pd.DataFrame) -> pd.DataFrame:
+        crop_proba = self.crop_estimator_.predict_proba(X)
+        pairs: list[tuple[str, str]] = []
+        pair_scores: list[np.ndarray] = []
+        for column, crop in enumerate(self.crop_estimator_.classes_):
+            stage_model = self.stage_estimators_[crop]
+            pair_scores.append(crop_proba[:, [column]] * stage_model.predict_proba(X))
+            pairs.extend((crop, stage) for stage in stage_model.classes_)
+        best = np.hstack(pair_scores).argmax(axis=1)
+        return pd.DataFrame([pairs[i] for i in best], index=X.index, columns=list(TARGET_COLS))
 
     def predict_stage(self, X: pd.DataFrame, crop: pd.Series | np.ndarray) -> pd.Series:
         """Predict the stage for a given crop per sample.
@@ -156,15 +196,20 @@ def _equal_per_crop(weights: np.ndarray, crops: np.ndarray) -> np.ndarray:
     return weights * len(weights) / (len(crop_totals) * crop_totals[crop_index])
 
 
-def make_hierarchical_svm() -> HierarchicalClassifier:
+def make_hierarchical_svm(routing: Routing = HARD_ROUTING) -> HierarchicalClassifier:
     """Create the hierarchy with an RBF-SVM on both levels.
+
+    Args:
+        routing: ``"soft"`` switches on probability estimates of the SVMs (Platt scaling with
+            an internal cross-validation, slower to fit); their ``predict`` stays unchanged, so
+            ``routing`` can then be tuned between ``"hard"`` and ``"soft"`` on the same model.
 
     Returns:
         Unfitted classifier with balanced class weights, so keep ``balance_samples=False``.
             Scale its features through
             ``PreprocessingConfig(use_spectral_standard_scale=True)`` before fitting.
     """
-    return HierarchicalClassifier(SVC(class_weight="balanced"), SVC(class_weight="balanced"))
+    return HierarchicalClassifier(_svm(routing), _svm(routing), routing=routing)
 
 
 def make_hierarchical_extra_trees() -> HierarchicalClassifier:
@@ -186,6 +231,12 @@ def make_hierarchical_extra_trees_svm() -> HierarchicalClassifier:
             ``PreprocessingConfig(use_spectral_standard_scale=True)`` for the stage SVMs.
     """
     return HierarchicalClassifier(_extra_trees(), SVC(class_weight="balanced"))
+
+
+def _svm(routing: Routing) -> SVC:
+    if routing == SOFT_ROUTING:
+        return SVC(class_weight="balanced", probability=True, random_state=SEED)
+    return SVC(class_weight="balanced")
 
 
 def _extra_trees() -> ExtraTreesClassifier:
