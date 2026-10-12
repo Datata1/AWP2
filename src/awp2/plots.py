@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.container import BarContainer
 
-from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI, TARGET_COLS
+from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI, RECALL_COL, SUPPORT_COL, TARGET_COLS
 from awp2.data import band_columns, wavelengths
-from awp2.evaluation import METRIC_LABELS, MetricName, Metrics
+from awp2.evaluation import METRIC_LABELS, ErrorBreakdown, MetricName, Metrics
 
 
 def plot_spectra(
@@ -194,3 +194,84 @@ def save_doc_figure(fig: plt.Figure, name: str, directory: Path = DOCS_FIGURES_D
     """
     directory.mkdir(parents=True, exist_ok=True)
     fig.savefig(directory / f"{name}.png", dpi=FIGURE_DPI, bbox_inches="tight")
+
+
+_ERROR_SHARE_LABELS = {
+    "both_correct": "beides richtig",
+    "stage_only_wrong": "nur Stadium falsch",
+    "crop_wrong": "Kultur falsch",
+}
+_ERROR_SHARE_COLORS = ("C2", "C1", "C3")
+_MIN_LABELLED_SHARE = 0.05  # narrower segments are too small for a readable label
+
+
+def plot_error_breakdown(
+    breakdowns: Mapping[str, ErrorBreakdown], ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Compare where the errors of several models come from as stacked bars.
+
+    Args:
+        breakdowns: ``error_breakdown()`` per model, keyed by the label to show.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one bar per model, split into fully correct, stage-only and crop errors.
+    """
+    table = pd.DataFrame(
+        {label: breakdown.model_dump() for label, breakdown in breakdowns.items()}
+    ).T[list(_ERROR_SHARE_LABELS)]
+    table.columns = list(_ERROR_SHARE_LABELS.values())
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 0.6 * len(table) + 1.5))
+    table.plot.barh(stacked=True, ax=ax, color=_ERROR_SHARE_COLORS, width=0.7)
+    for container in ax.containers:
+        if isinstance(container, BarContainer):
+            labels = [
+                f"{bar.get_width():.2f}" if bar.get_width() >= _MIN_LABELLED_SHARE else ""
+                for bar in container
+            ]
+            ax.bar_label(container, labels=labels, label_type="center", fontsize="small")
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Anteil der Zeilen")
+    ax.legend(fontsize="small", loc="lower left", bbox_to_anchor=(0, 1), ncol=len(table.columns))
+    ax.invert_yaxis()
+    return ax
+
+
+def plot_recall_comparison(
+    recalls: Mapping[str, pd.DataFrame], top: int | None = None
+) -> plt.Figure:
+    """Compare the recall per combined crop/stage class of several models.
+
+    Args:
+        recalls: ``recall_by_class()`` per model, keyed by the label to show; all for the same
+            samples.
+        top: Show only the classes where the models differ most (recommended with many
+            classes); all classes if omitted.
+
+    Returns:
+        Figure with one group of horizontal bars per class (support in the label), classes
+            ordered by the largest recall difference between the models.
+
+    Raises:
+        ValueError: If the tables do not cover the same samples or ``top`` is not positive.
+    """
+    if top is not None and top < 1:
+        raise ValueError(f"top must be positive, got {top}.")
+    supports = [recall[SUPPORT_COL].sort_index() for recall in recalls.values()]
+    if not all(support.equals(supports[0]) for support in supports):
+        raise ValueError("All recall tables must come from the same samples.")
+    support = supports[0]
+    table = pd.DataFrame({label: recall[RECALL_COL] for label, recall in recalls.items()})
+    spread = table.max(axis=1) - table.min(axis=1)
+    table = table.loc[spread.sort_values(ascending=False).index[:top]].iloc[::-1]
+    table.index = [f"{pair} (n={support[pair]})" for pair in table.index]
+    bar_height = 0.225
+    fig, ax = plt.subplots(figsize=(9, bar_height * len(table) * len(recalls) + 1.5))
+    table.plot.barh(ax=ax, width=0.8)
+    ax.set_xlim(0, 1.05)
+    ax.set_xlabel("Recall")
+    ax.legend(fontsize="small", loc="upper left", bbox_to_anchor=(1, 1))
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    return fig
