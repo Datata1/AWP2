@@ -177,8 +177,10 @@ Klassifikatoren, siehe [Vergleich aller Klassifikatoren](ansaetze/hierarchisch.m
 Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet die CV.
 
 - **Kulturfehler an den Saisonrändern sind der Hauptengpass** aller Ansätze – auf Validierung
-  und Trainingsteil. Mögliche Ansätze: Kontext gezielter nutzen (Monat × AEZ), Merkmale für
-  Helligkeit bzw. Bodenanteil, stärkere Gewichtung früher und später Stadien.
+  und Trainingsteil. Getestet in #114: Helligkeit (#119) und Bodenindizes (NDTI, BSI) helfen nicht;
+  ein Indikator für AEZ × Monat senkt die Kulturfehler im Mai (Training 25,4 % → 22,1 %), ohne
+  belastbaren Gesamtgewinn. Offen bleiben: stärkere Gewichtung früher und später Stadien,
+  Kontext nur gezielt für die Saisonränder bzw. AEZ 9.
 - **Kombiniert vs. hierarchisch** unterscheiden sich bei den Treffern nicht signifikant; der
   BAcc-Vorsprung des kombinierten Ansatzes kommt von wenigen kleinen Klassen und ist zusätzlich
   durch unterschiedliche Vorverarbeitung verzerrt. Für die Abgabe bleibt `combined_svm_expanded`

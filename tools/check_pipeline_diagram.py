@@ -37,6 +37,9 @@ def _probe_configs() -> list[PreprocessingConfig]:
         PreprocessingConfig(spectral_lpp_components=5, spectral_lpp_neighbors=5),
         PreprocessingConfig(spectral_vsrp_components=5),
         PreprocessingConfig(use_cyclic_month=False),
+        PreprocessingConfig(
+            use_spectral_standard_scale=True, use_soil_indices=True, use_aez_month=True
+        ),
     ]
 
 
