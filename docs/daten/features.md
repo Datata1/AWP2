@@ -42,7 +42,7 @@ belegt deshalb keine robuste spektrale Klassifikation.
 | Rohspektren | CV Balanced Accuracy kombiniert: 0,570. | Bleibt die unverzichtbare Referenz. |
 | Rohspektren + One-Hot-`AEZ` + numerischer `Month` | CV Balanced Accuracy kombiniert: 0,750. | Bisher stärkster beobachteter Zugewinn, aber mit Risiko einer Orts- oder Kalenderabhängigkeit; Monatskodierung wird separat verglichen. |
 | Rohspektren + NDVI, NDRE, PRI, NDWI | CV Balanced Accuracy kombiniert: 0,590. | Für diesen Random Forest kein klarer Zusatznutzen gegenüber Rohspektren. Nicht blind übernehmen; für andere Modelle oder eine kompakte Merkmalsmenge separat prüfen. |
-| SNV-Spektren + `AEZ` + `Month` | Für die kombinierte RBF-SVM: CV BAcc kombiniert 0,823 bei `C=100.0`, `gamma=0.003`. | Unter Rohspektren (0,847); der Holdout blieb deshalb unberührt und SNV wird nicht übernommen. |
+| SNV-Spektren + `AEZ` + zyklischer `Month` | Für die kombinierte RBF-SVM: CV BAcc kombiniert 0,823 bei `C=100.0`, `gamma=0.003`. | Unter Rohspektren (0,847); der Holdout blieb deshalb unberührt und SNV wird nicht übernommen. |
 
 Die ersten drei Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md)
 dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen gemeinsamen Split,

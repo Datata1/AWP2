@@ -97,12 +97,11 @@ getrennte Versuche:
 | Baum-Ensembles | `scale=False`, `use_meta=True` | Nichtlineare Interaktionen ohne Skalierung | Klassengewichte oder Sample Weights gegen die ungleichen kombinierten Klassen einsetzen. |
 | Kontext-Ablation | `use_meta=False` | Misst den reinen Beitrag der Spektren | Nie anhand eines anderen Splits vergleichen. |
 | Indizes | `use_vegetation_indices=True` | Testet NDVI, NDRE, PRI und NDWI zusätzlich zu den Bändern | Gegen dieselbe Basiskonfiguration ohne Indizes vergleichen. |
-| SNV | `scale=True`, `use_spectral_snv=True`, `use_meta=True` | Hebt die Form jedes Spektrums gegenüber seinem Helligkeitsniveau hervor | CV-BAcc 0,823 liegt unter Rohspektren (0,847); kein Holdout-Lauf. |
+| SNV | `scale=True`, `use_spectral_snv=True`, `use_meta=True`, `use_cyclic_month=True` | Hebt die Form jedes Spektrums gegenüber seinem Helligkeitsniveau hervor | CV-BAcc 0,823 liegt unter Rohspektren (0,847); kein Holdout-Lauf. |
 | Spätere Glättung/Bandauswahl | neues Feld in `PreprocessingConfig` und Transformer in `awp2.preprocessing` | Kann Rauschen oder Redundanz senken | Erst eine fachliche Hypothese und einen kleinen Vergleich definieren; niemals Features vor dem CV fitten. |
 
-Month bleibt zunächst numerisch, AEZ wird One-Hot-kodiert. Eine zyklische Month-Kodierung ist
-eine weitere, getrennte Preprocessing-Hypothese und darf nicht still in ein anderes Experiment
-einfließen.
+Month wird zyklisch kodiert, AEZ wird One-Hot-kodiert. Eine numerische Month-Kodierung ist eine
+weitere, getrennte Preprocessing-Hypothese und darf nicht still in ein anderes Experiment einfließen.
 
 ### Dokumentations-Checkliste je Versuch
 
@@ -217,7 +216,8 @@ Metadatenzweig.
 - **Warum getestet?** Die Transformation prüft, ob die Form der Spektralkurve die kombinierten
     Klassen robuster trennt, wenn absolute Reflektanzunterschiede abgeschwächt werden.
 - Die feste Referenz-SVM mit `C=100.0` und `gamma=0.003` erreicht mit SNV im Tuning-Lauf
-    `combined_svm_snv_search` (MLflow `01484f93`) nur eine CV-BAcc kombiniert von 0,8233.
+    `combined_svm_snv_search` (MLflow `e1ea0e6c`) bei ansonsten gleicher Vorverarbeitung nur eine
+    CV-BAcc kombiniert von 0,8233.
 - Das liegt 0,0240 unter der Rohspektren-Referenz (0,8473). Der vorher festgelegten
     Entscheidungsregel folgend wurde der gemeinsame Holdout nicht bewertet; SNV wird nicht
     übernommen.
