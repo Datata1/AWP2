@@ -51,8 +51,8 @@ Stadien je Kultur im Trainingsteil:
 | Kultur- und Stadium-Stufe lassen sich getrennt analysieren und mit unterschiedlichen Klassifikatoren besetzen | Mehr Modelle; dieselben Hyperparameter für alle Stadium-Modelle sind ein Kompromiss |
 | Die Oracle-Kultur trennt Kultur- und Stadiumfehler sauber | Kein Wissensaustausch zwischen gleichen Stadien verschiedener Kulturen (z. B. Mais/Late und Soja/Late) |
 
-Geplante Gegenmaßnahmen: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung
-(#88) sowie Vorverarbeitung und gezieltes Tuning schwacher Kulturen (#89).
+Gegenmaßnahmen: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung (#88,
+ohne messbaren Effekt) sowie Vorverarbeitung und gezieltes Tuning schwacher Kulturen (#89).
 
 ## Klassifikatoren
 
@@ -102,6 +102,42 @@ derselben Vorverarbeitung und demselben Raster **nur per CV** neu getunt
 
 ![Häufigste Verwechslungen](../img/hierarchical_confusions.png)
 
+### RBF-SVM → RBF-SVM, weiches Routing
+
+Notebook: `notebooks/08_jd_hierarchical_soft.ipynb` (#88). Statt der harten Kulturentscheidung
+gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
+(`HierarchicalClassifier(routing="soft")`); die SVMs bekommen Wahrscheinlichkeiten über
+`CalibratedClassifierCV` (Sigmoid, `ensemble=False`).
+
+- Suche `hierarchical_soft_search` (18 Kandidaten, MLflow `9e7edd15`): Kultur-`C`/`gamma` ×
+  Stadium-`C` um das Optimum aus #87. Bestes weiches Routing CV 0.840 gegenüber 0.839 für hart
+  (`hierarchical_svm_search`, gleiche Folds) – bei **identischen Hyperparametern**, drei von
+  fünf Folds gleich, Unterschied im Rauschen (Std 0.010).
+- Validierung `hierarchical_soft` (MLflow `4868f97d`): BAcc Crop 0.921, Stage 0.903,
+  **kombiniert 0.844** (hart: 0.844), Macro-F1 kombiniert 0.821, Samples-F1 0.907; keine
+  ungültigen Paare – ebenfalls ein Unentschieden.
+- **Kaum Änderungen** (out-of-fold auf dem Trainingsteil): Die Kalibrierung allein ändert keine
+  Kulturentscheidung und 5 Stadien; das weiche Routing danach 2 von 3 912 Kulturentscheidungen.
+  Der Recall je Kultur ist in allen Varianten gleich.
+- **Warum:** Auch bei *falschen* Kulturentscheidungen ist die Top-Kultur im Median 3,3-mal so
+  wahrscheinlich wie die zweite (90 % > 2-mal), kaum weniger als bei richtigen (3,4; 95 %). Die
+  kalibrierten Wahrscheinlichkeiten erben die Stimmenstruktur der OvO-SVM; ein Stadium-Modell
+  kann eine Kultur damit fast nie überstimmen. Weiches Routing hilft also **mit diesen
+  Wahrscheinlichkeiten** nicht – ob andere (z. B. Temperature Scaling oder eine multinomiale
+  logistische Regression auf den SVM-Scores) mehr Unsicherheit zeigen, wäre eine eigene
+  Hypothese.
+- **Die Wahrscheinlichkeitsquelle zählt:** Ein erster Lauf mit `SVC(probability=True)`
+  (libsvm-Platt, in scikit-learn 1.9 veraltet; MLflow `f0b6fbb8`, Notebook-Stand `7a515b2`)
+  änderte 2,3 % der Kulturentscheidungen, verschob sie zur häufigsten Kultur Mais (Recall Mais
+  0.916 → 0.935, Baumwolle 0.918 → 0.887) und verlor in der CV (0.828). Reis wurde in keinem
+  Lauf bevorzugt – die Vermutung „wenige Stadien ⇒ hohe P(Stadium | Kultur)“ trifft nicht zu.
+- Ein Smoke-Test hatte die libsvm-Variante vorab einmal auf der Validierung gesehen (0.823); er
+  ging nicht in die Entscheidung ein.
+- Hartes Routing bleibt Referenz: gleiche Güte, ein Fit statt sechs je SVM (die Kalibrierung
+  trainiert intern fünf weitere).
+
+![Weiches Routing: CV-Kandidaten](../img/hierarchical_soft_tuning.png)
+
 ### Extra Trees → RBF-SVM
 
 - Suche `hierarchical_et_svm_search` (24 Kandidaten, MLflow `c3f13a6e`): Kultur
@@ -128,6 +164,8 @@ derselben Vorverarbeitung und demselben Raster **nur per CV** neu getunt
 **Vorläufig (#87):** Hierarchisch mit RBF-SVM auf beiden Stufen liegt in der CV knapp hinter
 der kombinierten SVM (0.839 vs. 0.845, im Rauschen) – nicht besser. Die Stadium-Modelle sind stark (Oracle-Kultur 0.939); der
 Ansatz verliert fast alles an der Kulturstufe, deren Fehler sich hart ins Stadium fortpflanzen.
-Nächste Schritte: weiches Routing über Wahrscheinlichkeiten gegen die Fehlerfortpflanzung (#88),
-erweiterte SVM-Suche und Vorverarbeitung (#89), Ursachen der Kulturfehler in der Fehleranalyse
-(#32).
+Weiches Routing über Wahrscheinlichkeiten (#88) senkt die Fehlerfortpflanzung mit den
+kalibrierten SVM-Wahrscheinlichkeiten nicht: Die Kultur-SVM ist auch bei Fehlern so sicher, dass
+das Stadium sie kaum überstimmt (CV 0.840 vs. 0.839, Validierung 0.844 wie hart – im Rauschen).
+Hartes Routing bleibt als einfachere Variante die Referenz. Nächste Schritte: erweiterte SVM-Suche und
+Vorverarbeitung (#89), Ursachen der Kulturfehler in der Fehleranalyse (#32).

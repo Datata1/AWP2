@@ -20,6 +20,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-12 | hierarchical_svm | Datata1 | Hierarchisch | 0.920 | 0.902 | 0.844 | 0.820 | 0.906 | aa082323 | RBF-SVM → RBF-SVM je Kultur; Kultur `C=30, gamma=0.01`, Stadium `C=100, gamma=0.003`; Tuning `hierarchical_svm_search` (2b851b88), CV 0.839; Oracle-Kultur 0.939; keine ungültigen Paare |
 | 2026-10-12 | hierarchical_et_svm | Datata1 | Hierarchisch | 0.874 | 0.890 | 0.801 | 0.793 | 0.893 | 8449d63e | Extra Trees → RBF-SVM; Tuning `hierarchical_et_svm_search` (c3f13a6e), CV 0.811; keine ungültigen Paare |
 | 2026-10-12 | hierarchical_et | Datata1 | Hierarchisch | 0.874 | 0.879 | 0.785 | 0.779 | 0.891 | 55dd4258 | Extra Trees → Extra Trees; Tuning `hierarchical_et_search` (95c88504), CV 0.797; keine ungültigen Paare |
+| 2026-10-12 | hierarchical_soft | Datata1 | Hierarchisch | 0.921 | 0.903 | 0.844 | 0.821 | 0.907 | 4868f97d | RBF-SVM → RBF-SVM mit kalibrierten Wahrscheinlichkeiten und weichem Routing; Tuning `hierarchical_soft_search` (9e7edd15), CV 0.840; gleiche Hyperparameter wie `hierarchical_svm`, ändert nur 2 von 3 912 Kulturentscheidungen (Training, out-of-fold) – Unentschieden; keine ungültigen Paare |
 
 ## CV-only Analysen
 
@@ -30,3 +31,5 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
 | 2026-10-12 | combined_svm_cv_reference | Datata1 | Kombinierte Klasse | 0.845 | 014c54f2 | Kombinierte RBF-SVM mit der Vorverarbeitung der hierarchischen Läufe (standardisierte Spektren, zyklischer Monat), Raster wie `combined_svm_expanded_search`; bestes `C=100`, `gamma=0.003`. Fairer CV-Vergleich zu `hierarchical_svm` (0.839), keine Validierung. |
+| 2026-10-12 | hierarchical_soft_search (libsvm) | Datata1 | Hierarchisch | 0.828 (weich) | f0b6fbb8 | Hart gegen weich mit `SVC(probability=True)` (in scikit-learn 1.9 veraltet), 36 Kandidaten; bestes weiches Routing 0.828, bestes hartes 0.839 (in MLflow als `cv_bacc_combined_mean`). Ersetzt durch den kalibrierten Lauf (`9e7edd15`), keine Validierung. Zahlen zur Mais-Verschiebung: Notebook-Stand `7a515b2`. |
+| 2026-10-12 | hierarchical_soft_search | Datata1 | Hierarchisch | 0.840 | 9e7edd15 | Weiches Routing mit `CalibratedClassifierCV` (Sigmoid), 18 Kandidaten; gegen hart 0.839 (`hierarchical_svm_search`) bei identischen Hyperparametern – Unterschied im Rauschen (Std 0.010), einmal bewertet als `hierarchical_soft`. |

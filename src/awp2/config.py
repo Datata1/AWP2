@@ -64,6 +64,8 @@ CROPS: tuple[str, ...] = get_args(Crop)
 STAGES: tuple[str, ...] = get_args(Stage)
 Subset = Literal["train", "val"]
 TRAIN_SUBSET, VAL_SUBSET = get_args(Subset)
+Routing = Literal["hard", "soft"]
+HARD_ROUTING, SOFT_ROUTING = get_args(Routing)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
