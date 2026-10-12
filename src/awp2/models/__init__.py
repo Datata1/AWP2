@@ -11,7 +11,9 @@ from awp2.models.combined import (
 from awp2.models.hierarchical import (
     HierarchicalClassifier,
     make_hierarchical_extra_trees,
+    make_hierarchical_extra_trees_svm,
     make_hierarchical_svm,
+    oracle_crop_metrics,
 )
 
 __all__ = [
@@ -24,5 +26,7 @@ __all__ = [
     "make_combined_spectral_cnn",
     "make_combined_svm",
     "make_hierarchical_extra_trees",
+    "make_hierarchical_extra_trees_svm",
     "make_hierarchical_svm",
+    "oracle_crop_metrics",
 ]

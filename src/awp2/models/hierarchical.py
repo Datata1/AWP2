@@ -4,11 +4,13 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import CROP_COL, EXTRA_TREES_N_ESTIMATORS, SEED, STAGE_COL, TARGET_COLS
 from awp2.data import combined_label
+from awp2.evaluation import Metrics, evaluate
 
 
 class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
@@ -119,6 +121,30 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
         return pd.Series(stage, index=X.index, name=STAGE_COL)
 
 
+def oracle_crop_metrics(pipeline: Pipeline, X: pd.DataFrame, y: pd.DataFrame) -> Metrics:
+    """Score the stage models of a fitted hierarchy as if the crop were always correct.
+
+    The gap to the normal metrics is what crop errors cost the stage and the combination.
+
+    Args:
+        pipeline: Fitted pipeline whose last step is a :class:`HierarchicalClassifier`, e.g.
+            ``RunResult.pipeline``.
+        X: Raw features, e.g. ``load_split().X_val``.
+        y: True targets with the columns ``Crop`` and ``Stage``.
+
+    Returns:
+        Metrics of the true crop combined with the stage predicted for it.
+
+    Raises:
+        TypeError: If the last pipeline step is not a :class:`HierarchicalClassifier`.
+    """
+    model = pipeline[-1]
+    if not isinstance(model, HierarchicalClassifier):
+        raise TypeError(f"Expected a HierarchicalClassifier, got {type(model).__name__}.")
+    stage = model.predict_stage(pipeline[:-1].transform(X), y[CROP_COL])
+    return evaluate(y, pd.concat([y[CROP_COL], stage], axis=1))
+
+
 def _weight_params(sample_weight: np.ndarray | None) -> dict[str, np.ndarray]:
     return {} if sample_weight is None else {"sample_weight": sample_weight}
 
@@ -149,6 +175,17 @@ def make_hierarchical_extra_trees() -> HierarchicalClassifier:
             ``balance_samples=False``.
     """
     return HierarchicalClassifier(_extra_trees(), _extra_trees())
+
+
+def make_hierarchical_extra_trees_svm() -> HierarchicalClassifier:
+    """Create the hierarchy with Extra Trees for the crop and an RBF-SVM per crop for the stage.
+
+    Returns:
+        Unfitted classifier with balanced class weights and the project seed, so keep
+            ``balance_samples=False``. Scale its features through
+            ``PreprocessingConfig(use_spectral_standard_scale=True)`` for the stage SVMs.
+    """
+    return HierarchicalClassifier(_extra_trees(), SVC(class_weight="balanced"))
 
 
 def _extra_trees() -> ExtraTreesClassifier:
