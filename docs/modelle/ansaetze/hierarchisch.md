@@ -300,6 +300,22 @@ Notebook: `notebooks/15_jd_hierarchical_mlp.ipynb` (#102). Kleines neuronales Ne
 
 ![MLP: Fehlerzerlegung](../img/hierarchical_mlp_breakdown.png)
 
+### HistGradientBoosting → HistGradientBoosting
+
+Notebook: `notebooks/16_jd_hierarchical_hgb.ipynb` (#103). Gradient Boosting je Stufe mit
+ausgeglichenen Gewichten (`balance_samples=True`). Ein Fit dauert rund 30 s, daher nur eine
+kleine Suche über die Lernrate je Stufe.
+
+- Suche `hierarchical_hgb_search` (4 Kandidaten): beide Stufen Lernrate 0.05 (Rasterrand) –
+  **CV 0.783** (SVM 0.839).
+- Validierung `hierarchical_hgb` (MLflow `6cc2984f`): Crop 0.901, Stage 0.871, **kombiniert
+  0.795**; keine ungültigen Paare. McNemar gegen die SVM: 105 zu 62 Zeilen (p ≈ 0.001).
+- Bester Nicht-SVM-Wert auf der Validierung und besser als HistGradientBoosting im kombinierten
+  Ansatz (0.777) – für Boosting hilft die Zerlegung. Abstand zur SVM vor allem bei der Kultur
+  (11 % vs. 9 % falsch); mit wahrer Kultur 0.898.
+
+![HistGradientBoosting: Fehlerzerlegung](../img/hierarchical_hgb_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,
