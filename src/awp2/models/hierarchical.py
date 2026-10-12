@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
@@ -82,6 +83,10 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
         """
         if self.routing not in (HARD_ROUTING, SOFT_ROUTING):
             raise ValueError(f"Unknown routing {self.routing!r}.")
+        if self.routing == SOFT_ROUTING and not all(
+            hasattr(model, "predict_proba") for model in (self.crop_estimator, self.stage_estimator)
+        ):
+            raise ValueError("Soft routing needs predict_proba, e.g. CalibratedClassifierCV.")
         if list(y.columns) != list(TARGET_COLS):
             raise ValueError(f"Expected target columns {list(TARGET_COLS)}, got {list(y.columns)}.")
         crops = y[CROP_COL].to_numpy()
@@ -96,11 +101,6 @@ class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
             self.stage_estimators_[crop] = clone(self.stage_estimator).fit(
                 X[is_crop], y.loc[is_crop, STAGE_COL], **_weight_params(crop_weights)
             )
-        if self.routing == SOFT_ROUTING and not all(
-            hasattr(model, "predict_proba")
-            for model in (self.crop_estimator_, *self.stage_estimators_.values())
-        ):
-            raise ValueError("Soft routing needs predict_proba, e.g. SVC(probability=True).")
         self.classes_ = np.unique(combined_label(y).to_numpy())
         return self
 
@@ -200,9 +200,10 @@ def make_hierarchical_svm(routing: Routing = HARD_ROUTING) -> HierarchicalClassi
     """Create the hierarchy with an RBF-SVM on both levels.
 
     Args:
-        routing: ``"soft"`` switches on probability estimates of the SVMs (Platt scaling with
-            an internal cross-validation, slower to fit); their ``predict`` stays unchanged, so
-            ``routing`` can then be tuned between ``"hard"`` and ``"soft"`` on the same model.
+        routing: ``"soft"`` wraps each SVM in a sigmoid ``CalibratedClassifierCV`` for
+            probabilities (internal cross-validation, slower to fit); tune its SVM as
+            ``crop_estimator__estimator__C`` etc. The calibrated models also *predict* by the
+            highest probability, so compare soft against a separately tuned hard hierarchy.
 
     Returns:
         Unfitted classifier with balanced class weights, so keep ``balance_samples=False``.
@@ -233,10 +234,11 @@ def make_hierarchical_extra_trees_svm() -> HierarchicalClassifier:
     return HierarchicalClassifier(_extra_trees(), SVC(class_weight="balanced"))
 
 
-def _svm(routing: Routing) -> SVC:
+def _svm(routing: Routing) -> SVC | CalibratedClassifierCV:
+    svm = SVC(class_weight="balanced")
     if routing == SOFT_ROUTING:
-        return SVC(class_weight="balanced", probability=True, random_state=SEED)
-    return SVC(class_weight="balanced")
+        return CalibratedClassifierCV(svm, method="sigmoid", ensemble=False)
+    return svm
 
 
 def _extra_trees() -> ExtraTreesClassifier:
