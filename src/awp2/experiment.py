@@ -28,10 +28,11 @@ from awp2.evaluation import (
     plot_confusion_matrices,
     scorer,
 )
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor
+from awp2.preprocessing import PreprocessingConfig, build_preprocessor, describe_preprocessor
 from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
 
 _MODEL_STEP = "model"
+_PREPROCESS_STEP = "preprocess"
 
 
 class _ExperimentConfig(BaseModel):
@@ -143,7 +144,7 @@ class TuneResult:
 
 def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
     return Pipeline(
-        [("preprocess", build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
+        [(_PREPROCESS_STEP, build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
     )
 
 
@@ -151,6 +152,18 @@ def _fit_params(config: _ExperimentConfig, y_train: pd.DataFrame) -> dict[str, n
     if not config.balance_samples:
         return {}
     return {f"{_MODEL_STEP}__sample_weight": balanced_sample_weight(y_train)}
+
+
+def _pipeline_summary(config: _ExperimentConfig, pipeline: Pipeline | None = None) -> str:
+    preprocessor = (
+        pipeline.named_steps[_PREPROCESS_STEP]
+        if pipeline is not None
+        else build_preprocessor(config.preprocessing)
+    )
+    steps = " | ".join(describe_preprocessor(preprocessor))
+    if config.description:
+        return f"{config.description}\nPipeline: {steps}"
+    return f"Pipeline: {steps}"
 
 
 def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool]:
@@ -285,6 +298,35 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     )
 
 
+def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig) -> pd.DataFrame:
+    """Predict every training row with preprocessing + ``model`` fitted on the other folds.
+
+    Uses the shared folds of the training part (``load_folds()``) and never touches the
+    validation part – for analysing errors before the single :func:`run`. Fits exactly like
+    :func:`tune`/:func:`run` (``config.preprocessing``, ``config.balance_samples``); nothing is
+    tracked.
+
+    Args:
+        model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
+        config: Configuration the model was tuned or evaluated with, e.g. ``TuneResult.config``.
+
+    Returns:
+        Out-of-fold predictions with the columns ``Crop`` and ``Stage``, in the row order of
+            ``load_split().y_train``.
+    """
+    split = load_split()
+    predictions = []
+    for fold in load_folds():
+        y_fold = split.y_train.iloc[fold.train]
+        pipeline = _pipeline(model, config.preprocessing)
+        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        fold_index = split.X_train.index[fold.val]
+        predictions.append(
+            as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)
+        )
+    return pd.concat(predictions).loc[split.y_train.index]
+
+
 def _track_run(
     config: RunConfig,
     model: BaseEstimator,
@@ -300,7 +342,7 @@ def _track_run(
             experiment=config.experiment,
             name=config.name,
             approach=config.approach,
-            description=config.description,
+            description=_pipeline_summary(config, pipeline),
             params={**_shared_params(config), **estimator_params(model, "model")},
             metrics=scores,
             train=pd.concat([split.X_train, split.y_train], axis=1),
@@ -325,7 +367,7 @@ def _track_tuning(
             experiment=config.experiment,
             name=config.name,
             approach=config.approach,
-            description=config.description,
+            description=_pipeline_summary(config),
             params={**_shared_params(config), **estimator_params(model, "model")},
             metric=config.metric,
             candidates=candidates,

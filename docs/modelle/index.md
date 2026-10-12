@@ -9,6 +9,7 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 | [Ansätze](ansaetze/index.md) | Welche Strategien wir verfolgen – mit Begründung, Status und Entscheidung |
 | [Klassifikatoren](klassifikatoren.md) | Kandidaten nach Modellfamilie, Voraussetzungen und Priorität |
 | [Experimente](experimente.md) | Log aller Läufe mit Scores |
+| [Fehleranalyse](fehleranalyse.md) | Wo und warum die Ansätze falsch liegen – Vergleich Baseline, kombiniert, hierarchisch |
 
 ## Aktueller Stand
 

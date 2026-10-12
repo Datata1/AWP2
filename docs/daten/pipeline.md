@@ -64,6 +64,112 @@ lässt sich über `PreprocessingConfig(max_interpolation_gap_nm=...)` anpassen.
 `scale=True` werden diese beiden Merkmale mit dem Trainingsfold skaliert. Für den Vergleich mit
 der numerischen Monatszahl kann `PreprocessingConfig(use_cyclic_month=False)` gesetzt werden.
 
+### Ablauf der Vorverarbeitung
+
+Datensicht: durchgezogen = immer, gestrichelt = optional (entfällt wenn deaktiviert),
+Rauten = Verzweigung (Skalierung: genau eine Option, Reduktion: höchstens eine, Monat:
+je nach `use_cyclic_month`). Jedes Kästchen nennt seine `PreprocessingConfig`-Felder.
+Grafik generiert (`pipeline_options_diagram`) – bei Pipeline-Änderungen neu erzeugen,
+`tools/check_pipeline_diagram.py` (CI) prüft Stand und Vollständigkeit:
+
+```bash
+uv run python -c "from awp2.preprocessing import pipeline_options_diagram; print(pipeline_options_diagram())"
+```
+
+<!-- pipeline-options-diagram:start -->
+```mermaid
+flowchart TD
+    X["Rohdaten (Meta + Bänder)"]
+    subgraph meta
+        n_aez_aez["AEZ one-hot [use_meta]"]
+        d_month{"Monat [use_meta]"}
+        n_month_cyclic["Monat sin/cos [use_cyclic_month]"]
+        n_month_month["Monat numerisch [use_cyclic_month = False]"]
+    end
+    subgraph albedo
+        n_albedo_drop_empty["Leere Bänder entfernen (immer)"]
+        n_albedo_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_albedo_albedo["Mean Albedo [use_mean_albedo]"]
+    end
+    subgraph indizes
+        n_indices_drop_empty["Leere Bänder entfernen (immer)"]
+        n_indices_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_indices_indices["Vegetationsindizes [use_vegetation_indices]"]
+        n_indices_select["Nur Indizes behalten"]
+    end
+    subgraph spektren
+        n_spectra_drop_empty["Leere Bänder entfernen (immer)"]
+        n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_spectra_savgol["Savitzky-Golay [use_savgol + savgol_window_length + savgol_polyorder]"]
+        n_spectra_snv["SNV [use_spectral_snv]"]
+    end
+    subgraph skalierung
+        d_scaler{"Skalierung (XOR)"}
+        n_spectra_standard_scale["Standard [use_spectral_standard_scale]"]
+        n_spectra_minmax_scale["Min-Max [use_spectral_minmax_scale]"]
+        n_spectra_centering["Zentrierung [use_spectral_centering]"]
+        n_spectra_no_scaler["keine Skalierung [Standard]"]
+    end
+    subgraph reduktion
+        d_reduction{"Reduktion (max. eine)"}
+        n_spectra_pca["PCA [spectral_pca_components | braucht Standard/Center]"]
+        n_spectra_ica["ICA [spectral_ica_components | braucht Standard/Center]"]
+        n_spectra_nmf["NMF [spectral_nmf_components | nur roh: ohne SG/SNV/Skalierer/Indizes]"]
+        n_spectra_osp["OSP [spectral_osp_components | nur roh: ohne SNV/Skalierer/Indizes]"]
+        n_spectra_lpp["LPP [spectral_lpp_components + spectral_lpp_neighbors]"]
+        n_spectra_vsrp["VSRP [spectral_vsrp_components]"]
+        n_spectra_dbn["DBN [spectral_dbn_layers | braucht Min-Max]"]
+        n_spectra_no_reduction["keine Reduktion [Standard]"]
+    end
+        d_concat["Merkmale (verkettet)"]
+    X -.-> n_aez_aez
+    X -.-> d_month
+    d_month -->|"Standard"| n_month_cyclic
+    d_month -->|"False"| n_month_month
+    X --> n_albedo_drop_empty
+    X --> n_indices_drop_empty
+    X --> n_spectra_drop_empty
+    n_albedo_drop_empty --> n_albedo_interpolate
+    n_albedo_interpolate -.-> n_albedo_albedo
+    n_indices_drop_empty --> n_indices_interpolate
+    n_indices_interpolate -.-> n_indices_indices
+    n_indices_indices --> n_indices_select
+    n_spectra_drop_empty --> n_spectra_interpolate
+    n_spectra_interpolate -.-> n_spectra_savgol
+    n_spectra_savgol -.-> n_spectra_snv
+    n_spectra_snv --> d_scaler
+    d_scaler --> n_spectra_standard_scale
+    n_spectra_standard_scale --> d_reduction
+    d_scaler --> n_spectra_minmax_scale
+    n_spectra_minmax_scale --> d_reduction
+    d_scaler --> n_spectra_centering
+    n_spectra_centering --> d_reduction
+    d_scaler --> n_spectra_no_scaler
+    n_spectra_no_scaler --> d_reduction
+    d_reduction --> n_spectra_pca
+    n_spectra_pca --> d_concat
+    d_reduction --> n_spectra_ica
+    n_spectra_ica --> d_concat
+    d_reduction --> n_spectra_nmf
+    n_spectra_nmf --> d_concat
+    d_reduction --> n_spectra_osp
+    n_spectra_osp --> d_concat
+    d_reduction --> n_spectra_lpp
+    n_spectra_lpp --> d_concat
+    d_reduction --> n_spectra_vsrp
+    n_spectra_vsrp --> d_concat
+    d_reduction --> n_spectra_dbn
+    n_spectra_dbn --> d_concat
+    d_reduction --> n_spectra_no_reduction
+    n_spectra_no_reduction --> d_concat
+    n_aez_aez --> d_concat
+    n_month_cyclic --> d_concat
+    n_month_month --> d_concat
+    n_albedo_albedo --> d_concat
+    n_indices_select --> d_concat
+```
+<!-- pipeline-options-diagram:end -->
+
 ### Dimensionsreduktion
 
 Alle Verfahren fassen die 131 Bänder als letzter Spektral-Schritt zusammen; gleichzeitig ist
