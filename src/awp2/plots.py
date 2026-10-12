@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.container import BarContainer
 
-from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI, TARGET_COLS
+from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI, RECALL_COL, SUPPORT_COL, TARGET_COLS
 from awp2.data import band_columns, wavelengths
-from awp2.evaluation import METRIC_LABELS, MetricName, Metrics
+from awp2.evaluation import METRIC_LABELS, ErrorBreakdown, MetricName, Metrics
 
 
 def plot_spectra(
@@ -132,6 +132,41 @@ def plot_tuning_candidates(
     return ax
 
 
+def plot_cv_scores(
+    candidates: Mapping[str, pd.DataFrame],
+    reference: float | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Compare the best cross-validation score of several searches, e.g. preprocessing variants.
+
+    Args:
+        candidates: ``TuneResult.candidates`` per search, keyed by the label to show.
+        reference: CV score drawn as a dashed line, e.g. the variant everything is compared to.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one horizontal bar (best mean ± its std over the folds) per search, best on
+            top and the value written next to each bar.
+    """
+    best = pd.DataFrame(
+        {
+            label: table.loc[table["rank"].idxmin(), ["mean", "std"]]
+            for label, table in candidates.items()
+        }
+    ).T.sort_values("mean")
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 0.5 * len(best) + 1.5))
+    bars = ax.barh(best.index, best["mean"], xerr=best["std"], color="C0", capsize=3)
+    ax.bar_label(bars, fmt="%.3f", fontsize="small", padding=12)
+    if reference is not None:
+        ax.axvline(reference, color="black", linestyle="--", linewidth=1)
+    lower = (best["mean"] - best["std"]).min()
+    ax.set_xlim(max(0.0, lower - 0.02), min(1.0, (best["mean"] + best["std"]).max() + 0.03))
+    ax.set_xlabel("Bester CV-Score (Mittelwert ± Std über die Folds)")
+    ax.grid(axis="x", alpha=0.3)
+    return ax
+
+
 def plot_class_recall(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> plt.Figure:
     """Recall per class for crop and stage – which classes the model finds worst.
 
@@ -194,3 +229,116 @@ def save_doc_figure(fig: plt.Figure, name: str, directory: Path = DOCS_FIGURES_D
     """
     directory.mkdir(parents=True, exist_ok=True)
     fig.savefig(directory / f"{name}.png", dpi=FIGURE_DPI, bbox_inches="tight")
+
+
+_ERROR_SHARE_LABELS = {
+    "both_correct": "beides richtig",
+    "stage_only_wrong": "nur Stadium falsch",
+    "crop_wrong": "Kultur falsch",
+}
+_ERROR_SHARE_COLORS = ("C2", "C1", "C3")
+_MIN_LABELLED_SHARE = 0.05  # narrower segments are too small for a readable label
+
+
+def plot_error_breakdown(
+    breakdowns: Mapping[str, ErrorBreakdown], ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Compare where the errors of several models come from as stacked bars.
+
+    Args:
+        breakdowns: ``error_breakdown()`` per model, keyed by the label to show.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one bar per model, split into fully correct, stage-only and crop errors.
+    """
+    table = pd.DataFrame(
+        {label: breakdown.model_dump() for label, breakdown in breakdowns.items()}
+    ).T[list(_ERROR_SHARE_LABELS)]
+    table.columns = list(_ERROR_SHARE_LABELS.values())
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 0.6 * len(table) + 1.5))
+    table.plot.barh(stacked=True, ax=ax, color=_ERROR_SHARE_COLORS, width=0.7)
+    for container in ax.containers:
+        if isinstance(container, BarContainer):
+            labels = [
+                f"{bar.get_width():.2f}" if bar.get_width() >= _MIN_LABELLED_SHARE else ""
+                for bar in container
+            ]
+            ax.bar_label(container, labels=labels, label_type="center", fontsize="small")
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Anteil der Zeilen")
+    ax.legend(
+        fontsize="small", loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(table.columns)
+    )
+    ax.invert_yaxis()
+    return ax
+
+
+def plot_recall_comparison(
+    recalls: Mapping[str, pd.DataFrame], top: int | None = None
+) -> plt.Figure:
+    """Compare the recall per combined crop/stage class of several models.
+
+    Args:
+        recalls: ``recall_by_class()`` per model, keyed by the label to show; all for the same
+            samples.
+        top: Show only the classes where the models differ most (recommended with many
+            classes); all classes if omitted.
+
+    Returns:
+        Figure with one group of horizontal bars per class (support in the label), classes
+            ordered by the largest recall difference between the models.
+
+    Raises:
+        ValueError: If the tables do not cover the same samples or ``top`` is not positive.
+    """
+    if top is not None and top < 1:
+        raise ValueError(f"top must be positive, got {top}.")
+    supports = [recall[SUPPORT_COL].sort_index() for recall in recalls.values()]
+    if not all(support.equals(supports[0]) for support in supports):
+        raise ValueError("All recall tables must come from the same samples.")
+    support = supports[0]
+    table = pd.DataFrame({label: recall[RECALL_COL] for label, recall in recalls.items()})
+    spread = table.max(axis=1) - table.min(axis=1)
+    table = table.loc[spread.sort_values(ascending=False).index[:top]].iloc[::-1]
+    table.index = [f"{pair} (n={support[pair]})" for pair in table.index]
+    bar_height = 0.225
+    fig, ax = plt.subplots(figsize=(9, bar_height * len(table) * len(recalls) + 1.5))
+    table.plot.barh(ax=ax, width=0.8)
+    ax.set_xlim(0, 1.05)
+    ax.set_xlabel("Recall")
+    ax.legend(fontsize="small", loc="upper left", bbox_to_anchor=(1, 1))
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    return fig
+
+
+def plot_error_rate_by(
+    errors: Mapping[str, pd.Series],
+    groups: pd.Series,
+    xlabel: str | None = None,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Compare how the error rate of several models changes over a context such as month or AEZ.
+
+    Args:
+        errors: Per model a boolean Series (``True`` = wrong), aligned with ``groups``.
+        groups: Context value per sample, e.g. ``X_val["Month"]``.
+        xlabel: Label of the x axis; the name of ``groups`` if omitted.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with one group of bars per context value, its sample count in the tick label.
+    """
+    table = pd.DataFrame({label: error.groupby(groups).mean() for label, error in errors.items()})
+    counts = groups.value_counts()
+    table.index = [f"{value}\n(n={counts[value]})" for value in table.index]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(max(6, 0.9 * len(table) + 2), 4))
+    table.plot.bar(ax=ax, rot=0, width=0.8)
+    ax.set_xlabel(xlabel or str(groups.name))
+    ax.set_ylabel("Fehlerrate")
+    ax.legend(fontsize="small")
+    ax.grid(axis="y", alpha=0.3)
+    return ax

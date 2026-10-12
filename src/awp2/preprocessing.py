@@ -2,6 +2,7 @@
 
 import re
 import warnings
+from dataclasses import dataclass
 from typing import Self
 
 import numpy as np
@@ -21,6 +22,7 @@ from awp2.config import (
     AEZ_COL,
     BAND_PATTERN,
     BAND_PREFIX,
+    MEAN_ALBEDO_COL,
     MONTH_COL,
     MONTH_COS_COL,
     MONTH_SIN_COL,
@@ -551,41 +553,17 @@ class DeepBeliefFeatures(_BandTransformer):
         return pd.DataFrame(activations, index=X.index, columns=self.feature_names_out_)
 
 
-class StandardNormalVariate(_BandTransformer):
-    """Normalise each spectrum to zero mean and unit standard deviation."""
+def ndvi(bands: pd.DataFrame) -> pd.Series:
+    """Normalised difference vegetation index – a proxy for green vegetation cover.
 
-    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
-        """Record the spectral input schema.
+    Args:
+        bands: Reflectance with at least the columns ``NDVI_NIR_BAND`` and ``NDVI_RED_BAND``.
 
-        Args:
-            X: Complete band columns after missing-value processing.
-            y: Ignored; accepted for sklearn compatibility.
-
-        Returns:
-            This fitted transformer.
-        """
-        X = self._check(X)
-        self._set_input(X)
-        self.feature_names_out_ = list(X.columns)
-        return self
-
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Apply Standard Normal Variate to each spectrum.
-
-        Args:
-            X: Complete band columns with the fitted schema.
-
-        Returns:
-            Spectra with zero row mean and unit row standard deviation.
-
-        Raises:
-            ValueError: If a spectrum has no variation across its bands.
-        """
-        X = self._check(X)
-        row_std = X.std(axis=1)
-        if row_std.eq(0).any():
-            raise ValueError("Standard Normal Variate requires variation across every spectrum.")
-        return X.sub(X.mean(axis=1), axis=0).div(row_std, axis=0)
+    Returns:
+        NDVI per row, between -1 and 1 (bare soil about 0.1-0.2, dense canopy above 0.6).
+    """
+    nir, red = bands[NDVI_NIR_BAND], bands[NDVI_RED_BAND]
+    return (nir - red) / (nir + red)
 
 
 class AddVegetationIndices(_BandTransformer):
@@ -624,8 +602,7 @@ class AddVegetationIndices(_BandTransformer):
         X = self._check(X)
         indices = pd.DataFrame(
             {
-                "NDVI": (X[NDVI_NIR_BAND] - X[NDVI_RED_BAND])
-                / (X[NDVI_NIR_BAND] + X[NDVI_RED_BAND]),
+                "NDVI": ndvi(X),
                 "NDRE": (X[NDVI_NIR_BAND] - X[NDRE_RED_EDGE_BAND])
                 / (X[NDVI_NIR_BAND] + X[NDRE_RED_EDGE_BAND]),
                 "PRI": (X[PRI_FIRST_BAND] - X[PRI_SECOND_BAND])
@@ -636,6 +613,59 @@ class AddVegetationIndices(_BandTransformer):
             index=X.index,
         )
         return pd.concat([X, indices], axis=1)
+
+
+class SelectVegetationIndices(TransformerMixin, BaseEstimator):
+    """Keep only the vegetation index columns computed by AddVegetationIndices."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the index columns.
+
+        Args:
+            X: Bands plus vegetation indices, as produced by ``AddVegetationIndices``.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If any vegetation index column is missing.
+        """
+        self._check(X)
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Return only the vegetation index columns, dropping the bands.
+
+        Args:
+            X: Bands plus vegetation indices, as produced by ``AddVegetationIndices``.
+
+        Returns:
+            The four index columns.
+        """
+        return self._check(X)[list(VEGETATION_INDEX_NAMES)]
+
+    @staticmethod
+    def _check(X: pd.DataFrame) -> pd.DataFrame:
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError(f"Expected a pandas DataFrame, got {type(X)}.")
+        missing = [c for c in VEGETATION_INDEX_NAMES if c not in X.columns]
+        if missing:
+            raise ValueError(f"Missing vegetation index columns: {missing}")
+        return X
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The four vegetation index names.
+        """
+        return np.asarray(VEGETATION_INDEX_NAMES, dtype=object)
 
 
 class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
@@ -702,6 +732,54 @@ class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
         return np.asarray([MONTH_SIN_COL, MONTH_COS_COL], dtype=object)
 
 
+class MeanAlbedo(TransformerMixin, BaseEstimator):
+    """Per-spectrum mean reflectance (albedo) as one extra feature.
+
+    SNV removes brightness by construction, so the row-wise mean is kept in its own
+    column to stay available to the model. Runs after interpolation in its own branch,
+    in parallel to the spectra branch, so missing values never bias the mean.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Validate the band columns and store their names.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        bands = _BandTransformer._check(X)
+        self.feature_names_in_ = np.asarray(bands.columns, dtype=object)
+        self.n_features_in_ = bands.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Return the mean across the available (non-missing) bands per spectrum.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column, ``mean_albedo``; fully missing spectra give NaN.
+        """
+        bands = _BandTransformer._check(X)
+        means = np.nanmean(bands.to_numpy(dtype=float), axis=1)
+        return pd.DataFrame({MEAN_ALBEDO_COL: means}, index=X.index)
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The single mean-albedo column name.
+        """
+        return np.asarray([MEAN_ALBEDO_COL], dtype=object)
+
+
 class PreprocessingConfig(BaseModel):
     """Options of the standard preprocessing.
 
@@ -738,6 +816,11 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Subtract the per-band training mean without variance scaling "
         "(paper-faithful PCA input); mutually exclusive with the scalers.",
+    )
+    use_mean_albedo: bool = Field(
+        default=False,
+        description="Append the per-spectrum mean reflectance (mean albedo, computed "
+        "after interpolation) as an extra feature; preserves the brightness that SNV removes.",
     )
     use_savgol: bool = Field(
         default=False,
@@ -802,7 +885,8 @@ class PreprocessingConfig(BaseModel):
     )
     use_vegetation_indices: bool = Field(
         default=False,
-        description="Append EDA-defined NDVI, NDRE, PRI and NDWI to the spectral bands.",
+        description="Compute EDA-defined NDVI, NDRE, PRI and NDWI from interpolated bands "
+        "in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
     )
     use_cyclic_month: bool = Field(
         default=True,
@@ -955,8 +1039,6 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
-    if config.use_vegetation_indices:
-        spectra.append(("vegetation_indices", AddVegetationIndices()))
     if config.use_spectral_standard_scale or config.scale:
         spectra.append(("standard_scale", StandardScaler()))
     elif config.use_spectral_minmax_scale:
@@ -1002,6 +1084,424 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             transformers.append(
                 ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL])
             )
+    if config.use_mean_albedo:
+        transformers.append(
+            (
+                "albedo",
+                Pipeline(
+                    [
+                        ("drop_empty", DropEmptyBands()),
+                        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+                        ("albedo", MeanAlbedo()),
+                    ]
+                ),
+                make_column_selector(pattern=BAND_PATTERN),
+            )
+        )
+    if config.use_vegetation_indices:
+        transformers.append(
+            (
+                "indices",
+                Pipeline(
+                    [
+                        ("drop_empty", DropEmptyBands()),
+                        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+                        ("indices", AddVegetationIndices()),
+                        ("select", SelectVegetationIndices()),
+                    ]
+                ),
+                make_column_selector(pattern=BAND_PATTERN),
+            )
+        )
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
+
+
+def _describe_step(name: str, step: BaseEstimator | str) -> str:
+    if isinstance(step, str):
+        return f"Month {step}"
+    known: dict[str, str] = {
+        "drop_empty": "Drop empty bands",
+        "snv": "SNV scatter correction per spectrum",
+        "indices": "Vegetation indices NDVI, NDRE, PRI and NDWI (from interpolated bands)",
+        "standard_scale": "Standardize bands (per-band mean and std)",
+        "minmax_scale": "Min-max scale bands to [0, 1]",
+        "centering": "Center bands (per-band mean)",
+        "aez": "One-hot encode AEZ",
+        "albedo": "Mean albedo per spectrum (brightness after interpolation, before SNV)",
+        "cyclic": "Cyclic month encoding (sin/cos)",
+        "month": "Standardize month",
+        "scale": "Standardize month",
+    }
+    if name in known:
+        return known[name]
+    if name == "interpolate" and isinstance(step, InterpolateBands):
+        return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "select" and isinstance(step, SelectVegetationIndices):
+        return "Keep only the vegetation indices"
+    if name == "savgol" and isinstance(step, SavitzkyGolaySmoothing):
+        return (
+            f"Savitzky-Golay smoothing (window {step.window_length} bands, "
+            f"polyorder {step.polyorder})"
+        )
+    if name == "pca" and isinstance(step, PCA):
+        return f"PCA to {step.n_components} components"
+    if name == "ica" and isinstance(step, FastICA):
+        return f"ICA to {step.n_components} components"
+    if name == "nmf" and isinstance(step, NMF):
+        return f"NMF to {step.n_components} components"
+    if name == "osp" and isinstance(step, OrthogonalSubspaceProjection):
+        return f"OSP to {step.n_components} endmembers"
+    if name == "lpp" and isinstance(step, LocalityPreservingProjection):
+        return f"LPP to {step.n_components} components ({step.n_neighbors} neighbors)"
+    if name == "vsrp" and isinstance(step, VerySparseRandomProjection):
+        return f"VSRP to {step.n_components} components"
+    if name == "dbn" and isinstance(step, DeepBeliefFeatures):
+        layers = "x".join(str(size) for size in step.hidden_layers)
+        return f"DBN features ({layers})"
+    return type(step).__name__
+
+
+_BRANCH_LETTERS: dict[str, str] = {
+    "aez": "A",
+    "month": "B",
+    "albedo": "C",
+    "indices": "D",
+    "spectra": "E",
+}
+
+
+def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
+    r"""List the active preprocessing steps, grouped by independent branch.
+
+    Reads the built transformer, so optional steps appear only when enabled. Each
+    branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra)
+    and steps are numbered per branch from 1, so the labels stay comparable across
+    runs. Print the lines in the notebook to log which preprocessing a run used.
+
+    Args:
+        preprocessor: Built by ``build_preprocessor`` (fitting is not required).
+
+    Returns:
+        One labeled description per active step, e.g. ``"E3. PCA to 20 components"``.
+
+    Raises:
+        ValueError: If a branch has no letter yet (add one to ``_BRANCH_LETTERS``).
+
+    Example:
+        ```python
+        print("\\n".join(describe_preprocessor(build_preprocessor(
+            PreprocessingConfig(use_meta=True, use_spectral_snv=True)
+        ))))
+        ```
+    """
+    lines: list[str] = []
+    for branch_name, transformer, _columns in preprocessor.transformers:
+        if branch_name not in _BRANCH_LETTERS:
+            raise ValueError(f"describe_preprocessor needs a letter for branch: {branch_name}")
+        letter = _BRANCH_LETTERS[branch_name]
+        if isinstance(transformer, Pipeline):
+            steps: list[tuple[str, BaseEstimator | str]] = list(transformer.steps)
+        else:
+            steps = [(branch_name, transformer)]
+        for number, (step_name, step) in enumerate(steps, start=1):
+            lines.append(f"{letter}{number}. {_describe_step(step_name, step)}")
+    return lines
+
+
+def pipeline_diagram(config: PreprocessingConfig | None = None) -> str:
+    """Mermaid flowchart of the built preprocessor, one node per step.
+
+    Mechanical dump of ``build_preprocessor``: parallel branches as subgraphs, steps
+    chained in order, labels shared with ``describe_preprocessor``. Inspects one
+    rendered config; for the full option map see ``pipeline_options_diagram``.
+
+    Args:
+        config: Options; the defaults of ``PreprocessingConfig`` if omitted.
+
+    Returns:
+        Complete mermaid code block for the docs.
+    """
+    preprocessor = build_preprocessor(config or PreprocessingConfig())
+    diagram: list[str] = ["```mermaid", "flowchart TD"]
+    diagram.append('    X["Eingang: Metadaten + Bänder"]')
+    edges: list[str] = []
+    for branch_name, transformer, _columns in preprocessor.transformers:
+        steps: list[tuple[str, BaseEstimator | str]]
+        if isinstance(transformer, Pipeline):
+            steps = list(transformer.steps)
+        else:
+            steps = [(branch_name, transformer)]
+        diagram.append(f"    subgraph {branch_name}")
+        node_ids: list[str] = []
+        for position, (step_name, step) in enumerate(steps):
+            node_id = f"n_{branch_name}_{position}"
+            label = _describe_step(step_name, step).replace('"', "'")
+            diagram.append(f'        {node_id}["{label}"]')
+            node_ids.append(node_id)
+        for source, target in zip(node_ids, node_ids[1:], strict=False):
+            diagram.append(f"        {source} --> {target}")
+        diagram.append("    end")
+        edges.append(f"    X --> {node_ids[0]}")
+        edges.append(f"    {node_ids[-1]} --> FEATURES")
+    diagram.extend(edges)
+    diagram.append('    FEATURES["Modellmerkmale (verkettet)"]')
+    diagram.append("```")
+    return "\n".join(diagram)
+
+
+@dataclass(frozen=True)
+class _OptionNode:
+    """One box in the options diagram, addressed in built-preprocessor coordinates."""
+
+    branch: str
+    step: str
+    label: str
+    optional: bool
+    diamond: bool = False
+
+
+def _config_fields(*names: str) -> str:
+    unknown = sorted(name for name in names if name not in PreprocessingConfig.model_fields)
+    if unknown:
+        raise ValueError(f"unknown PreprocessingConfig field: {unknown}")
+    return " + ".join(names)
+
+
+_META_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("aez", "aez", f"AEZ one-hot [{_config_fields('use_meta')}]", True),
+    _OptionNode(
+        "month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False
+    ),
+    _OptionNode("month", "month", "Monat numerisch [use_cyclic_month = False]", False),
+)
+
+_ALBEDO_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("albedo", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "albedo",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        False,
+    ),
+    _OptionNode("albedo", "albedo", f"Mean Albedo [{_config_fields('use_mean_albedo')}]", True),
+)
+
+_SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("spectra", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "spectra",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "savgol",
+        "Savitzky-Golay ["
+        + _config_fields("use_savgol", "savgol_window_length", "savgol_polyorder")
+        + "]",
+        True,
+    ),
+    _OptionNode("spectra", "snv", f"SNV [{_config_fields('use_spectral_snv')}]", True),
+)
+
+_INDICES_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("indices", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "indices",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        False,
+    ),
+    _OptionNode(
+        "indices",
+        "indices",
+        "Vegetationsindizes [" + _config_fields("use_vegetation_indices") + "]",
+        True,
+    ),
+    _OptionNode("indices", "select", "Nur Indizes behalten", False),
+)
+
+_SCALER_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode(
+        "spectra",
+        "standard_scale",
+        f"Standard [{_config_fields('use_spectral_standard_scale')}]",
+        False,
+    ),
+    _OptionNode(
+        "spectra", "minmax_scale", f"Min-Max [{_config_fields('use_spectral_minmax_scale')}]", False
+    ),
+    _OptionNode(
+        "spectra", "centering", f"Zentrierung [{_config_fields('use_spectral_centering')}]", False
+    ),
+    _OptionNode("spectra", "no_scaler", "keine Skalierung [Standard]", False),
+)
+
+_REDUCTION_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode(
+        "spectra",
+        "pca",
+        f"PCA [{_config_fields('spectral_pca_components')} | braucht Standard/Center]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "ica",
+        f"ICA [{_config_fields('spectral_ica_components')} | braucht Standard/Center]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "nmf",
+        "NMF ["
+        + _config_fields("spectral_nmf_components")
+        + " | nur roh: ohne SG/SNV/Skalierer/Indizes]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "osp",
+        f"OSP [{_config_fields('spectral_osp_components')} | nur roh: ohne SNV/Skalierer/Indizes]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "lpp",
+        f"LPP [{_config_fields('spectral_lpp_components', 'spectral_lpp_neighbors')}]",
+        False,
+    ),
+    _OptionNode("spectra", "vsrp", f"VSRP [{_config_fields('spectral_vsrp_components')}]", False),
+    _OptionNode(
+        "spectra",
+        "dbn",
+        f"DBN [{_config_fields('spectral_dbn_layers')} | braucht Min-Max]",
+        False,
+    ),
+    _OptionNode("spectra", "no_reduction", "keine Reduktion [Standard]", False),
+)
+
+_DIAMONDS: tuple[_OptionNode, ...] = (
+    _OptionNode("", "month", "Monat [use_meta]", True, True),
+    _OptionNode("", "scaler", "Skalierung (XOR)", False, True),
+    _OptionNode("", "reduction", "Reduktion (max. eine)", False, True),
+)
+
+
+def _diagram_steps() -> set[tuple[str, str]]:
+    """Built-preprocessor coordinates shown in the options diagram (CI coverage probe).
+
+    Includes the "keine" placeholders, which are diagram connectors the builder never
+    produces; the legacy ``scale`` path is intentionally absent (deprecated).
+
+    Returns:
+        (branch, step) pairs covered by the options diagram.
+    """
+    lanes = (
+        _META_NODES,
+        _ALBEDO_NODES,
+        _INDICES_NODES,
+        _SPECTRA_PREFIX_NODES,
+        _SCALER_NODES,
+        _REDUCTION_NODES,
+    )
+    return {(node.branch, node.step) for lane in lanes for node in lane}
+
+
+def _node_id(node: _OptionNode) -> str:
+    return f"n_{node.branch}_{node.step}" if node.branch else f"d_{node.step}"
+
+
+def _node_line(node: _OptionNode) -> str:
+    label = node.label.replace('"', "'")
+    shape = ("{", "}") if node.diamond else ("[", "]")
+    return f'        {_node_id(node)}{shape[0]}"{label}"{shape[1]}'
+
+
+def pipeline_options_diagram() -> str:
+    """Mermaid option map of the preprocessing: data-flow order, fields, XOR splits.
+
+    Shows every step ``build_preprocessor`` can produce (not one rendered config):
+    dashed edges mark optional steps, diamonds mark exclusive choices, and each box
+    names its ``PreprocessingConfig`` fields. Paste the output into
+    ``docs/daten/pipeline.md`` (between the ``pipeline-options-diagram`` markers);
+    ``tools/check_pipeline_diagram.py`` guards freshness and step coverage.
+
+    Returns:
+        Complete mermaid code block for the docs.
+    """
+    aez, cyclic, numeric = _META_NODES
+    a_drop, a_inter, albedo = _ALBEDO_NODES
+    i_drop, i_inter, indices, select = _INDICES_NODES
+    s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
+    month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
+
+    diagram: list[str] = ["```mermaid", "flowchart TD"]
+    diagram.append('    X["Rohdaten (Meta + Bänder)"]')
+    diagram.append("    subgraph meta")
+    diagram.append(_node_line(aez))
+    diagram.append(_node_line(month_diamond))
+    diagram.append(_node_line(cyclic))
+    diagram.append(_node_line(numeric))
+    diagram.append("    end")
+    diagram.append("    subgraph albedo")
+    for node in _ALBEDO_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph indizes")
+    for node in _INDICES_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph spektren")
+    for node in _SPECTRA_PREFIX_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph skalierung")
+    diagram.append(_node_line(scaler_diamond))
+    for node in _SCALER_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph reduktion")
+    diagram.append(_node_line(reduction_diamond))
+    for node in _REDUCTION_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    concat = _OptionNode("", "concat", "Merkmale (verkettet)", False)
+    diagram.append(_node_line(concat))
+
+    edges: list[str] = []
+
+    def link(source: str, target: _OptionNode, text: str | None = None) -> None:
+        arrow = "-.->" if target.optional else "-->"
+        head = f'|"{text}"|' if text else ""
+        edges.append(f"    {source} {arrow}{head} {_node_id(target)}")
+
+    link("X", aez)
+    link("X", month_diamond)
+    link(_node_id(month_diamond), cyclic, "Standard")
+    link(_node_id(month_diamond), numeric, "False")
+    link("X", a_drop)
+    link("X", i_drop)
+    link("X", s_drop)
+    link(_node_id(a_drop), a_inter)
+    link(_node_id(a_inter), albedo)
+    link(_node_id(i_drop), i_inter)
+    link(_node_id(i_inter), indices)
+    link(_node_id(indices), select)
+    link(_node_id(s_drop), s_inter)
+    link(_node_id(s_inter), savgol)
+    link(_node_id(savgol), snv)
+    link(_node_id(snv), scaler_diamond)
+    for node in _SCALER_NODES:
+        link(_node_id(scaler_diamond), node)
+        link(_node_id(node), reduction_diamond)
+    for node in _REDUCTION_NODES:
+        link(_node_id(reduction_diamond), node)
+        link(_node_id(node), concat)
+    for node in (aez, cyclic, numeric, albedo, select):
+        link(_node_id(node), concat)
+    diagram.extend(edges)
+    diagram.append("```")
+    return "\n".join(diagram)
