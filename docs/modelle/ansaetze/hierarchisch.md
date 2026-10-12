@@ -138,6 +138,63 @@ gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
 
 ![Weiches Routing: CV-Kandidaten](../img/hierarchical_soft_tuning.png)
 
+### RBF-SVM → RBF-SVM: Tuning und Vorverarbeitung
+
+Notebook: `notebooks/09_jd_hierarchical_tuning.ipynb` (#89). Jede Entscheidung per CV; ein
+Gewinn unter 0.005 gilt als Rauschen (Std der Referenz über die Folds 0.010).
+
+| Schritt | Ergebnis (CV kombiniert) | MLflow |
+| --- | --- | --- |
+| Erweitertes Raster (Stadium `C` bis 1000, `gamma` bis 0.0003) | 0.840 ± 0.020 mit Stadium `C=1000` (Referenz 0.839 ± 0.010) | `ed78855f` |
+| *Ablationen unten: je eine Änderung auf Stadium `C=1000` (Basis 0.840), `gamma` bisher/`scale`* | | |
+| Savitzky-Golay (Fenster 5, Grad 2) | 0.842 | `5a21e11a` |
+| PCA 60 / 30 / 15 | 0.840 / 0.839 / 0.831 | `58b2f7e9` / `4c8cdc20` / `715d5390` |
+| Monat numerisch statt zyklisch | 0.839 | `a3d29cf0` |
+| Vegetationsindizes | 0.839 | `7e153174` |
+| SNV | 0.822 | `c81bd2e6` |
+
+![Vorverarbeitung je Variante](../img/hierarchical_preprocessing.png)
+
+- **Kein Hebel:** Weder das größere Raster noch eine Vorverarbeitungs-Variante gewinnt mehr als
+  das Rauschen; daher keine Kombination. Die Pipeline-Optionen aus #83 bringen für diese SVM
+  nichts – die standardisierten Rohspektren reichen. Die Varianten hatten je 4, die Basis 36
+  Kandidaten; der Vergleich begünstigt eher die Basis, das Ergebnis ist also konservativ.
+- **Plateau statt Optimum:** Stadium `C=1000` liegt wieder am Rasterrand, die Scores sind aber
+  flach (`C=300`: 0.839, `C=1000`: 0.840) – größere Werte versprechen keinen Gewinn.
+- **SNV schadet deutlich** (−0.018, in 4 von 5 Folds schlechter), vermutlich weil die absolute
+  Helligkeit Information über Kultur und Stadium trägt (z. B. Biomasse), die SNV entfernt –
+  nicht eigens getestet. PCA mit 15 Komponenten verliert ebenfalls (−0.009).
+- **Zyklischer vs. numerischer Monat ist egal** (0.839 vs. 0.840); die Variante nutzt das
+  veraltete `scale=True` und ändert damit Kodierung und Skalierung des Monats. Der Unterschied
+  zwischen `combined_svm_expanded` und den hierarchischen Läufen liegt nicht an der
+  Monatskodierung.
+- Das erweiterte Raster wählte Stadium `C=1000`: +0.001 liegt unter der Schwelle von 0.005, und
+  die Fold-Differenzen zur Referenz wechseln das Vorzeichen (−0.025, −0.004, +0.007, +0.011,
+  +0.016). Weil die Schwelle in diesem Schritt fehlte, wurde es dennoch einmal bewertet:
+  `hierarchical_svm_tuned` (MLflow `f2d755a7`) erreicht Crop 0.920, Stage 0.898, **kombiniert
+  0.839**. `hierarchical_svm` bleibt Referenz – begründet durch die CV, nicht durch die
+  Validierung.
+
+![Erweitertes Raster](../img/hierarchical_wide_tuning.png)
+
+**Schwache Kultur: Baumwolle.** Stadium-BAcc je Kultur auf den Zeilen mit richtig erkannter
+Kultur (out-of-fold, Trainingsteil, `out_of_fold_predictions`, Referenzmodell
+`hierarchical_svm`):
+
+| Kultur | Stadium-BAcc | Zeilen | schwächste Stadien (Recall, Zeilen) |
+| --- | --- | --- | --- |
+| corn | 0.964 | 1344 | Mature_Senesc 0.91 (233) |
+| cotton | **0.837** | 423 | Mature_Senesc 0.75 (36), Emerge_VEarly 0.82 (113), Critical 0.84 (98) |
+| rice | 1.000 | 65 | – |
+| soybean | 0.932 | 1069 | Mature_Senesc 0.85 (95), Emerge_VEarly 0.90 (52) |
+| winter_wheat | 0.981 | 692 | – |
+
+Baumwolle/Harvest (7 Zeilen, Recall 0.86) ist zu selten für eine belastbare Aussage.
+
+Die Stadium-Modelle von Baumwolle und Soja sind die Schwachstelle nach der Kulturstufe; Reis ist
+trotz nur 66 Zeilen perfekt. Eigene Hyperparameter je Kultur unterstützt
+`HierarchicalClassifier` noch nicht – ein möglicher nächster Schritt, Ursachen in #32.
+
 ### Extra Trees → RBF-SVM
 
 - Suche `hierarchical_et_svm_search` (24 Kandidaten, MLflow `c3f13a6e`): Kultur
@@ -161,11 +218,16 @@ gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
 
 ## Fazit
 
-**Vorläufig (#87):** Hierarchisch mit RBF-SVM auf beiden Stufen liegt in der CV knapp hinter
-der kombinierten SVM (0.839 vs. 0.845, im Rauschen) – nicht besser. Die Stadium-Modelle sind stark (Oracle-Kultur 0.939); der
-Ansatz verliert fast alles an der Kulturstufe, deren Fehler sich hart ins Stadium fortpflanzen.
-Weiches Routing über Wahrscheinlichkeiten (#88) senkt die Fehlerfortpflanzung mit den
-kalibrierten SVM-Wahrscheinlichkeiten nicht: Die Kultur-SVM ist auch bei Fehlern so sicher, dass
-das Stadium sie kaum überstimmt (CV 0.840 vs. 0.839, Validierung 0.844 wie hart – im Rauschen).
-Hartes Routing bleibt als einfachere Variante die Referenz. Nächste Schritte: erweiterte SVM-Suche und
-Vorverarbeitung (#89), Ursachen der Kulturfehler in der Fehleranalyse (#32).
+**Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,
+Validierung 0.844) liegt in der CV knapp hinter der kombinierten SVM mit gleicher
+Vorverarbeitung (0.839 vs. 0.845, im Rauschen) – gleichwertig, aber nicht besser.
+
+- **Engpass Kulturstufe:** Mit der wahren Kultur wären es 0.939; Kulturfehler pflanzen sich hart
+  ins Stadium fort.
+- **Weiches Routing (#88) hilft nicht** mit den kalibrierten SVM-Wahrscheinlichkeiten: Die
+  Kultur-SVM ist auch bei Fehlern so sicher, dass das Stadium sie kaum überstimmt.
+- **Tuning und Vorverarbeitung (#89) bringen keinen Gewinn** über das Rauschen; SNV schadet.
+- **Schwachstelle nach der Kultur:** die Stadium-Modelle von Baumwolle (0.84) und Soja (0.93),
+  vor allem Mature_Senesc.
+
+Ursachen der Kultur- und Stadiumfehler im Vergleich der Ansätze: Fehleranalyse (#32).
