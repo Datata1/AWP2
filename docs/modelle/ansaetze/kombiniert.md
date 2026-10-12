@@ -221,10 +221,10 @@ die Spektralbänder; AEZ und Month werden im parallelen Metadatenzweig unveränd
     Ausgabekomponenten. PCA-20 gewinnt mit `C=300.0`, `gamma=0.001` und CV-BAcc kombiniert
     0,8531 vor PCA-40 (0,8510) und PCA-80 (0,8485); der beste nicht-PCA-Kandidat ist ICA-20
     mit 0,8139.
-- Der einmalige Validierungslauf `combined_svm_spectral_reduction` (MLflow `c5c8ec2f`) erreicht
-    BAcc 0,923 für Crop, 0,902 für Stage und **0,863 kombiniert**. Das liegt 0,003 unter der
-    Rohspektren-Referenz (0,866); die Hypothese wird nicht gestützt und die Referenz bleibt
-    bestehen.
+- Der einmalige Validierungslauf `combined_svm_spectral_reduction` (MLflow `c5c8ec2f`, Tuning
+    `combined_svm_reduction_pca_20_search`, `13661b7e`) erreicht BAcc 0,923 für Crop, 0,902 für
+    Stage und **0,863 kombiniert**. Das liegt 0,003 unter der Rohspektren-Referenz (0,866); die
+    Hypothese wird nicht gestützt und die Referenz bleibt bestehen.
 - Alle vorhergesagten Crop/Stage-Paare sind gültig. Häufigste Verwechslungen sind
     Winterweizen → Baumwolle (37), Soja → Mais (31) und Critical → Mature_Senesc (21).
 
