@@ -266,6 +266,24 @@ Priors – ein Standard der Spektroskopie.
 
 ![PLS-DA: Fehlerzerlegung](../img/hierarchical_plsda_breakdown.png)
 
+### kNN → kNN
+
+Notebook: `notebooks/14_jd_hierarchical_knn.ipynb` (#101). k-Nearest Neighbors klassifiziert über
+die ähnlichsten Trainingsspektren; der Kosinus-Abstand misst den Winkel zwischen Spektren
+(verwandt mit dem Spectral Angle Mapper). Klassengewichte gibt es nicht, `weights="distance"`
+mildert das nur.
+
+- Suche `hierarchical_knn_search` (64 Kandidaten): beide Stufen **1 Nachbar, Kosinus** –
+  **CV 0.742** (SVM 0.839). Kosinus schlägt euklidisch durchgehend: Die Form des Spektrums zählt
+  mehr als der absolute Abstand.
+- Validierung `hierarchical_knn` (MLflow `4be28bd7`): Crop 0.860, Stage 0.828, **kombiniert
+  0.704**; keine ungültigen Paare. McNemar gegen die SVM: 200 zu 63 Zeilen.
+- Der Abfall von der CV (0.742) zur Validierung (0.704) ist der größte der Serie – 1-NN hat eine
+  hohe Varianz. Anders als bei den linearen Modellen ist auch das Stadium schwach: mit wahrer
+  Kultur nur 0.839.
+
+![kNN: Fehlerzerlegung](../img/hierarchical_knn_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,
