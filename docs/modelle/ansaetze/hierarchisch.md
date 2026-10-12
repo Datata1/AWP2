@@ -248,6 +248,21 @@ mit `class_weight="balanced"` – die einfachste lineare Referenz mit Klassengew
 
 ![Logistische Regression: Fehlerzerlegung](../img/hierarchical_logreg_breakdown.png)
 
+### PLS-DA → PLS-DA
+
+Notebook: `notebooks/13_jd_hierarchical_plsda.ipynb` (#100). `PLSDAClassifier` verdichtet die
+Bänder per PLS überwacht auf wenige Komponenten und klassifiziert sie mit einer LDA mit gleichen
+Priors – ein Standard der Spektroskopie.
+
+- Suche `hierarchical_plsda_search` (25 Kandidaten): Kultur 120 Komponenten (Rasterrand, fast
+  alle Merkmale), Stadium 20 – **CV 0.678** (LDA 0.657, SVM 0.839).
+- Validierung `hierarchical_plsda` (MLflow `b3627b9c`): Crop 0.846, Stage 0.778, **kombiniert
+  0.686**; keine ungültigen Paare. McNemar gegen die SVM: 303 zu 55 Zeilen.
+- Die überwachte Verdichtung hilft kaum: Die Kulturstufe will fast alle Komponenten und landet
+  damit nahe an LDA auf allen Bändern. 20 % falsche Kultur, mit wahrer Kultur 0.898.
+
+![PLS-DA: Fehlerzerlegung](../img/hierarchical_plsda_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,
