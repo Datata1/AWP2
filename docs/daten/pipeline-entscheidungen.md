@@ -41,7 +41,10 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | NMF/OSP auf rohen Spektren | NMF braucht Nicht-Negativität (Reflektanz, multiplikative Updates), OSP die physikalischen Endmember – Standardisierung oder SNV würden beides zerstören |
 | DBN als gestapelte Bernoulli-RBMs aus sklearn | Volles DBN-Training (Fine-Tuning, CAE) braucht PyTorch/Keras; für den Methodenvergleich genügen RBM-Merkmale auf Min-Max-skalierten Bändern |
 | Zentrierung als Alternative zur Standardisierung | Zentrierung normiert keine Varianzen (schonender als Standardisierung); LPP läuft zusätzlich auch auf rohen Bändern |
+| Mean Albedo als Zusatzmerkmal (`use_mean_albedo`) | SNV entfernt die Helligkeit per Konstruktion; der Mittelwert über die interpolierten Bänder hält sie vor SNV als eigenes Merkmal fest |
+| Vegetationsindizes aus interpolierten Reflektanzen (eigener Zweig) | Indizes sind Verhältnisse physikalischer Reflektanzen; auf SNV-standardisierten Spektren (Mittelwert 0, Varianz 1) wären sie bedeutungslos – deshalb eigener Zweig mit denselben Daten wie die Albedo |
 | Optionen als pydantic-`PreprocessingConfig` | Tippfehler oder falsche Typen (`scale="yes"`) fallen sofort auf |
+| Pipeline-Grafik generiert (`pipeline_options_diagram`) | Handgezeichnete Grafiken veralten; die CI prüft Stand und Vollständigkeit (alle baubaren Schritte) |
 
 ## Klassenungleichgewicht
 
