@@ -284,6 +284,22 @@ mildert das nur.
 
 ![kNN: Fehlerzerlegung](../img/hierarchical_knn_breakdown.png)
 
+### MLP → MLP
+
+Notebook: `notebooks/15_jd_hierarchical_mlp.ipynb` (#102). Kleines neuronales Netz
+(`MLPClassifier`) je Stufe mit frühem Stoppen und ausgeglichenen Gewichten
+(`balance_samples=True`, je Stufe umskaliert).
+
+- Suche `hierarchical_mlp_search` (16 Kandidaten): beide Stufen zwei Schichten (256, 128)
+  (Rasterrand), Kultur `alpha=0.01`, Stadium `alpha=0.1` – **CV 0.789** (SVM 0.839).
+- Validierung `hierarchical_mlp` (MLflow `5aa76d10`): Crop 0.893, Stage 0.838, **kombiniert
+  0.787**; keine ungültigen Paare. McNemar gegen die SVM: 175 zu 30 Zeilen.
+- Bester Klassifikator nach der SVM. Anders als die linearen Modelle verliert das MLP auch beim
+  Stadium: 8 % nur Stadium falsch (SVM 4 %), mit wahrer Kultur 0.892 – die Stadium-Netze haben
+  je Kultur nur 66 bis 1 467 Zeilen.
+
+![MLP: Fehlerzerlegung](../img/hierarchical_mlp_breakdown.png)
+
 ## Fazit
 
 **Vorläufig (#87–#89):** Hierarchisch mit RBF-SVM auf beiden Stufen (`hierarchical_svm`,

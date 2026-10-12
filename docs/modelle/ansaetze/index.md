@@ -39,6 +39,7 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | Logistische Regression | | | | [0.759](hierarchisch.md#logistische-regression-logistische-regression) | |
 | PLS-DA | | | | [0.686](hierarchisch.md#pls-da-pls-da) | |
 | kNN | | | | [0.704](hierarchisch.md#knn-knn) | |
+| MLP | | | | [0.787](hierarchisch.md#mlp-mlp) | |
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.

@@ -80,6 +80,7 @@ SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
 EXTRA_TREES_N_ESTIMATORS = 300
 LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on ~140 features
+MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 CNN_DEFAULT_FILTERS = 16
 CNN_DEFAULT_KERNEL_SIZE = 5
 CNN_DEFAULT_DROPOUT = 0.2
