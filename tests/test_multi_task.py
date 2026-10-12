@@ -4,11 +4,12 @@ import unittest
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.base import clone
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-from awp2.config import AEZ_COL, CROP_COL, MONTH_COL, STAGE_COL, TARGET_COLS
+from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
@@ -53,6 +54,26 @@ class MultiTaskMLPClassifierTest(unittest.TestCase):
         self.assertEqual(list(predicted.columns), list(TARGET_COLS))
         self.assertTrue(predicted.index.equals(self.X.index))
         self.assertEqual(len(predicted), len(self.X))
+
+    def test_predict_limits_results_to_observed_crop_stage_pairs(self) -> None:
+        model = self._model().fit(self.X[["X427", "X437", "X447"]], self.y)
+
+        class IndependentHeads(torch.nn.Module):
+            def forward(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+                crop_logits = torch.full((len(features), len(CROPS)), -1.0)
+                stage_logits = torch.full((len(features), len(STAGES)), -1.0)
+                crop_logits[:, CROPS.index("rice")] = 6.0
+                crop_logits[:, CROPS.index("corn")] = 5.0
+                stage_logits[:, STAGES.index("Late")] = 6.0
+                stage_logits[:, STAGES.index("Harvest")] = 5.0
+                return crop_logits, stage_logits
+
+        model.module_ = IndependentHeads()
+        predicted = model.predict(self.X[["X427", "X437", "X447"]])
+        observed_pairs = set(map(tuple, self.y[[CROP_COL, STAGE_COL]].to_numpy()))
+
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+        self.assertNotIn(("rice", "Late"), set(map(tuple, predicted.to_numpy())))
 
     def test_pipeline_preserves_multi_output_prediction_contract(self) -> None:
         pipeline = Pipeline(

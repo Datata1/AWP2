@@ -146,6 +146,10 @@ class MultiTaskMLPClassifier(ClassifierMixin, BaseEstimator):
         self.crop_classes_ = np.asarray(CROPS, dtype=object)
         self.stage_classes_ = np.asarray(STAGES, dtype=object)
         self.classes_ = [self.crop_classes_, self.stage_classes_]
+        self.allowed_pair_codes_ = np.unique(
+            np.column_stack((crop_codes, stage_codes)),
+            axis=0,
+        )
         self.module_ = _MultiTaskMLPModule(
             self.n_features_in_, self.hidden_units, self.hidden_layers, self.dropout
         )
@@ -216,17 +220,21 @@ class MultiTaskMLPClassifier(ClassifierMixin, BaseEstimator):
         Returns:
             Target frame with the columns ``Crop`` and ``Stage``.
         """
-        check_is_fitted(self, "module_")
+        check_is_fitted(self, ["module_", "allowed_pair_codes_"])
         features = self._validate_prediction_features(X)
         self.module_.eval()
         with torch.no_grad():
             crop_logits, stage_logits = self.module_(torch.from_numpy(features))
-        crop_codes = crop_logits.argmax(dim=1).numpy()
-        stage_codes = stage_logits.argmax(dim=1).numpy()
+        allowed_pair_codes = torch.from_numpy(self.allowed_pair_codes_)
+        pair_log_probabilities = (
+            functional.log_softmax(crop_logits, dim=1)[:, allowed_pair_codes[:, 0]]
+            + functional.log_softmax(stage_logits, dim=1)[:, allowed_pair_codes[:, 1]]
+        )
+        prediction_codes = self.allowed_pair_codes_[pair_log_probabilities.argmax(dim=1).numpy()]
         return pd.DataFrame(
             {
-                CROP_COL: self.crop_classes_[crop_codes],
-                STAGE_COL: self.stage_classes_[stage_codes],
+                CROP_COL: self.crop_classes_[prediction_codes[:, 0]],
+                STAGE_COL: self.stage_classes_[prediction_codes[:, 1]],
             },
             index=X.index,
         )

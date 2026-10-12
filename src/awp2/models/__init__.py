@@ -8,7 +8,6 @@ from awp2.models.combined import (
     make_combined_random_forest,
     make_combined_svm,
 )
-from awp2.models.multi_task import MultiTaskMLPClassifier
 from awp2.models.hierarchical import (
     HierarchicalClassifier,
     make_hierarchical_extra_trees,
@@ -17,6 +16,7 @@ from awp2.models.hierarchical import (
     oracle_crop_metrics,
 )
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
+from awp2.models.multi_task import MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
