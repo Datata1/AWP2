@@ -256,8 +256,11 @@ Priors – ein Standard der Spektroskopie.
 
 - Suche `hierarchical_plsda_search` (25 Kandidaten): Kultur 120 Komponenten (Rasterrand, fast
   alle Merkmale), Stadium 20 – **CV 0.678** (LDA 0.657, SVM 0.839).
-- Validierung `hierarchical_plsda` (MLflow `b3627b9c`): Crop 0.846, Stage 0.778, **kombiniert
+- Validierung `hierarchical_plsda` (MLflow `b21da81c`): Crop 0.846, Stage 0.778, **kombiniert
   0.686**; keine ungültigen Paare. McNemar gegen die SVM: 303 zu 55 Zeilen.
+- Ein erster Lauf (`b3627b9c`) begrenzte die Komponentenzahl nicht auf die Zeilenzahl; beim
+  Reis-Stadium-Modell (~50 Zeilen je Fold) scheiterten so alle Kandidaten mit 80 oder 120
+  Stadium-Komponenten. Nach der Korrektur sind alle 25 gültig – mit demselben Ergebnis.
 - Die überwachte Verdichtung hilft kaum: Die Kulturstufe will fast alle Komponenten und landet
   damit nahe an LDA auf allen Bändern. 20 % falsche Kultur, mit wahrer Kultur 0.898.
 

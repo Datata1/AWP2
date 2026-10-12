@@ -17,15 +17,11 @@ class PLSDAClassifier(ClassifierMixin, BaseEstimator):
     the scores, so frequent classes are not favoured.
 
     Args:
-        n_components: Number of PLS components; capped at the number of features.
+        n_components: Number of PLS components; capped at the number of samples and features,
+            which matters for small stage models (rice: about 50 rows per CV fold).
     """
 
-    def __init__(self, n_components: int = 10) -> None:
-        """Initialise the classifier.
-
-        Args:
-            n_components: Number of PLS components.
-        """
+    def __init__(self, n_components: int = 10) -> None:  # noqa: D107 – documented on the class
         self.n_components = n_components
 
     def fit(self, X: pd.DataFrame | np.ndarray, y: pd.Series | np.ndarray) -> "PLSDAClassifier":
@@ -41,7 +37,7 @@ class PLSDAClassifier(ClassifierMixin, BaseEstimator):
         labels = np.asarray(y)
         self.classes_ = np.unique(labels)
         one_hot = (labels[:, np.newaxis] == self.classes_).astype(float)
-        components = min(self.n_components, np.shape(X)[1])
+        components = min(self.n_components, *np.shape(X))
         self.pls_ = PLSRegression(n_components=components, scale=False).fit(X, one_hot)
         self.lda_ = BalancedLinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto").fit(
             self.pls_.transform(X), labels
