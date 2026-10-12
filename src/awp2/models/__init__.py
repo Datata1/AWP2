@@ -15,8 +15,12 @@ from awp2.models.hierarchical import (
     make_hierarchical_svm,
     oracle_crop_metrics,
 )
+from awp2.models.linear import BalancedLinearDiscriminantAnalysis
+from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
+    "BalancedLinearDiscriminantAnalysis",
+    "PLSDAClassifier",
     "CombinedLabelClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
