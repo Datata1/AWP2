@@ -39,6 +39,7 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | Datum | ID | Autor | Ansatz | CV-BAcc kombiniert | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-09 | combined_svm_wide_cv_search | duac1011 | Kombinierte Klasse | 0.853 | 01903fad | 25 Kombinationen von `C` und `gamma`; bestes CV-Ergebnis: `C=300.0`, `gamma=0.001`. Nach der Holdout-Bewertung von `combined_svm_expanded` nur zur Sensitivitätsanalyse ausgeführt; keine zweite Validierung. |
+| 2026-10-12 | combined_svm_snv_search | duac1011 | Kombinierte Klasse | 0.823 | e1ea0e6c | SNV mit `use_spectral_snv`; sonst gleiche Vorverarbeitung und feste Parameter wie die Rohspektren-Referenz, unter deren CV-BAcc, kein Holdout-Lauf. |
 | 2026-10-10 | combined_svm_month_numeric_search | duac1011 | Kombinierte Klasse | 0.852 | fe4910f5 | RBF-SVM mit numerischem Month; bestes `C=100.0`, `gamma=0.003`, gewinnt gegen die zyklische Kodierung und wird einmal als `combined_svm_month_encoding` bewertet. |
 | 2026-10-10 | combined_svm_month_cyclical_search | duac1011 | Kombinierte Klasse | 0.849 | b0f72833 | RBF-SVM mit zyklischem Month; bestes `C=100.0`, `gamma=0.003`, keine Validierung. |
 | 2026-10-12 | combined_svm_cv_reference | Datata1 | Kombinierte Klasse | 0.845 | 014c54f2 | Kombinierte RBF-SVM mit der Vorverarbeitung der hierarchischen Läufe (standardisierte Spektren, zyklischer Monat), Raster wie `combined_svm_expanded_search`; bestes `C=100`, `gamma=0.003`. Fairer CV-Vergleich zu `hierarchical_svm` (0.839), keine Validierung. |
