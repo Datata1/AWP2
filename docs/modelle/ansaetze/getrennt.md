@@ -33,39 +33,56 @@ Unabhängigkeit der beiden Vorhersagen nachträglich aufhebt.
 eine mindestens so hohe kombinierte BAcc wie die hierarchische RBF-SVM. Falls nicht, zeigt der
 Abstand den Nutzen, die Stage-Vorhersage von der Kultur abhängig zu machen.
 
-#### Erster Arbeitsplan
+Notebook: `notebooks/18_duac1011_independent-svm.ipynb`. Beide SVMs erhalten skalierte
+Spektren, AEZ und einen zyklisch kodierten Month. Die 81 CV-Kandidaten wählen unabhängig `C`
+und `gamma` für Crop und Stage.
 
-1. `IndependentClassifier` in `src/awp2/models/independent.py` implementieren. Er klont
-    `crop_estimator` und `stage_estimator`, trainiert sie auf `y["Crop"]` bzw. `y["Stage"]` und
-    gibt eine DataFrame-Vorhersage mit beiden Zielspalten zurück. Die Parameter bleiben als
-    `crop_estimator__...` und `stage_estimator__...` für `tune()` erreichbar.
-2. `make_independent_svm()` exportieren: zwei `SVC(class_weight="balanced")`. Der erste Versuch
-    nutzt die Vorverarbeitung der kombinierten SVM-Referenz: skalierte Spektren, AEZ und Month.
-    Nicht im Notebook skalieren oder Labels verändern.
-3. Einen Unit-Test schreiben: Beide Estimatoren werden gefittet, die Vorhersage hat exakt die
-    Spalten `Crop` und `Stage`, und unbekannte Paare bleiben erlaubt. Das ist der günstige Test,
-    ob der Adapter mit `tune()` und `run()` kompatibel sein kann.
-4. Im Notebook `18_<initials>_independent-svm.ipynb` die getrennten SVMs per `tune()` nur auf den
-    fünf Trainingsfolds suchen. Anfangsraster: `C` in {30, 100, 300} und `gamma` in
-    {0.001, 0.003, 0.01} je Modellstufe; das sind 81 Kombinationen.
-5. Ausschließlich den CV-Gewinner einmal mit `run()` auf dem gemeinsamen Validierungssplit
-    bewerten. Dokumentieren: BAcc für Crop, Stage und kombiniert, Macro-F1, Samples-F1 sowie den
-    Anteil ungültiger Paare.
-6. Gegen `combined_svm_expanded` und `hierarchical_svm` vergleichen: Confusion Matrices,
-    Klassenrecall und `error_breakdown()` zeigen, ob die fehlende Fehlerfortpflanzung oder die
-    fehlende Bedingung auf die Kultur überwiegt. Keine Paarbeschränkung nach dem Validierungsscore
-    ergänzen.
-7. Tuning- und Bewertungslauf in MLflow verknüpfen, eine Zeile im
-    [Experiment-Log](../experimente.md) ergänzen und diese Seite mit Ergebnis, MLflow-Run und
-    Entscheidung aktualisieren.
+- Tuning `independent_svm_search` (MLflow `9d9be212`): Crop `C=300, gamma=0.003`, Stage
+    `C=30, gamma=0.01`; CV-BAcc kombiniert **0.815** (Std 0.028).
+- Validierung `independent_svm` (MLflow `330ac1b4`): BAcc Crop 0.929, Stage 0.900,
+    **kombiniert 0.818**, Macro-F1 kombiniert 0.733 und Samples-F1 0.909.
+- Nur 0,3 % der Vorhersagen sind ungültige Crop/Stage-Paare. Diese sind nicht die wesentliche
+    Ursache für den Abstand von 0.026 zur hierarchischen SVM (0.844).
+- Die Crop-SVM erreicht fast die kombinierte Referenz (0.931), das globale Stage-Modell bleibt
+    aber hinter der bedingten Stage-SVM zurück. Besonders schwach sind Emerge_VEarly (Recall 0.86)
+    und Mature_Senesc (0.82); die häufigsten Stadiumsverwechslungen sind Emerge_VEarly → Early_Mid
+    (26) sowie Mature_Senesc → Emerge_VEarly (18).
+- Die CV- und Validierungs-BAcc liegen eng zusammen (0.815 / 0.818). Der Befund ist daher keine
+    Auffälligkeit des gemeinsamen Holdouts, sondern spricht gegen die Unabhängigkeitsannahme.
+- Der direkte Vergleich zur hierarchischen SVM ist nicht vollständig vorverarbeitungsidentisch:
+    dieser Lauf verwendet `scale=True`, die hierarchische Referenz die spektrale
+    Standardskalierung. Der Abstand zur kombinierten Referenz beträgt jedoch bereits 0.048; die
+    Verwerfung als finale Referenz bleibt davon unberührt.
 
-**Entscheidungsregel:** Der Ansatz wird nur weiter verfolgt, wenn seine CV-BAcc kombiniert die
-hierarchische Referenz von 0.839 belastbar erreicht oder übertrifft. Bei ähnlicher BAcc ist der
-Anteil ungültiger Paare ausschlaggebend; die kombinierte SVM bleibt als Referenz, wenn sie ohne
-Paar-Korrektur klar besser ist.
+![Tuning der unabhängigen RBF-SVMs](../img/independent_svm_tuning.png)
+
+![Confusion Matrices](../img/independent_svm_confusion.png)
+
+![Recall je Klasse](../img/independent_svm_recall.png)
+
+![Häufigste Verwechslungen](../img/independent_svm_confusions.png)
+
+#### Preprocessing-Screen
+
+`notebooks/19_duac1011_independent-svm-preprocessing.ipynb` vergleicht fünf Varianten bei den
+festen CV-Gewinnern des ersten Laufs, ausschließlich auf den Trainingsfolds:
+
+| Variante | CV-BAcc kombiniert | Differenz zur Referenz |
+| --- | --- | --- |
+| Skalierte Spektren, zyklischer Month | **0.815** | 0.000 |
+| Spektrale Standardskalierung, zyklischer Month | 0.800 | −0.015 |
+| Spektrale Standardskalierung + Savitzky-Golay | 0.795 | −0.021 |
+| Skalierte Spektren, numerischer Month | 0.794 | −0.021 |
+| SNV + Mean Albedo | 0.769 | −0.046 |
+
+Keine Variante übertrifft die Referenz um die vorab festgelegte Schwelle von 0.005; eine weitere
+`C`-/`gamma`-Suche oder Validierung ist daher nicht begründet. Als einzige noch unterscheidbare
+Hypothese bleibt eine Paarbeschränkung: Kalibrierte Wahrscheinlichkeiten beider globaler SVMs
+zu $P(\text{Crop}) \cdot P(\text{Stage})$ für die im Training erlaubten Paare kombinieren. Das
+wäre ein eigener **CV-only** Versuch und keine Optimierung des unabhängigen Kontrollansatzes.
 
 ## Fazit
 
-**Geplant.** Der unabhängige RBF-SVM-Vergleich schließt die noch offene Modellierungsstrategie.
-Er testet gezielt die Rolle der Target-Abhängigkeit, nicht eine weitere allgemeine
-Hyperparameter-Variation.
+**Verworfen.** Der Kontrollversuch zeigt, dass die Crop-Stage-Abhängigkeit für die kombinierte
+BAcc wertvoll ist. Die kombinierte SVM bleibt mit 0.866 die Referenz; die hierarchische SVM
+bleibt mit 0.844 die bessere explizite Zerlegung.

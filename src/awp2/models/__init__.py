@@ -15,6 +15,7 @@ from awp2.models.hierarchical import (
     make_hierarchical_svm,
     oracle_crop_metrics,
 )
+from awp2.models.independent import IndependentClassifier, make_independent_svm
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
 from awp2.models.multi_task import MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
@@ -23,6 +24,7 @@ __all__ = [
     "BalancedLinearDiscriminantAnalysis",
     "PLSDAClassifier",
     "CombinedLabelClassifier",
+    "IndependentClassifier",
     "MultiTaskMLPClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
@@ -34,5 +36,6 @@ __all__ = [
     "make_hierarchical_extra_trees",
     "make_hierarchical_extra_trees_svm",
     "make_hierarchical_svm",
+    "make_independent_svm",
     "oracle_crop_metrics",
 ]
