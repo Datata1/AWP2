@@ -10,16 +10,22 @@ from awp2.models.combined import (
 )
 from awp2.models.hierarchical import (
     HierarchicalClassifier,
+    HierarchicalSummary,
     make_hierarchical_extra_trees,
     make_hierarchical_extra_trees_svm,
     make_hierarchical_svm,
     oracle_crop_metrics,
+    summarize_hierarchical,
+    summary_table,
 )
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
 from awp2.models.multi_task import MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
+    "HierarchicalSummary",
+    "summarize_hierarchical",
+    "summary_table",
     "BalancedLinearDiscriminantAnalysis",
     "PLSDAClassifier",
     "CombinedLabelClassifier",
