@@ -367,6 +367,34 @@ geladen, nichts neu trainiert.
   HistGradientBoosting (91), MLP (70). Ausgerechnet das schwache kNN ergänzt die SVM am meisten;
   wie viele richtige SVM-Zeilen ein Modell dabei verdirbt, zeigt diese Zählung nicht.
 
+### Ensemble: gewichtete Abstimmung
+
+Notebook: `notebooks/18_jd_hierarchical_ensemble.ipynb` (#113). `CropStageVotingClassifier` lässt
+jedes Mitglied ein vollständiges Crop/Stage-Paar vorhersagen; das Paar mit den meisten Stimmen
+gewinnt, bei Gleichstand das Paar des frühesten Mitglieds (der SVM). Mitglieder: RBF-SVM plus jede
+Teilmenge der auf dem Trainingsteil komplementärsten Modelle (kNN, logistische Regression, Extra
+Trees), Gewicht der SVM 1, 1.5 oder 2. Weil Gleichstände an die SVM gehen, entscheiden Gewicht 1
+und 1.5 gleich, und mit nur einem weiteren Mitglied ist das Ensemble die SVM – die 21 Kandidaten
+sind etwa 5 verschiedene Entscheidungsregeln.
+
+- Suche `hierarchical_ensemble_search` (MLflow `9259062a`): bestes Ensemble alle vier Modelle mit
+  gleichem Gewicht – **CV 0.844** (SVM 0.839, Std des Ensembles 0.014). Der Gewinn von 0.0045 liegt
+  unter `MIN_CV_GAIN` (0.005), daher **keine Validierung**; die SVM bleibt Referenz.
+- Auf dem Trainingsteil (out-of-fold) ändert das Ensemble kaum etwas: Kultur falsch 8,15 % (SVM)
+  vs. 8,13 % (Ensemble); der kleine Gewinn kommt vom Stadium (nur Stadium falsch 4,17 % → 3,91 %).
+  McNemar 43 zu 54 Zeilen (p = 0.31).
+- **Warum hilft es nicht, obwohl sich die Modelle ergänzen?** Mindestens eines der vier trifft
+  94,9 % der Trainingszeilen (SVM 87,7 %). Von den 482 Zeilen, in denen die SVM falsch liegt, hat
+  in 282 mindestens ein anderes Mitglied recht – in 150 davon aber nur genau eines, das in der
+  Abstimmung unterliegt. Das Ensemble rettet nur 54 dieser Zeilen.
+- **Fehlerhafter erster Lauf:** Eine erste Version entschied Gleichstände nach dem Alphabet der
+  Klassennamen statt zugunsten der SVM und erreichte so scheinbar CV 0.848 und Validierung 0.849
+  (`d4e93003`, ungültig, in MLflow markiert). Die Validierung wurde dabei einmal gesehen, ging aber
+  nicht in die Entscheidung ein. Varianten der Gleichstandsregel sind dadurch vorbelastet und
+  dürfen auf diesem Split nicht erneut validiert werden.
+
+![Ensemble: CV je Mitgliedermenge](../img/hierarchical_ensemble_tuning.png)
+
 ## Fazit
 
 **Stand nach #87–#89 und #98–#104:** Hierarchisch mit RBF-SVM auf beiden Stufen
@@ -384,7 +412,8 @@ Gegen die kombinierte SVM mit gleicher Vorverarbeitung liegt er in der CV knapp 
   Saisonrändern (Mai/Juni, Oktober) und in AEZ 9; vermutlich werden sich die Spektren dort
   ähnlicher. Nach der Kultur sind die Stadium-Modelle von Baumwolle (0.84) und Soja (0.93) die
   Schwachstelle.
-- **Offene Idee:** Die Klassifikatoren ergänzen sich (auf dem Trainingsteil trifft mindestens
-  einer 96,2 % der Zeilen, die SVM 87,7 %). Ein Ensemble aus SVM und den auf dem Trainingsteil
-  komplementärsten Modellen (kNN, logistische Regression, Extra Trees) ist der naheliegende
-  nächste Versuch – per CV zu prüfen.
+- **Ensemble (#113) bringt keinen Gewinn:** Die Modelle ergänzen sich zwar (auf dem Trainingsteil
+  trifft mindestens einer 96,2 % der Zeilen, die SVM 87,7 %), eine Abstimmung löst das aber nicht
+  ein (CV 0.844 vs. 0.839, unter der Schwelle) – wo die SVM irrt, hat meist nur ein einzelnes
+  anderes Modell recht und unterliegt. Nächster Hebel sind Merkmale für die
+  Kulturfehler an den Saisonrändern (#114).
