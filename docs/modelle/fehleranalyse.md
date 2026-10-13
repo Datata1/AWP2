@@ -201,6 +201,8 @@ Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet
 - **Hierarchisch** profitiert direkt von einer besseren Kulturstufe (Oracle-Kultur 0.939), ein
   vergleichbarer Oracle-Wert für den kombinierten Ansatz fehlt aber – welcher Ansatz mehr
   gewinnen würde, ist offen.
-- **Ensemble:** Die hierarchischen Klassifikatoren ergänzen sich stark; ein Ensemble aus SVM und
-  den auf dem Trainingsteil komplementärsten Modellen (kNN, logistische Regression, Extra Trees)
-  ist eine begründete Hypothese für die CV.
+- **Ensemble:** Die hierarchischen Klassifikatoren ergänzen sich stark, eine gewichtete
+  Abstimmung aus SVM, kNN, logistischer Regression und Extra Trees schlägt die SVM aber nicht
+  über das Rauschen (#113, CV 0.844 vs. 0.839). Auf dem Trainingsteil hat in 282 von 482
+  SVM-Fehlern ein anderes Modell recht, in 150 davon aber nur genau eines – es unterliegt in der
+  Abstimmung.

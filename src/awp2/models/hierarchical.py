@@ -1,7 +1,10 @@
 """Classifiers that predict the crop first and then the growth stage with one model per crop."""
 
+from collections.abc import Mapping
+
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import ExtraTreesClassifier
@@ -20,7 +23,13 @@ from awp2.config import (
     Routing,
 )
 from awp2.data import combined_label
-from awp2.evaluation import Metrics, evaluate
+from awp2.evaluation import (
+    ErrorBreakdown,
+    Metrics,
+    as_target_frame,
+    error_breakdown,
+    evaluate,
+)
 
 
 class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
@@ -257,4 +266,58 @@ def _extra_trees() -> ExtraTreesClassifier:
         class_weight="balanced",
         random_state=SEED,
         n_jobs=-1,
+    )
+
+
+class HierarchicalSummary(BaseModel):
+    """Scores of a fitted hierarchy on labelled data, incl. where its errors come from."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    metrics: Metrics = Field(description="Grading metrics of the predictions.")
+    breakdown: ErrorBreakdown = Field(description="Crop errors vs. stage-only errors.")
+    oracle: Metrics = Field(description="Metrics if the crop were always correct.")
+
+
+def summarize_hierarchical(
+    pipeline: Pipeline, X: pd.DataFrame, y: pd.DataFrame
+) -> HierarchicalSummary:
+    """Score a fitted hierarchy, split its errors and add the oracle-crop scores.
+
+    Args:
+        pipeline: Fitted pipeline whose last step is a ``HierarchicalClassifier``.
+        X: Raw features, e.g. ``load_split().X_val``.
+        y: True targets with the columns ``Crop`` and ``Stage``.
+
+    Returns:
+        Metrics, error breakdown and oracle-crop metrics.
+    """
+    predicted = as_target_frame(pipeline.predict(X), y.index)
+    return HierarchicalSummary(
+        metrics=evaluate(y, predicted),
+        breakdown=error_breakdown(y, predicted),
+        oracle=oracle_crop_metrics(pipeline, X, y),
+    )
+
+
+def summary_table(summaries: Mapping[str, HierarchicalSummary]) -> pd.DataFrame:
+    """Put several summaries side by side, one column per model.
+
+    Args:
+        summaries: ``summarize_hierarchical()`` per model, keyed by the label to show.
+
+    Returns:
+        Rows: BAcc crop/stage/combined, oracle-crop combined and the error breakdown.
+    """
+    return pd.DataFrame(
+        {
+            label: {
+                "BAcc Kultur": summary.metrics.bacc_crop,
+                "BAcc Stadium": summary.metrics.bacc_stage,
+                "BAcc kombiniert": summary.metrics.bacc_combined,
+                "Oracle-Kultur kombiniert": summary.oracle.bacc_combined,
+                **summary.breakdown.model_dump(),
+            }
+            for label, summary in summaries.items()
+        }
     )
