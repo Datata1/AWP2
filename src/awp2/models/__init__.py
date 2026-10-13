@@ -3,6 +3,7 @@
 from awp2.models.cnn import SpectralCNNClassifier, make_combined_spectral_cnn
 from awp2.models.combined import (
     CombinedLabelClassifier,
+    make_combined_catboost,
     make_combined_extra_trees,
     make_combined_hist_gradient_boosting,
     make_combined_random_forest,
@@ -24,6 +25,7 @@ __all__ = [
     "CombinedLabelClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
+    "make_combined_catboost",
     "make_combined_extra_trees",
     "make_combined_hist_gradient_boosting",
     "make_combined_random_forest",

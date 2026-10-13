@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from catboost import CatBoostClassifier
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.ensemble import (
     ExtraTreesClassifier,
@@ -12,6 +13,10 @@ from sklearn.svm import SVC
 from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import (
+    CATBOOST_DEPTH,
+    CATBOOST_ITERATIONS,
+    CATBOOST_L2_LEAF_REG,
+    CATBOOST_LEARNING_RATE,
     CROP_COL,
     EXTRA_TREES_N_ESTIMATORS,
     LABEL_SEP,
@@ -75,7 +80,8 @@ class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
             Predicted targets with the columns ``Crop`` and ``Stage``.
         """
         check_is_fitted(self, "estimator_")
-        labels = pd.Series(self.estimator_.predict(X), index=X.index, name="combined")
+        predictions = np.asarray(self.estimator_.predict(X)).reshape(-1)
+        labels = pd.Series(predictions, index=X.index, name="combined")
         targets = labels.str.split(LABEL_SEP, n=1, expand=True)
         return targets.set_axis([CROP_COL, STAGE_COL], axis=1)
 
@@ -130,3 +136,23 @@ def make_combined_svm() -> CombinedLabelClassifier:
             ``PreprocessingConfig(use_spectral_standard_scale=True)`` before fitting.
     """
     return CombinedLabelClassifier(SVC(class_weight="balanced"))
+
+
+def make_combined_catboost() -> CombinedLabelClassifier:
+    """Create the CatBoost classifier for the combined-label approach.
+
+    Returns:
+        Unfitted classifier with balanced class weights and the project seed.
+    """
+    return CombinedLabelClassifier(
+        CatBoostClassifier(
+            iterations=CATBOOST_ITERATIONS,
+            depth=CATBOOST_DEPTH,
+            learning_rate=CATBOOST_LEARNING_RATE,
+            l2_leaf_reg=CATBOOST_L2_LEAF_REG,
+            auto_class_weights="Balanced",
+            random_seed=SEED,
+            verbose=False,
+            allow_writing_files=False,
+        )
+    )
