@@ -16,7 +16,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | Ansatz | Status | Klassifikatoren | Bestes Experiment | Entscheidung |
 | --- | --- | --- | --- | --- |
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
-| [Getrennte Modelle](getrennt.md) | offen | – | | |
+| [Getrennte Modelle](getrennt.md) | geplant | RBF-SVM -> RBF-SVM | | Direkter Kontrollversuch ohne Crop-bedingte Stadiumsvorhersage |
 | [Multi-Task](multi-task.md) | in Arbeit | Tabellarisches MLP | `multi_task_mlp_pca20` (BAcc kombiniert 0.765) | PCA-20 mit Paarbeschränkung verbessert das MLP, bleibt aber unter der SVM-Referenz; getrenntes MLP als Kontrolle ausstehend |
 | [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm_expanded` (BAcc kombiniert 0.866) | vorläufig führend; gegen weitere Ansätze vergleichen |
 | [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM (bester), Extra Trees, HistGradientBoosting, MLP, logistische Regression, kNN, PLS-DA, LDA | `hierarchical_svm` (BAcc kombiniert 0.844) | CV 0.839 vs. 0.845 (`combined_svm_cv_reference`, gleiche Vorverarbeitung) – knapp dahinter; Engpass ist die Kulturstufe, weiches Routing ohne Effekt (#88) |
