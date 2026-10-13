@@ -110,6 +110,36 @@ der Abstand von 0.022 über die Verteilung auf die Klassen.
   (AEZ 9: 16 %, AEZ 8/10: unter 4 %). Vermutlich bestimmt die Agrarökozone, welche Kulturen zur
   gleichen Zeit in ähnlichem Zustand sind.
 
+## Was bedeutet das für die Vorverarbeitung?
+
+Die Fehleranalyse liefert Hypothesen; die folgenden Ablationen aus den Notebooks
+`09_jd_hierarchical_tuning.ipynb`, `08_duac1011_combined-svm-snv.ipynb`,
+`07_duac1011_combined-svm-pca.ipynb` und `07_duac1011_combined-svm-month-encoding.ipynb`
+prüfen sie ausschließlich per CV auf dem Trainingsteil.
+
+- **Absolute Helligkeit erhalten:** Die hellen, als Baumwolle erkannten Weizenspektren sprechen
+  dagegen, das Niveau jedes Spektrums vollständig zu entfernen. Das bestätigt die SNV-Ablation:
+  Sie verliert bei der kombinierten SVM 0.024 CV-BAcc (0.823 statt 0.847) und bei der
+  hierarchischen SVM 0.018. SNV wird daher nicht übernommen; eine Albedo-Ergänzung ist nur
+  sinnvoll, wenn sie eine neue, klar abgegrenzte CV-Hypothese beantwortet.
+- **Formglättung und Reduktion sind kein erkennbarer Hebel:** Savitzky-Golay verbessert die
+  hierarchische SVM nur von 0.840 auf 0.842 CV-BAcc und bleibt unter der Rauschschwelle von
+  0.005. PCA-20 gewinnt zwar das Reduktionsscreening der kombinierten SVM (CV 0.853), liegt auf
+  der einmaligen Validierung mit 0.863 dennoch 0.003 unter der Rohspektren-Referenz. Die Fehler
+  an Saisonrändern entstehen damit nicht erkennbar aus hochfrequentem Spektralrauschen oder
+  bloßer Bandredundanz.
+- **Monat kodiert den Kontext, ersetzt aber keine spektrale Trennung:** Die numerische und die
+  zyklische Kodierung liegen bei der kombinierten SVM in der CV nur 0.002 auseinander (0.852 vs.
+  0.849); in der hierarchischen Ablation bleibt der Unterschied ebenfalls im Rauschen. Die
+  gehäuften Fehler im Mai/Juni und Oktober sind deshalb kein Anlass, die Monatsdarstellung ohne
+  weitere Hypothese zu ändern. AEZ und Month bleiben nützlicher Kontext, ihre regionale und
+  saisonale Shortcut-Wirkung muss in der Interpretation aber sichtbar bleiben.
+- **Modellvergleich nicht als Pipeline-Wettbewerb lesen:** Die kombinierte und die hierarchische
+  SVM nutzen unterschiedliche Skalierungs- und Month-Varianten. Der faire CV-Vergleich mit
+  identischer Vorverarbeitung liegt jedoch bei 0.845 zu 0.839. Die in dieser Seite beschriebenen
+  Fehlerunterschiede erklären sich daher überwiegend durch die Modellierung der Labels, nicht
+  durch eine belegte Preprocessing-Verbesserung.
+
 ## Die häufigsten Verwechslungen
 
 Häufigste Kulturverwechslungen des hierarchischen Modells: Winterweizen → Baumwolle (26),
