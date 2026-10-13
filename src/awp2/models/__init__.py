@@ -16,12 +16,14 @@ from awp2.models.hierarchical import (
     oracle_crop_metrics,
 )
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
+from awp2.models.multi_task import MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
     "BalancedLinearDiscriminantAnalysis",
     "PLSDAClassifier",
     "CombinedLabelClassifier",
+    "MultiTaskMLPClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
     "make_combined_extra_trees",
