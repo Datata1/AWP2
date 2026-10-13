@@ -172,6 +172,21 @@ Klassifikatoren, siehe [Vergleich aller Klassifikatoren](ansaetze/hierarchisch.m
 - Mit mehr Modellen sinkt die Zahl der Zeilen, die *alle* falsch haben, zwangsläufig; sie ist
   daher kein Maß für die Modelle selbst.
 
+## Multi-Task-MLP
+
+Die ergänzende Analyse des PCA-20-Multi-Task-MLP steht in
+[Multi-Task](ansaetze/multi-task.md#fehleranalyse-pca-20-gegen-kombinierte-svm) und im Notebook
+`notebooks/11_duac1011_multi-task-fehleranalyse.ipynb`.
+
+- Gegen die kombinierte SVM liegt das MLP bei BAcc kombiniert um 0,102 zurück (0,764 vs. 0,866),
+  obwohl beide ausschließlich gültige Paare ausgeben.
+- Der Rückstand entsteht zugleich bei Kultur- und bei reinen Stadiumfehlern. Besonders Übergangs-
+  und Seneszenzpaare verlieren Recall; die OOF-Gegenprobe bestätigt höhere Paarfehlerraten an
+  Saisonrändern.
+- Die stärkste Verwechslung, `cotton|Emerge_VEarly` → `cotton|Early_Mid`, weist auf
+  überlappende Übergangsspektren. Ob geteilte MLP-Schichten besser als zwei getrennte MLPs sind,
+  bleibt eine CV-Hypothese.
+
 ## Folgerungen
 
 Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet die CV.

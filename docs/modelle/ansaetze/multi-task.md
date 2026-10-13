@@ -114,6 +114,55 @@ Holdout-Metrik oder Referenz.
 
 ![Häufigste Verwechslungen des Multi-Task-MLP](../img/multi_task_mlp_confusions.png)
 
+## Fehleranalyse: PCA-20 gegen kombinierte SVM
+
+Notebook: `notebooks/11_duac1011_multi-task-fehleranalyse.ipynb` (#32). Beide
+Referenzmodelle werden mit ihren vorher per CV festgelegten Einstellungen neu trainiert und ohne
+Tracking auf der gemeinsamen Validierung verglichen. Der Refit bestätigt den Abstand: das
+Multi-Task-MLP erreicht BAcc Crop/Stage/kombiniert von 0,920 / 0,902 / **0,764**, die
+kombinierte SVM 0,930 / 0,906 / **0,866**. Beide sagen ausschließlich gültige Crop/Stage-Paare
+voraus; die Paarbeschränkung erklärt den Abstand daher nicht.
+
+![Fehlerzerlegung: Multi-Task gegen SVM](../img/multi_task_error_breakdown.png)
+
+| | Multi-Task-MLP | Kombinierte SVM |
+| --- | --- | --- |
+| beides richtig | 0,827 | 0,877 |
+| Kultur falsch | 0,106 | 0,084 |
+| nur Stadium falsch | 0,067 | 0,039 |
+| Stadium-BAcc bei richtiger Kultur | 0,940 | 0,957 |
+
+- Das MLP verliert an **beiden** Teilaufgaben: 2,2 Prozentpunkte mehr Kulturfehler und 2,8
+        Punkte mehr reine Stadiumfehler. Bei richtiger Kultur trennt es die Stadien ebenfalls
+        schlechter; der Abstand ist also nicht bloß die Folge der Kulturentscheidung.
+- Die kombinierte SVM trifft 139 vollständige Paare, die das MLP verfehlt, umgekehrt trifft das
+        MLP nur 55 exklusiv ($p = 1{,}4\cdot10^{-9}$, exakter McNemar-Test). Der Test wird von
+        häufigen Klassen bestimmt und bewertet nicht die Balanced Accuracy.
+
+![Recall je Crop/Stage-Paar: Multi-Task gegen SVM](../img/multi_task_error_recall.png)
+
+- Die BAcc-Lücke betrifft auch Klassen mit mittlerem Support: `corn|Early_Mid` erreicht 0,688
+        statt 0,906 Recall (64 Zeilen), `corn|Mature_Senesc` 0,742 statt 0,850 (120). Seltene Paare
+        verstärken sie: `winter_wheat|Critical` erreicht 0,000 statt 0,882 (17).
+- Die häufigste einzelne Verwechslung ist `cotton|Emerge_VEarly` → `cotton|Early_Mid` (18).
+        Die fehlklassifizierten Fälle stammen überwiegend aus Juni und haben mit NDVI 0,14 sowie
+        mittlerer Reflektanz 33,99 % Werte näher an `cotton|Early_Mid` (0,17; 32,45 %) als an korrekt
+        erkannter früher Baumwolle (0,12; 23,48 %). Das erklärt die Verwechslung als
+        phänologischen Übergang, nicht als ungültige Kombination.
+
+![Spektren der häufigsten Multi-Task-Verwechslung](../img/multi_task_error_top_confusion_spectra.png)
+
+![Paarfehler nach Monat](../img/multi_task_error_month.png)
+
+- Mai, Juni und Oktober bleiben in den Out-of-Fold-Vorhersagen des Trainingsteils deutlich
+        fehleranfälliger (0,416 / 0,359 / 0,340) als Juli und August (0,096 / 0,072). Der Befund ist
+        damit nicht nur ein Zufall des Validierungssplits und passt zu frühen, Übergangs- und
+        Seneszenzspektren.
+- Die kombinierte SVM lernt die 23 Paare direkt. Das MLP optimiert zwei gleich gewichtete Köpfe
+        und kombiniert sie erst bei der Dekodierung; diese Zielfunktion begünstigt nicht zwingend die
+        gemeinsame Paar-BAcc. Ein kontrollierter CV-Vergleich mit zwei getrennten MLPs bleibt nötig,
+        bevor sich ein Nutzen der gemeinsamen Repräsentation behaupten lässt.
+
 ## Fazit
 
 **In Arbeit.** PCA-20 verbessert den tabellarischen Multi-Task-MLP klar gegenüber dem
