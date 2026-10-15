@@ -4,12 +4,15 @@ Build them once with ``make data``; everyone then works on identical files. The 
 itself is not stored – it is fitted inside each model pipeline on the training part only.
 """
 
+import argparse
+
 import pandas as pd
 
 from awp2.config import (
     CLEAN_TRAIN_FILE,
     FOLD_COL,
     ID_COL,
+    SPLIT_CONFIG_FILE,
     SPLIT_FILE,
     SUBSET_COL,
     TRAIN_SUBSET,
@@ -19,6 +22,7 @@ from awp2.data.load import load_train
 from awp2.data.split import (
     Dataset,
     Fold,
+    SplitConfig,
     TrainValSplit,
     cv_splits,
     prepare_dataset,
@@ -30,15 +34,18 @@ class StaleArtifactsError(RuntimeError):
     """The artifacts are missing or do not match each other – run ``make data``."""
 
 
-def build_artifacts() -> None:
+def build_artifacts(config: SplitConfig | None = None) -> None:
     """Write the cleaned dataset and the split assignment to ``data/`` (run via ``make data``).
 
-    Creates ``data/interim/train_clean.parquet`` (validated, deduplicated training data) and
-    ``data/processed/split.csv`` (per ``id``: ``subset`` train/val and ``cv_fold``).
+    Creates ``data/interim/train_clean.parquet`` (validated, deduplicated training data),
+    ``data/processed/split.csv`` (per ``id``: ``subset`` train/val and ``cv_fold``) and
+    ``data/processed/split_config.json`` (the split settings).
     Deterministic: rebuilding from the same raw data gives identical files.
     """
+    if config is None:
+        config = SplitConfig()
     dataset = prepare_dataset(load_train())
-    split = train_val_split(dataset.X, dataset.y)
+    split = train_val_split(dataset.X, dataset.y, config)
 
     assignment = pd.Series(VAL_SUBSET, index=dataset.X.index, name=SUBSET_COL)
     assignment[split.X_train.index] = TRAIN_SUBSET
@@ -50,6 +57,7 @@ def build_artifacts() -> None:
     SPLIT_FILE.parent.mkdir(parents=True, exist_ok=True)
     pd.concat([dataset.X, dataset.y], axis=1).to_parquet(CLEAN_TRAIN_FILE)
     pd.concat([assignment, folds], axis=1).rename_axis(ID_COL).to_csv(SPLIT_FILE)
+    SPLIT_CONFIG_FILE.write_text(config.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
 def load_dataset() -> Dataset:
@@ -76,8 +84,22 @@ def _load_assignment(dataset: Dataset) -> pd.DataFrame:
     return assignment.loc[dataset.X.index]
 
 
+def load_split_config() -> SplitConfig:
+    """Load the configuration used to build the shared split.
+
+    Returns:
+        Validated settings persisted with the split artifact.
+
+    Raises:
+        StaleArtifactsError: If the split configuration is missing – run ``make data``.
+    """
+    if not SPLIT_CONFIG_FILE.exists():
+        raise StaleArtifactsError(f"{SPLIT_CONFIG_FILE} missing – run `make data`.")
+    return SplitConfig.model_validate_json(SPLIT_CONFIG_FILE.read_text(encoding="utf-8"))
+
+
 def load_split() -> TrainValSplit:
-    """Load the shared 70/30 holdout split – the same for everyone.
+    """Load the shared train/validation split – the same for everyone.
 
     Returns:
         Training and validation part, read from ``data/processed/split.csv``.
@@ -115,6 +137,19 @@ def load_folds() -> list[Fold]:
     ]
 
 
+def _parse_args() -> SplitConfig:
+    parser = argparse.ArgumentParser(description="Build the shared data artifacts.")
+    parser.add_argument(
+        "--validation-size",
+        type=float,
+        default=SplitConfig.model_fields["validation_size"].default,
+        help="Fraction of rows assigned to validation (default: %(default)s).",
+    )
+    args = parser.parse_args()
+    return SplitConfig(validation_size=args.validation_size)
+
+
 if __name__ == "__main__":
-    build_artifacts()
-    print(f"Wrote {CLEAN_TRAIN_FILE} and {SPLIT_FILE}")
+    config = _parse_args()
+    build_artifacts(config)
+    print(f"Wrote {CLEAN_TRAIN_FILE}, {SPLIT_FILE} and {SPLIT_CONFIG_FILE}")
