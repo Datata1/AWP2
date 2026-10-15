@@ -34,6 +34,12 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-12 | hierarchical_hgb | Datata1 | Hierarchisch | 0.901 | 0.871 | 0.795 | 0.780 | 0.887 | 6cc2984f | HistGradientBoosting → HistGradientBoosting, ausgeglichene Gewichte; beide Stufen Lernrate 0.05 (Rasterrand), sonst Standard; Tuning `hierarchical_hgb_search` (4 Kandidaten, ~30 s je Fit), CV 0.783 – gleichauf mit `combined_hist_gradient_boosting` (CV 0.781); Kultur falsch 11 %, Oracle-Kultur 0.898; keine ungültigen Paare |
 | 2026-10-12 | ~~hierarchical_ensemble~~ (ungültig) | Datata1 | Hierarchisch | ~~0.923~~ | ~~0.905~~ | ~~0.849~~ | ~~0.827~~ | ~~0.908~~ | d4e93003 | **Ungültig, nicht verwenden:** Gleichstand wurde nach dem Alphabet der Klassennamen entschieden statt zugunsten der SVM (Fehler in `CropStageVotingClassifier`, behoben). Tuning `93a43f14`, identische Wiederholung `d810bef2`/`0300be13`; in MLflow mit `invalid` markiert. Gültig ist die CV-only-Suche `9259062a`. |
 
+## Abweichende Split-Protokolle
+
+| Datum | ID | Autor | Ansatz | BAcc Crop | BAcc Stage | BAcc kombiniert | Macro-F1 kombiniert | Samples-F1 | MLflow-Run | Notiz |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 | combined_svm_split_80_20 | QMoWo | Kombinierte Klasse | 0.920 | 0.913 | 0.866 | 0.859 | 0.917 | 8fa9aeed | 80/20-Split, Tuning `combined_svm_split_80_20_search` (CV 0.859, MLflow `08fdabe4`); keine ungültigen Paare. Nicht direkt mit den 70/30-Läufen oben vergleichen. |
+
 ## CV-only Analysen
 
 Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Validierungsmetriken und
