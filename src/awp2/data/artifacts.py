@@ -5,6 +5,7 @@ itself is not stored – it is fitted inside each model pipeline on the training
 """
 
 import argparse
+from hashlib import sha256
 
 import pandas as pd
 
@@ -13,6 +14,7 @@ from awp2.config import (
     FOLD_COL,
     ID_COL,
     SPLIT_CONFIG_FILE,
+    SPLIT_CONFIG_HASH_COL,
     SPLIT_FILE,
     SUBSET_COL,
     TRAIN_SUBSET,
@@ -56,8 +58,11 @@ def build_artifacts(config: SplitConfig | None = None) -> None:
     CLEAN_TRAIN_FILE.parent.mkdir(parents=True, exist_ok=True)
     SPLIT_FILE.parent.mkdir(parents=True, exist_ok=True)
     pd.concat([dataset.X, dataset.y], axis=1).to_parquet(CLEAN_TRAIN_FILE)
-    pd.concat([assignment, folds], axis=1).rename_axis(ID_COL).to_csv(SPLIT_FILE)
-    SPLIT_CONFIG_FILE.write_text(config.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    config_json = config.model_dump_json()
+    config_hash = sha256(config_json.encode()).hexdigest()
+    config_hashes = pd.Series(config_hash, index=dataset.X.index, name=SPLIT_CONFIG_HASH_COL)
+    pd.concat([assignment, folds, config_hashes], axis=1).rename_axis(ID_COL).to_csv(SPLIT_FILE)
+    SPLIT_CONFIG_FILE.write_text(config_json + "\n", encoding="utf-8")
 
 
 def load_dataset() -> Dataset:
@@ -81,6 +86,11 @@ def _load_assignment(dataset: Dataset) -> pd.DataFrame:
     assignment = pd.read_csv(SPLIT_FILE, index_col=ID_COL, dtype={FOLD_COL: "Int64"})
     if not assignment.index.sort_values().equals(dataset.X.index.sort_values()):
         raise StaleArtifactsError("Split and dataset do not match – run `make data`.")
+    if SPLIT_CONFIG_HASH_COL not in assignment:
+        raise StaleArtifactsError("Split lacks its configuration fingerprint – run `make data`.")
+    config_hash = sha256(load_split_config().model_dump_json().encode()).hexdigest()
+    if not assignment[SPLIT_CONFIG_HASH_COL].eq(config_hash).all():
+        raise StaleArtifactsError("Split and configuration do not match – run `make data`.")
     return assignment.loc[dataset.X.index]
 
 

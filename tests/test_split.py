@@ -66,3 +66,31 @@ class SplitConfigTest(unittest.TestCase):
         self.assertEqual(config.validation_size, 0.2)
         self.assertEqual(len(split.X_train), 16)
         self.assertEqual(len(split.X_val), 4)
+
+    def test_load_split_rejects_mismatched_split_configuration(self) -> None:
+        rows_per_label = 10
+        labels = [("corn", "Early_Mid"), ("rice", "Late")]
+        dataset = pd.DataFrame(
+            [
+                {AEZ_COL: 1, MONTH_COL: 1, "X427": row, CROP_COL: crop, STAGE_COL: stage}
+                for crop, stage in labels
+                for row in range(rows_per_label)
+            ]
+        )
+        dataset.index.name = "id"
+
+        with TemporaryDirectory() as temporary_directory:
+            processed_dir = Path(temporary_directory) / "processed"
+            interim_dir = Path(temporary_directory) / "interim"
+            with (
+                patch.object(artifacts, "CLEAN_TRAIN_FILE", interim_dir / "train_clean.parquet"),
+                patch.object(artifacts, "SPLIT_FILE", processed_dir / "split.csv"),
+                patch.object(artifacts, "SPLIT_CONFIG_FILE", processed_dir / "split_config.json"),
+                patch.object(artifacts, "load_train", return_value=dataset),
+            ):
+                artifacts.build_artifacts(SplitConfig(validation_size=0.2))
+                artifacts.SPLIT_CONFIG_FILE.write_text(
+                    SplitConfig(validation_size=0.199).model_dump_json(), encoding="utf-8"
+                )
+                with self.assertRaisesRegex(artifacts.StaleArtifactsError, "configuration"):
+                    artifacts.load_split()

@@ -23,8 +23,8 @@ make data DATA_ARGS="--validation-size 0.2"
 | Datei | Inhalt |
 | --- | --- |
 | `data/interim/train_clean.parquet` | Validierte Trainingsdaten ohne Duplikate |
-| `data/processed/split.csv` | Je `id`: `subset` (`train`/`val`) und `cv_fold` (0–4) |
-| `data/processed/split_config.json` | Validierter Anteil der Validierungsdaten |
+| `data/processed/split.csv` | Je `id`: `subset` (`train`/`val`), `cv_fold` (0–4) und Fingerabdruck der Split-Konfiguration |
+| `data/processed/split_config.json` | Validierter Anteil der Validierungsdaten; sein Fingerabdruck wird beim Laden gegen `split.csv` geprüft |
 
 Die Dateien sind nicht in git, aber deterministisch – bei allen byte-identisch.
 
