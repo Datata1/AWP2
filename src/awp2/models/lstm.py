@@ -238,3 +238,23 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         self.max_epochs = max_epochs
         self.batch_size = batch_size
         self.random_state = random_state
+
+    def _validate_hyperparameters(self) -> None:
+        if self.context_mode not in (
+            LSTM_NO_CONTEXT,
+            LSTM_STANDARD_CONTEXT,
+            LSTM_EMBEDDINGS_CONTEXT,
+        ):
+            raise ValueError(f"Unknown context mode {self.context_mode!r}")
+        if self.hidden_size < 1 or self.num_layers < 1:
+            raise ValueError("hidden_size and num_layers must be positive")
+        if not 0 <= self.dropout < 1:
+            raise ValueError("dropout must be in [0, 1)")
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be positive")
+        if self.weight_decay < 0:
+            raise ValueError("weight_decay must be non-negative")
+        if self.aez_embedding_dim < 1 or self.month_embedding_dim < 1:
+            raise ValueError("embedding dimensions must be positive")
+        if self.max_epochs < 1 or self.batch_size < 1:
+            raise ValueError("max_epochs and batch_size must be positive")

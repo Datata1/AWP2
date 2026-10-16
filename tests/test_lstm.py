@@ -135,3 +135,9 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
 
         self.assertEqual(cloned.hidden_size, 8)
         self.assertEqual(cloned.context_mode, LSTM_EMBEDDINGS_CONTEXT)
+
+    def test_rejects_invalid_dropout(self) -> None:
+        classifier = SpectralLSTMClassifier(dropout=1.0)
+
+        with self.assertRaisesRegex(ValueError, "dropout"):
+            classifier._validate_hyperparameters()
