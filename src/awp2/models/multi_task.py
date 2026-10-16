@@ -46,7 +46,7 @@ from awp2.config import (
     TARGET_COLS,
 )
 from awp2.data import combined_label
-from awp2.models.lstm import _SpectralLSTMEncoder
+from awp2.models.lstm import _CategoricalContextEncoder, _SpectralLSTMEncoder
 
 
 class _MultiTaskMLPModule(nn.Module):
@@ -101,6 +101,45 @@ class _MultiTaskLateFusionLSTMModule(nn.Module):
 
     def forward(self, spectrum: Tensor, context: Tensor) -> tuple[Tensor, Tensor]:
         """Return crop and stage logits after fusing context with spectral features."""
+        features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
+        return self.crop_head(features), self.stage_head(features)
+
+
+class _MultiTaskEmbeddingFusionLSTMModule(nn.Module):
+    """Predict crop and stage from shared LSTM features and learned context."""
+
+    def __init__(
+        self,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float,
+        n_aez_categories: int,
+        n_month_categories: int,
+        aez_embedding_dim: int,
+        month_embedding_dim: int,
+    ) -> None:
+        super().__init__()
+        self.spectral_encoder = _SpectralLSTMEncoder(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+        )
+        self.context_encoder = _CategoricalContextEncoder(
+            n_aez_categories=n_aez_categories,
+            n_month_categories=n_month_categories,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+        )
+        n_fused_features = hidden_size + aez_embedding_dim + month_embedding_dim
+        self.crop_head = nn.Linear(n_fused_features, len(CROPS))
+        self.stage_head = nn.Linear(n_fused_features, len(STAGES))
+
+    def forward(
+        self, spectrum: Tensor, aez_codes: Tensor, month_codes: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        """Return crop and stage logits after fusing context embeddings."""
+        context = self.context_encoder(aez_codes, month_codes)
         features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
         return self.crop_head(features), self.stage_head(features)
 

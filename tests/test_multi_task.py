@@ -12,7 +12,11 @@ from sklearn.pipeline import Pipeline
 from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
-from awp2.models.multi_task import _MultiTaskLateFusionLSTMModule, MultiTaskLSTMClassifier
+from awp2.models.multi_task import (
+    _MultiTaskEmbeddingFusionLSTMModule,
+    _MultiTaskLateFusionLSTMModule,
+    MultiTaskLSTMClassifier,
+)
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 
@@ -138,6 +142,36 @@ class MultiTaskLateFusionLSTMModuleTest(unittest.TestCase):
 
         self.assertEqual(module.crop_head.in_features, hidden_size + n_context_features)
         self.assertEqual(module.stage_head.in_features, hidden_size + n_context_features)
+        self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
+        self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
+
+
+class MultiTaskEmbeddingFusionLSTMModuleTest(unittest.TestCase):
+    def test_fuses_context_embeddings_before_crop_and_stage_heads(self) -> None:
+        batch_size = 3
+        n_bands = 4
+        hidden_size = 5
+        aez_embedding_dim = 4
+        month_embedding_dim = 3
+        module = _MultiTaskEmbeddingFusionLSTMModule(
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            n_aez_categories=5,
+            n_month_categories=4,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+        )
+
+        crop_logits, stage_logits = module(
+            torch.rand(batch_size, n_bands, 1),
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 2, 3]),
+        )
+
+        n_fused_features = hidden_size + aez_embedding_dim + month_embedding_dim
+        self.assertEqual(module.crop_head.in_features, n_fused_features)
+        self.assertEqual(module.stage_head.in_features, n_fused_features)
         self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
         self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
 
