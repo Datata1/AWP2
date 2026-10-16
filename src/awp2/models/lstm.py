@@ -1,11 +1,14 @@
 """Sequential LSTM components for hyperspectral signatures."""
 
+import copy
 from typing import Self
 
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import train_test_split
+from sklearn.utils.validation import check_is_fitted
 from torch import Tensor, nn
 
 from awp2.config import (
@@ -20,6 +23,8 @@ from awp2.config import (
     LSTM_DEFAULT_NUM_LAYERS,
     LSTM_DEFAULT_WEIGHT_DECAY,
     LSTM_EMBEDDINGS_CONTEXT,
+    LSTM_EARLY_STOPPING_PATIENCE,
+    LSTM_INNER_VALIDATION_FRACTION,
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
     LSTMContextMode,
@@ -283,3 +288,171 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             n_context_features=n_context_features,
             n_classes=n_classes,
         )
+
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        sample_weight: np.ndarray | None = None,
+    ) -> Self:
+        """Fit one class label per spectrum with balanced weighted cross-entropy.
+
+        Args:
+            X: Preprocessed spectral bands and context columns.
+            y: One target label per row of ``X``.
+            sample_weight: Optional non-negative weight per training row.
+
+        Returns:
+            This fitted classifier.
+
+        Raises:
+            TypeError: If targets are not a pandas Series.
+            ValueError: If features, targets or sample weights are invalid.
+        """
+        self._validate_hyperparameters()
+        if not isinstance(y, pd.Series):
+            raise TypeError(f"Expected y as a pandas Series, got {type(y)}.")
+        if not y.index.equals(X.index):
+            raise ValueError("X and y must have the same index")
+        if len(y) < 2:
+            raise ValueError("At least two rows are required for the inner validation split")
+        weights = self._validate_sample_weight(sample_weight, len(X))
+        adapter = _LSTMInputAdapter(self.context_mode).fit(X)
+        inputs = adapter.transform(X)
+        self._validate_inputs(inputs)
+        self.classes_, target_codes = np.unique(np.asarray(y, dtype=str), return_inverse=True)
+        train_indices, validation_indices = train_test_split(
+            np.arange(len(X)),
+            test_size=LSTM_INNER_VALIDATION_FRACTION,
+            stratify=target_codes,
+            random_state=self.random_state,
+        )
+        torch.manual_seed(self.random_state)
+        np.random.seed(self.random_state)
+        self.input_adapter_ = adapter
+        self.feature_names_in_ = adapter.feature_names_in_
+        self.n_features_in_ = X.shape[1]
+        self.module_ = self._build_module(adapter, len(self.classes_))
+        class_weights = self._class_weights(target_codes[train_indices], len(self.classes_))
+        optimizer = torch.optim.Adam(
+            self.module_.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+        best_state: dict[str, Tensor] | None = None
+        best_loss = float("inf")
+        epochs_without_improvement = 0
+        for epoch in range(self.max_epochs):
+            self.module_.train()
+            shuffled_indices = np.random.default_rng(self.random_state + epoch).permutation(
+                train_indices
+            )
+            for start in range(0, len(shuffled_indices), self.batch_size):
+                batch_indices = shuffled_indices[start : start + self.batch_size]
+                optimizer.zero_grad()
+                logits = self._logits(inputs, batch_indices)
+                loss = self._loss(
+                    logits,
+                    target_codes[batch_indices],
+                    weights[batch_indices],
+                    class_weights,
+                )
+                loss.backward()
+                optimizer.step()
+
+            validation_loss = self._loss(
+                self._logits(inputs, validation_indices),
+                target_codes[validation_indices],
+                np.ones(len(validation_indices), dtype=np.float32),
+                class_weights,
+            ).item()
+            if validation_loss < best_loss:
+                best_loss = validation_loss
+                best_state = copy.deepcopy(self.module_.state_dict())
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+                if epochs_without_improvement >= LSTM_EARLY_STOPPING_PATIENCE:
+                    self.n_epochs_ = epoch + 1
+                    break
+        else:
+            self.n_epochs_ = self.max_epochs
+
+        assert best_state is not None
+        self.module_.load_state_dict(best_state)
+        self.best_validation_loss_ = best_loss
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Predict one target label per spectrum.
+
+        Args:
+            X: Preprocessed features with the fitted column order.
+
+        Returns:
+            One predicted class label per row of ``X``.
+        """
+        check_is_fitted(self, ["input_adapter_", "module_"])
+        inputs = self.input_adapter_.transform(X)
+        self._validate_inputs(inputs)
+        self.module_.eval()
+        with torch.no_grad():
+            prediction_codes = self._logits(inputs, np.arange(len(X))).argmax(dim=1).numpy()
+        return self.classes_[prediction_codes]
+
+    @staticmethod
+    def _validate_sample_weight(
+        sample_weight: np.ndarray | None, n_samples: int
+    ) -> np.ndarray:
+        if sample_weight is None:
+            return np.ones(n_samples, dtype=np.float32)
+        weights = np.asarray(sample_weight, dtype=np.float32)
+        if weights.shape != (n_samples,):
+            raise ValueError(f"sample_weight must have shape ({n_samples},), got {weights.shape}")
+        if not np.isfinite(weights).all() or (weights < 0).any() or weights.sum() == 0:
+            raise ValueError("sample_weight must be finite, non-negative and not all zero")
+        return weights
+
+    @staticmethod
+    def _validate_inputs(inputs: dict[str, np.ndarray]) -> None:
+        if not np.isfinite(inputs["spectrum"]).all():
+            raise ValueError("Spectral inputs must be finite")
+        if "context" in inputs and not np.isfinite(inputs["context"]).all():
+            raise ValueError("Context inputs must be finite")
+
+    @staticmethod
+    def _class_weights(target_codes: np.ndarray, n_classes: int) -> Tensor:
+        counts = np.bincount(target_codes, minlength=n_classes)
+        weights = np.zeros(n_classes, dtype=np.float32)
+        present = counts > 0
+        weights[present] = counts.sum() / (present.sum() * counts[present])
+        return torch.from_numpy(weights)
+
+    def _logits(self, inputs: dict[str, np.ndarray], indices: np.ndarray) -> Tensor:
+        spectrum = torch.from_numpy(inputs["spectrum"][indices])
+        if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
+            return self.module_(
+                spectrum,
+                torch.from_numpy(inputs["aez_codes"][indices]),
+                torch.from_numpy(inputs["month_codes"][indices]),
+            )
+        context = torch.from_numpy(
+            inputs.get("context", np.empty((len(indices), 0), dtype=np.float32))[indices]
+            if "context" in inputs
+            else np.empty((len(indices), 0), dtype=np.float32)
+        )
+        return self.module_(spectrum, context)
+
+    @staticmethod
+    def _loss(
+        logits: Tensor,
+        target_codes: np.ndarray,
+        sample_weights: np.ndarray,
+        class_weights: Tensor,
+    ) -> Tensor:
+        losses = nn.functional.cross_entropy(
+            logits,
+            torch.from_numpy(target_codes),
+            weight=class_weights,
+            reduction="none",
+        )
+        weights = torch.from_numpy(sample_weights)
+        return (losses * weights).sum() / weights.sum()

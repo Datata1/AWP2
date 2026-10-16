@@ -2,6 +2,7 @@
 
 import unittest
 
+import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import clone
@@ -158,3 +159,28 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
         )
 
         self.assertIsInstance(module, _EmbeddingFusionLSTMClassifier)
+
+    def test_fit_predict_returns_one_label_per_spectrum(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.Series(np.tile(["first", "second"], n_rows // 2), index=features.index)
+        classifier = SpectralLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=2,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(predicted.shape, (n_rows,))
+        self.assertTrue(set(predicted).issubset(set(targets)))
