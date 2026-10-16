@@ -141,3 +141,20 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "dropout"):
             classifier._validate_hyperparameters()
+
+    def test_builds_embedding_module_for_embedding_context(self) -> None:
+        features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [3, 9, 12],
+                "X427": [0.1, 0.2, 0.3],
+                "X437": [0.4, 0.5, 0.6],
+            }
+        )
+        adapter = _LSTMInputAdapter(LSTM_EMBEDDINGS_CONTEXT).fit(features)
+
+        module = SpectralLSTMClassifier(context_mode=LSTM_EMBEDDINGS_CONTEXT)._build_module(
+            adapter, n_classes=2
+        )
+
+        self.assertIsInstance(module, _EmbeddingFusionLSTMClassifier)

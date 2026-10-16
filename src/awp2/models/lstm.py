@@ -258,3 +258,28 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             raise ValueError("embedding dimensions must be positive")
         if self.max_epochs < 1 or self.batch_size < 1:
             raise ValueError("max_epochs and batch_size must be positive")
+
+    def _build_module(self, adapter: _LSTMInputAdapter, n_classes: int) -> nn.Module:
+        if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
+            return _EmbeddingFusionLSTMClassifier(
+                input_size=1,
+                hidden_size=self.hidden_size,
+                num_layers=self.num_layers,
+                dropout=self.dropout,
+                n_aez_categories=len(adapter.aez_codes_) + 1,
+                n_month_categories=len(adapter.month_codes_) + 1,
+                aez_embedding_dim=self.aez_embedding_dim,
+                month_embedding_dim=self.month_embedding_dim,
+                n_classes=n_classes,
+            )
+        n_context_features = 0 if self.context_mode == LSTM_NO_CONTEXT else len(
+            adapter.context_columns_
+        )
+        return _LateFusionLSTMClassifier(
+            input_size=1,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            dropout=self.dropout,
+            n_context_features=n_context_features,
+            n_classes=n_classes,
+        )
