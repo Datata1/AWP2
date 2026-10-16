@@ -18,6 +18,19 @@ from torch.utils.data import DataLoader, TensorDataset
 from awp2.config import (
     CROP_COL,
     CROPS,
+    LSTM_DEFAULT_AEZ_EMBEDDING_DIM,
+    LSTM_DEFAULT_BATCH_SIZE,
+    LSTM_DEFAULT_DROPOUT,
+    LSTM_DEFAULT_HIDDEN_SIZE,
+    LSTM_DEFAULT_LEARNING_RATE,
+    LSTM_DEFAULT_MAX_EPOCHS,
+    LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
+    LSTM_DEFAULT_NUM_LAYERS,
+    LSTM_DEFAULT_WEIGHT_DECAY,
+    LSTM_EMBEDDINGS_CONTEXT,
+    LSTM_NO_CONTEXT,
+    LSTM_STANDARD_CONTEXT,
+    LSTMContextMode,
     MLP_DEFAULT_BATCH_SIZE,
     MLP_DEFAULT_DROPOUT,
     MLP_DEFAULT_HIDDEN_LAYERS,
@@ -405,3 +418,74 @@ class MultiTaskMLPClassifier(ClassifierMixin, BaseEstimator):
         if list(X.columns) != list(self.feature_names_in_):
             raise ValueError("X must have the same columns in the same order as during fitting")
         return features
+
+
+class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
+    """Learn shared LSTM features with separate crop and stage prediction heads.
+
+    Args:
+        context_mode: Whether to omit context, use preprocessed numeric context, or learn
+            AEZ and Month embeddings.
+        hidden_size: Width of the LSTM hidden state.
+        num_layers: Number of stacked LSTM layers.
+        dropout: Dropout probability between stacked LSTM layers.
+        learning_rate: Adam learning rate.
+        weight_decay: Adam L2 regularization strength.
+        aez_embedding_dim: Width of the AEZ embedding.
+        month_embedding_dim: Width of the Month embedding.
+        max_epochs: Maximum training epochs before early stopping.
+        batch_size: Number of rows per optimization batch.
+        crop_loss_weight: Weight of the crop loss; the stage loss gets the remaining weight.
+        random_state: Seed for training randomness and the inner validation split.
+    """
+
+    def __init__(
+        self,
+        context_mode: LSTMContextMode = LSTM_STANDARD_CONTEXT,
+        hidden_size: int = LSTM_DEFAULT_HIDDEN_SIZE,
+        num_layers: int = LSTM_DEFAULT_NUM_LAYERS,
+        dropout: float = LSTM_DEFAULT_DROPOUT,
+        learning_rate: float = LSTM_DEFAULT_LEARNING_RATE,
+        weight_decay: float = LSTM_DEFAULT_WEIGHT_DECAY,
+        aez_embedding_dim: int = LSTM_DEFAULT_AEZ_EMBEDDING_DIM,
+        month_embedding_dim: int = LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
+        max_epochs: int = LSTM_DEFAULT_MAX_EPOCHS,
+        batch_size: int = LSTM_DEFAULT_BATCH_SIZE,
+        crop_loss_weight: float = 0.5,
+        random_state: int = SEED,
+    ) -> None:
+        """Store unfitted hyperparameters for sklearn cloning."""
+        self.context_mode = context_mode
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.aez_embedding_dim = aez_embedding_dim
+        self.month_embedding_dim = month_embedding_dim
+        self.max_epochs = max_epochs
+        self.batch_size = batch_size
+        self.crop_loss_weight = crop_loss_weight
+        self.random_state = random_state
+
+    def _validate_hyperparameters(self) -> None:
+        if self.context_mode not in (
+            LSTM_NO_CONTEXT,
+            LSTM_STANDARD_CONTEXT,
+            LSTM_EMBEDDINGS_CONTEXT,
+        ):
+            raise ValueError(f"Unknown context mode {self.context_mode!r}")
+        if self.hidden_size < 1 or self.num_layers < 1:
+            raise ValueError("hidden_size and num_layers must be positive")
+        if not 0 <= self.dropout < 1:
+            raise ValueError("dropout must be in [0, 1)")
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be positive")
+        if self.weight_decay < 0:
+            raise ValueError("weight_decay must be non-negative")
+        if self.aez_embedding_dim < 1 or self.month_embedding_dim < 1:
+            raise ValueError("embedding dimensions must be positive")
+        if self.max_epochs < 1 or self.batch_size < 1:
+            raise ValueError("max_epochs and batch_size must be positive")
+        if not 0 < self.crop_loss_weight < 1:
+            raise ValueError("crop_loss_weight must be in (0, 1)")

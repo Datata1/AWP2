@@ -12,7 +12,7 @@ from sklearn.pipeline import Pipeline
 from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
-from awp2.models.multi_task import _MultiTaskLateFusionLSTMModule
+from awp2.models.multi_task import _MultiTaskLateFusionLSTMModule, MultiTaskLSTMClassifier
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 
@@ -140,6 +140,22 @@ class MultiTaskLateFusionLSTMModuleTest(unittest.TestCase):
         self.assertEqual(module.stage_head.in_features, hidden_size + n_context_features)
         self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
         self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
+
+
+class MultiTaskLSTMClassifierTest(unittest.TestCase):
+    def test_clone_preserves_configured_hyperparameters(self) -> None:
+        classifier = MultiTaskLSTMClassifier(hidden_size=8, crop_loss_weight=0.6)
+
+        cloned = clone(classifier)
+
+        self.assertEqual(cloned.hidden_size, 8)
+        self.assertEqual(cloned.crop_loss_weight, 0.6)
+
+    def test_rejects_invalid_crop_loss_weight(self) -> None:
+        classifier = MultiTaskLSTMClassifier(crop_loss_weight=1.0)
+
+        with self.assertRaisesRegex(ValueError, "crop_loss_weight"):
+            classifier._validate_hyperparameters()
 
 
 if __name__ == "__main__":
