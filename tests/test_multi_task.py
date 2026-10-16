@@ -23,9 +23,9 @@ from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
 from awp2.models.lstm import _LSTMInputAdapter
 from awp2.models.multi_task import (
+    MultiTaskLSTMClassifier,
     _MultiTaskEmbeddingFusionLSTMModule,
     _MultiTaskLateFusionLSTMModule,
-    MultiTaskLSTMClassifier,
 )
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 

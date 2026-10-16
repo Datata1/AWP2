@@ -17,11 +17,11 @@ from awp2.config import (
     EXTRA_TREES_N_ESTIMATORS,
     HARD_ROUTING,
     LSTM_STANDARD_CONTEXT,
-    LSTMContextMode,
     SEED,
     SOFT_ROUTING,
     STAGE_COL,
     TARGET_COLS,
+    LSTMContextMode,
     Routing,
 )
 from awp2.data import combined_label

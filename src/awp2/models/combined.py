@@ -16,11 +16,11 @@ from awp2.config import (
     EXTRA_TREES_N_ESTIMATORS,
     LABEL_SEP,
     LSTM_STANDARD_CONTEXT,
-    LSTMContextMode,
     RANDOM_FOREST_N_ESTIMATORS,
     SEED,
     STAGE_COL,
     TARGET_COLS,
+    LSTMContextMode,
 )
 from awp2.data import combined_label
 from awp2.models.lstm import SpectralLSTMClassifier

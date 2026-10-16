@@ -11,12 +11,12 @@ from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, LSTM_STANDARD_CONTEXT,
 from awp2.models.combined import CombinedLabelClassifier, make_combined_spectral_lstm
 from awp2.models.hierarchical import HierarchicalClassifier, make_hierarchical_spectral_lstm
 from awp2.models.lstm import (
+    SpectralLSTMClassifier,
     _CategoricalContextEncoder,
     _EmbeddingFusionLSTMClassifier,
-    _LSTMInputAdapter,
     _LateFusionLSTMClassifier,
+    _LSTMInputAdapter,
     _SpectralLSTMEncoder,
-    SpectralLSTMClassifier,
 )
 
 
@@ -51,7 +51,10 @@ class CategoricalContextEncoderTest(unittest.TestCase):
 
         context = encoder(torch.tensor([1, 2, 3]), torch.tensor([1, 2, 3]))
 
-        self.assertEqual(tuple(context.shape), (batch_size, aez_embedding_dim + month_embedding_dim))
+        self.assertEqual(
+            tuple(context.shape),
+            (batch_size, aez_embedding_dim + month_embedding_dim),
+        )
 
 
 class LateFusionLSTMClassifierTest(unittest.TestCase):

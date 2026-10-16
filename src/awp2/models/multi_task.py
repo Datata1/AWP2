@@ -27,12 +27,11 @@ from awp2.config import (
     LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
     LSTM_DEFAULT_NUM_LAYERS,
     LSTM_DEFAULT_WEIGHT_DECAY,
-    LSTM_EMBEDDINGS_CONTEXT,
     LSTM_EARLY_STOPPING_PATIENCE,
+    LSTM_EMBEDDINGS_CONTEXT,
     LSTM_INNER_VALIDATION_FRACTION,
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
-    LSTMContextMode,
     MLP_DEFAULT_BATCH_SIZE,
     MLP_DEFAULT_DROPOUT,
     MLP_DEFAULT_HIDDEN_LAYERS,
@@ -46,6 +45,7 @@ from awp2.config import (
     STAGE_COL,
     STAGES,
     TARGET_COLS,
+    LSTMContextMode,
 )
 from awp2.data import combined_label
 from awp2.models.lstm import (

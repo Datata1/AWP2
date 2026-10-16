@@ -22,14 +22,14 @@ from awp2.config import (
     LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
     LSTM_DEFAULT_NUM_LAYERS,
     LSTM_DEFAULT_WEIGHT_DECAY,
-    LSTM_EMBEDDINGS_CONTEXT,
     LSTM_EARLY_STOPPING_PATIENCE,
+    LSTM_EMBEDDINGS_CONTEXT,
     LSTM_INNER_VALIDATION_FRACTION,
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
-    LSTMContextMode,
     MONTH_COL,
     SEED,
+    LSTMContextMode,
 )
 from awp2.data import band_columns
 
@@ -151,7 +151,17 @@ class _LSTMInputAdapter:
         self.context_mode = context_mode
 
     def fit(self, X: pd.DataFrame) -> Self:
-        """Learn the fitted input columns and categorical context codes."""
+        """Learn the fitted input columns and categorical context codes.
+
+        Args:
+            X: Preprocessed spectral bands and context columns.
+
+        Returns:
+            This fitted input adapter.
+
+        Raises:
+            ValueError: If features are empty, lack spectral bands or violate the context mode.
+        """
         self._validate_frame(X)
         self.feature_names_in_ = np.asarray(X.columns, dtype=object)
         self.band_columns_ = band_columns(X)
@@ -168,7 +178,17 @@ class _LSTMInputAdapter:
         return self
 
     def transform(self, X: pd.DataFrame) -> dict[str, np.ndarray]:
-        """Return network inputs in the representation selected during fitting."""
+        """Return network inputs in the representation selected during fitting.
+
+        Args:
+            X: Preprocessed features with the fitted column order.
+
+        Returns:
+            Arrays for the spectral sequence and configured context representation.
+
+        Raises:
+            ValueError: If features are empty or have different columns than during fitting.
+        """
         self._validate_frame(X)
         if list(X.columns) != list(self.feature_names_in_):
             raise ValueError("X must have the same columns in the same order as during fitting")
