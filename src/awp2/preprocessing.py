@@ -1131,6 +1131,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
 
 
 def _describe_step(name: str, step: BaseEstimator | str) -> str:
+    if name == "context":
+        return "AEZ and Month as categorical context"
     if isinstance(step, str):
         return f"Month {step}"
     known: dict[str, str] = {
@@ -1177,6 +1179,7 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
 
 _BRANCH_LETTERS: dict[str, str] = {
     "aez": "A",
+    "context": "A",
     "month": "B",
     "albedo": "C",
     "indices": "D",
