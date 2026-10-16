@@ -666,6 +666,35 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
         self.best_validation_loss_ = best_loss
         return self
 
+    def predict(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Predict crop and stage labels from preprocessed spectral and context features.
+
+        Args:
+            X: Preprocessed features with the fitted column order.
+
+        Returns:
+            Target frame with the columns ``Crop`` and ``Stage``.
+        """
+        check_is_fitted(self, ["input_adapter_", "module_", "allowed_pair_codes_"])
+        inputs = self.input_adapter_.transform(X)
+        self._validate_inputs(inputs)
+        self.module_.eval()
+        with torch.no_grad():
+            crop_logits, stage_logits = self._logits(inputs, np.arange(len(X)))
+        allowed_pair_codes = torch.from_numpy(self.allowed_pair_codes_)
+        pair_log_probabilities = (
+            functional.log_softmax(crop_logits, dim=1)[:, allowed_pair_codes[:, 0]]
+            + functional.log_softmax(stage_logits, dim=1)[:, allowed_pair_codes[:, 1]]
+        )
+        prediction_codes = self.allowed_pair_codes_[pair_log_probabilities.argmax(dim=1).numpy()]
+        return pd.DataFrame(
+            {
+                CROP_COL: self.crop_classes_[prediction_codes[:, 0]],
+                STAGE_COL: self.stage_classes_[prediction_codes[:, 1]],
+            },
+            index=X.index,
+        )
+
     @staticmethod
     def _validate_sample_weight(
         sample_weight: np.ndarray | None, n_samples: int

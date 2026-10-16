@@ -250,6 +250,51 @@ class MultiTaskLSTMClassifierTest(unittest.TestCase):
         self.assertLessEqual(classifier.n_epochs_, classifier.max_epochs)
         self.assertEqual(classifier.allowed_pair_codes_.shape, (2, 2))
 
+    def test_predict_limits_results_to_observed_crop_stage_pairs(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        ).fit(features, targets)
+
+        class IndependentHeads(torch.nn.Module):
+            def forward(
+                self, spectrum: torch.Tensor, context: torch.Tensor
+            ) -> tuple[torch.Tensor, torch.Tensor]:
+                crop_logits = torch.full((len(spectrum), len(CROPS)), -1.0)
+                stage_logits = torch.full((len(spectrum), len(STAGES)), -1.0)
+                crop_logits[:, CROPS.index("rice")] = 6.0
+                crop_logits[:, CROPS.index("corn")] = 5.0
+                stage_logits[:, STAGES.index("Late")] = 6.0
+                stage_logits[:, STAGES.index("Harvest")] = 5.0
+                return crop_logits, stage_logits
+
+        classifier.module_ = IndependentHeads()
+        predicted = classifier.predict(features)
+        observed_pairs = set(map(tuple, targets[[CROP_COL, STAGE_COL]].to_numpy()))
+
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+        self.assertNotIn(("rice", "Late"), set(map(tuple, predicted.to_numpy())))
+
 
 if __name__ == "__main__":
     unittest.main()
