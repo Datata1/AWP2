@@ -46,3 +46,30 @@ class _CategoricalContextEncoder(nn.Module):
     def forward(self, aez_codes: Tensor, month_codes: Tensor) -> Tensor:
         """Return concatenated AEZ and Month embeddings per sample."""
         return torch.cat((self.aez_embedding(aez_codes), self.month_embedding(month_codes)), dim=1)
+
+
+class _LateFusionLSTMClassifier(nn.Module):
+    """Predict one target from an LSTM spectrum representation and static context."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float,
+        n_context_features: int,
+        n_classes: int,
+    ) -> None:
+        super().__init__()
+        self.spectral_encoder = _SpectralLSTMEncoder(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+        )
+        self.classifier = nn.Linear(hidden_size + n_context_features, n_classes)
+
+    def forward(self, spectrum: Tensor, context: Tensor) -> Tensor:
+        """Return class logits after fusing the encoded spectrum and context."""
+        features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
+        return self.classifier(features)
