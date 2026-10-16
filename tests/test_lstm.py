@@ -8,6 +8,7 @@ import torch
 from sklearn.base import clone
 
 from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, LSTM_STANDARD_CONTEXT, MONTH_COL
+from awp2.models.combined import CombinedLabelClassifier, make_combined_spectral_lstm
 from awp2.models.lstm import (
     _CategoricalContextEncoder,
     _EmbeddingFusionLSTMClassifier,
@@ -129,6 +130,13 @@ class LSTMInputAdapterTest(unittest.TestCase):
 
 
 class SpectralLSTMClassifierTest(unittest.TestCase):
+    def test_combined_factory_wraps_lstm_with_requested_context_mode(self) -> None:
+        classifier = make_combined_spectral_lstm(LSTM_EMBEDDINGS_CONTEXT)
+
+        self.assertIsInstance(classifier, CombinedLabelClassifier)
+        self.assertIsInstance(classifier.estimator, SpectralLSTMClassifier)
+        self.assertEqual(classifier.estimator.context_mode, LSTM_EMBEDDINGS_CONTEXT)
+
     def test_clone_preserves_configured_hyperparameters(self) -> None:
         classifier = SpectralLSTMClassifier(hidden_size=8, context_mode=LSTM_EMBEDDINGS_CONTEXT)
 
