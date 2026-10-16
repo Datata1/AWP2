@@ -23,7 +23,7 @@ from awp2.models.hierarchical import (
 )
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
 from awp2.models.lstm import SpectralLSTMClassifier
-from awp2.models.multi_task import MultiTaskMLPClassifier
+from awp2.models.multi_task import MultiTaskLSTMClassifier, MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "BalancedLinearDiscriminantAnalysis",
     "PLSDAClassifier",
     "CombinedLabelClassifier",
+    "MultiTaskLSTMClassifier",
     "MultiTaskMLPClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
