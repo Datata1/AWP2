@@ -361,6 +361,42 @@ class MultiTaskLSTMClassifierTest(unittest.TestCase):
         self.assertEqual(list(predicted.columns), list(TARGET_COLS))
         self.assertTrue(predicted.index.equals(features.index))
 
+    def test_grid_search_scores_multi_output_predictions(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        search = GridSearchCV(
+            MultiTaskLSTMClassifier(
+                context_mode="none",
+                hidden_size=4,
+                num_layers=1,
+                dropout=0.0,
+                max_epochs=1,
+                batch_size=4,
+            ),
+            param_grid={"hidden_size": [4]},
+            scoring=scorer(),
+            cv=2,
+            error_score="raise",
+        )
+
+        search.fit(features, targets)
+
+        self.assertTrue(np.isfinite(search.cv_results_["mean_test_score"][0]))
+
     def test_predict_limits_results_to_observed_crop_stage_pairs(self) -> None:
         n_rows = 20
         generator = np.random.default_rng(42)
