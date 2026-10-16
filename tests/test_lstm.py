@@ -9,11 +9,9 @@ from sklearn.base import clone
 
 from awp2.config import (
     AEZ_COL,
-    CROP_COL,
     LSTM_EMBEDDINGS_CONTEXT,
     LSTM_STANDARD_CONTEXT,
     MONTH_COL,
-    STAGE_COL,
     TARGET_COLS,
 )
 from awp2.models.combined import CombinedLabelClassifier, make_combined_spectral_lstm
@@ -181,7 +179,9 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
 
         self.assertEqual(list(predicted.columns), list(TARGET_COLS))
         self.assertTrue(predicted.index.equals(features.index))
-        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy()))))
+        self.assertTrue(
+            set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy())))
+        )
 
     def test_hierarchical_lstm_fits_and_returns_target_frame(self) -> None:
         features, targets = self._paired_training_data()
@@ -202,7 +202,9 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
 
         self.assertEqual(list(predicted.columns), list(TARGET_COLS))
         self.assertTrue(predicted.index.equals(features.index))
-        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy()))))
+        self.assertTrue(
+            set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy())))
+        )
 
     def test_hierarchical_factory_configures_independent_lstm_prototypes(self) -> None:
         classifier = make_hierarchical_spectral_lstm(LSTM_EMBEDDINGS_CONTEXT)

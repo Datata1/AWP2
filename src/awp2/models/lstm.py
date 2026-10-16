@@ -337,7 +337,9 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         elif isinstance(y, np.ndarray) and y.ndim == 1:
             target_values = y.astype(str, copy=False)
         else:
-            raise TypeError(f"Expected y as a pandas Series or one-dimensional ndarray, got {type(y)}.")
+            raise TypeError(
+                f"Expected y as a pandas Series or one-dimensional ndarray, got {type(y)}."
+            )
         if len(target_values) != len(X):
             raise ValueError("X and y must have the same index")
         if len(target_values) < 2:
