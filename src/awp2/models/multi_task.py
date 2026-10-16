@@ -46,7 +46,11 @@ from awp2.config import (
     TARGET_COLS,
 )
 from awp2.data import combined_label
-from awp2.models.lstm import _CategoricalContextEncoder, _SpectralLSTMEncoder
+from awp2.models.lstm import (
+    _CategoricalContextEncoder,
+    _LSTMInputAdapter,
+    _SpectralLSTMEncoder,
+)
 
 
 class _MultiTaskMLPModule(nn.Module):
@@ -528,3 +532,24 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
             raise ValueError("max_epochs and batch_size must be positive")
         if not 0 < self.crop_loss_weight < 1:
             raise ValueError("crop_loss_weight must be in (0, 1)")
+
+    def _build_module(self, adapter: _LSTMInputAdapter) -> nn.Module:
+        if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
+            return _MultiTaskEmbeddingFusionLSTMModule(
+                hidden_size=self.hidden_size,
+                num_layers=self.num_layers,
+                dropout=self.dropout,
+                n_aez_categories=len(adapter.aez_codes_) + 1,
+                n_month_categories=len(adapter.month_codes_) + 1,
+                aez_embedding_dim=self.aez_embedding_dim,
+                month_embedding_dim=self.month_embedding_dim,
+            )
+        n_context_features = 0 if self.context_mode == LSTM_NO_CONTEXT else len(
+            adapter.context_columns_
+        )
+        return _MultiTaskLateFusionLSTMModule(
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            dropout=self.dropout,
+            n_context_features=n_context_features,
+        )

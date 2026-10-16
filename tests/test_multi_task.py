@@ -9,9 +9,19 @@ from sklearn.base import clone
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
+from awp2.config import (
+    AEZ_COL,
+    CROP_COL,
+    CROPS,
+    LSTM_EMBEDDINGS_CONTEXT,
+    MONTH_COL,
+    STAGE_COL,
+    STAGES,
+    TARGET_COLS,
+)
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
+from awp2.models.lstm import _LSTMInputAdapter
 from awp2.models.multi_task import (
     _MultiTaskEmbeddingFusionLSTMModule,
     _MultiTaskLateFusionLSTMModule,
@@ -177,6 +187,23 @@ class MultiTaskEmbeddingFusionLSTMModuleTest(unittest.TestCase):
 
 
 class MultiTaskLSTMClassifierTest(unittest.TestCase):
+    def test_builds_embedding_module_for_embedding_context(self) -> None:
+        features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [3, 9, 12],
+                "X427": [0.1, 0.2, 0.3],
+                "X437": [0.4, 0.5, 0.6],
+            }
+        )
+        adapter = _LSTMInputAdapter(LSTM_EMBEDDINGS_CONTEXT).fit(features)
+
+        module = MultiTaskLSTMClassifier(context_mode=LSTM_EMBEDDINGS_CONTEXT)._build_module(
+            adapter
+        )
+
+        self.assertIsInstance(module, _MultiTaskEmbeddingFusionLSTMModule)
+
     def test_clone_preserves_configured_hyperparameters(self) -> None:
         classifier = MultiTaskLSTMClassifier(hidden_size=8, crop_loss_weight=0.6)
 
