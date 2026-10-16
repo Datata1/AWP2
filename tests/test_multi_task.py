@@ -250,6 +250,73 @@ class MultiTaskLSTMClassifierTest(unittest.TestCase):
         self.assertLessEqual(classifier.n_epochs_, classifier.max_epochs)
         self.assertEqual(classifier.allowed_pair_codes_.shape, (2, 2))
 
+    def test_fit_predict_supports_standard_context(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "AEZ_1": np.tile([1.0, 0.0], n_rows // 2),
+                "Month_sin": np.tile([0.5, -0.5], n_rows // 2),
+                "Month_cos": np.tile([0.5, -0.5], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="standard",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        observed_pairs = set(map(tuple, targets.to_numpy()))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+
+    def test_fit_predict_supports_context_embeddings(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                AEZ_COL: np.tile([1, 2], n_rows // 2),
+                MONTH_COL: np.tile([3, 9], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode=LSTM_EMBEDDINGS_CONTEXT,
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        observed_pairs = set(map(tuple, targets.to_numpy()))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+
     def test_predict_limits_results_to_observed_crop_stage_pairs(self) -> None:
         n_rows = 20
         generator = np.random.default_rng(42)
