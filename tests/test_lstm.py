@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 from sklearn.base import clone
 
-from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, MONTH_COL
+from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, LSTM_STANDARD_CONTEXT, MONTH_COL
 from awp2.models.lstm import (
     _CategoricalContextEncoder,
     _EmbeddingFusionLSTMClassifier,
@@ -177,6 +177,59 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
             num_layers=1,
             dropout=0.0,
             max_epochs=2,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(predicted.shape, (n_rows,))
+        self.assertTrue(set(predicted).issubset(set(targets)))
+
+    def test_fit_predict_supports_standard_context(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "AEZ_1": np.tile([1.0, 0.0], n_rows // 2),
+                "Month_sin": np.tile([0.5, -0.5], n_rows // 2),
+                "Month_cos": np.tile([0.5, -0.5], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.Series(np.tile(["first", "second"], n_rows // 2), index=features.index)
+        classifier = SpectralLSTMClassifier(
+            context_mode=LSTM_STANDARD_CONTEXT,
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(predicted.shape, (n_rows,))
+        self.assertTrue(set(predicted).issubset(set(targets)))
+
+    def test_fit_predict_supports_context_embeddings(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                AEZ_COL: np.tile([1, 2], n_rows // 2),
+                MONTH_COL: np.tile([3, 9], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.Series(np.tile(["first", "second"], n_rows // 2), index=features.index)
+        classifier = SpectralLSTMClassifier(
+            context_mode=LSTM_EMBEDDINGS_CONTEXT,
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
             batch_size=4,
         )
 
