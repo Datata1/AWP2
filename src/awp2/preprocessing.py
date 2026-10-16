@@ -792,6 +792,13 @@ class PreprocessingConfig(BaseModel):
     use_meta: bool = Field(
         default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
     )
+    use_categorical_context: bool = Field(
+        default=False,
+        description=(
+            "Keep AEZ and Month as unscaled categorical columns for a model that learns "
+            "context embeddings; overrides one-hot AEZ and cyclic Month encoding."
+        ),
+    )
     scale: bool = Field(
         default=False,
         description="Deprecated, will be removed soon – use use_spectral_standard_scale instead. "
@@ -1072,18 +1079,23 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
 
     transformers: list[tuple[str, BaseEstimator | str, object]] = []
     if config.use_meta:
-        transformers.append(
-            ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [AEZ_COL])
-        )
-        if config.use_cyclic_month:
-            month_transformers: list[tuple[str, BaseEstimator]] = [("cyclic", CyclicMonthEncoder())]
-            if config.scale:
-                month_transformers.append(("scale", StandardScaler()))
-            transformers.append(("month", Pipeline(month_transformers), [MONTH_COL]))
+        if config.use_categorical_context:
+            transformers.append(("context", "passthrough", [AEZ_COL, MONTH_COL]))
         else:
             transformers.append(
-                ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL])
+                ("aez", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [AEZ_COL])
             )
+            if config.use_cyclic_month:
+                month_transformers: list[tuple[str, BaseEstimator]] = [
+                    ("cyclic", CyclicMonthEncoder())
+                ]
+                if config.scale:
+                    month_transformers.append(("scale", StandardScaler()))
+                transformers.append(("month", Pipeline(month_transformers), [MONTH_COL]))
+            else:
+                transformers.append(
+                    ("month", StandardScaler() if config.scale else "passthrough", [MONTH_COL])
+                )
     if config.use_mean_albedo:
         transformers.append(
             (
