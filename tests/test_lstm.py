@@ -6,6 +6,7 @@ import torch
 
 from awp2.models.lstm import (
     _CategoricalContextEncoder,
+    _EmbeddingFusionLSTMClassifier,
     _LateFusionLSTMClassifier,
     _SpectralLSTMEncoder,
 )
@@ -66,4 +67,37 @@ class LateFusionLSTMClassifierTest(unittest.TestCase):
         )
 
         self.assertEqual(classifier.classifier.in_features, hidden_size + n_context_features)
+        self.assertEqual(tuple(logits.shape), (batch_size, n_classes))
+
+
+class EmbeddingFusionLSTMClassifierTest(unittest.TestCase):
+    def test_fuses_context_embeddings_after_spectral_encoding(self) -> None:
+        batch_size = 3
+        n_bands = 4
+        hidden_size = 5
+        aez_embedding_dim = 4
+        month_embedding_dim = 3
+        n_classes = 6
+        classifier = _EmbeddingFusionLSTMClassifier(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            n_aez_categories=5,
+            n_month_categories=4,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+            n_classes=n_classes,
+        )
+
+        logits = classifier(
+            torch.rand(batch_size, n_bands, 1),
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 2, 3]),
+        )
+
+        self.assertEqual(
+            classifier.classifier.in_features,
+            hidden_size + aez_embedding_dim + month_embedding_dim,
+        )
         self.assertEqual(tuple(logits.shape), (batch_size, n_classes))

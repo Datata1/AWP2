@@ -73,3 +73,42 @@ class _LateFusionLSTMClassifier(nn.Module):
         """Return class logits after fusing the encoded spectrum and context."""
         features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
         return self.classifier(features)
+
+
+class _EmbeddingFusionLSTMClassifier(nn.Module):
+    """Predict one target from an LSTM spectrum representation and learned context."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float,
+        n_aez_categories: int,
+        n_month_categories: int,
+        aez_embedding_dim: int,
+        month_embedding_dim: int,
+        n_classes: int,
+    ) -> None:
+        super().__init__()
+        self.spectral_encoder = _SpectralLSTMEncoder(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+        )
+        self.context_encoder = _CategoricalContextEncoder(
+            n_aez_categories=n_aez_categories,
+            n_month_categories=n_month_categories,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+        )
+        self.classifier = nn.Linear(
+            hidden_size + aez_embedding_dim + month_embedding_dim, n_classes
+        )
+
+    def forward(self, spectrum: Tensor, aez_codes: Tensor, month_codes: Tensor) -> Tensor:
+        """Return class logits after fusing the encoded spectrum and context embeddings."""
+        context = self.context_encoder(aez_codes, month_codes)
+        features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
+        return self.classifier(features)
