@@ -4,6 +4,7 @@ import unittest
 
 import pandas as pd
 import torch
+from sklearn.base import clone
 
 from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, MONTH_COL
 from awp2.models.lstm import (
@@ -12,6 +13,7 @@ from awp2.models.lstm import (
     _LSTMInputAdapter,
     _LateFusionLSTMClassifier,
     _SpectralLSTMEncoder,
+    SpectralLSTMClassifier,
 )
 
 
@@ -123,3 +125,13 @@ class LSTMInputAdapterTest(unittest.TestCase):
         self.assertEqual(tuple(inputs["spectrum"].shape), (3, 2, 1))
         self.assertEqual(inputs["aez_codes"].tolist(), [1, 2, 3])
         self.assertEqual(inputs["month_codes"].tolist(), [1, 2, 3])
+
+
+class SpectralLSTMClassifierTest(unittest.TestCase):
+    def test_clone_preserves_configured_hyperparameters(self) -> None:
+        classifier = SpectralLSTMClassifier(hidden_size=8, context_mode=LSTM_EMBEDDINGS_CONTEXT)
+
+        cloned = clone(classifier)
+
+        self.assertEqual(cloned.hidden_size, 8)
+        self.assertEqual(cloned.context_mode, LSTM_EMBEDDINGS_CONTEXT)

@@ -5,15 +5,26 @@ from typing import Self
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.base import BaseEstimator, ClassifierMixin
 from torch import Tensor, nn
 
 from awp2.config import (
     AEZ_COL,
+    LSTM_DEFAULT_AEZ_EMBEDDING_DIM,
+    LSTM_DEFAULT_BATCH_SIZE,
+    LSTM_DEFAULT_DROPOUT,
+    LSTM_DEFAULT_HIDDEN_SIZE,
+    LSTM_DEFAULT_LEARNING_RATE,
+    LSTM_DEFAULT_MAX_EPOCHS,
+    LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
+    LSTM_DEFAULT_NUM_LAYERS,
+    LSTM_DEFAULT_WEIGHT_DECAY,
     LSTM_EMBEDDINGS_CONTEXT,
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
     LSTMContextMode,
     MONTH_COL,
+    SEED,
 )
 from awp2.data import band_columns
 
@@ -181,3 +192,49 @@ class _LSTMInputAdapter:
     @staticmethod
     def _encode_categories(values: pd.Series, codes: dict[int, int]) -> np.ndarray:
         return np.asarray([codes.get(int(value), 0) for value in values], dtype=np.int64)
+
+
+class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
+    """Classify one target from a spectral sequence and optional static context.
+
+    Args:
+        context_mode: Whether to omit context, use preprocessed numeric context, or learn
+            AEZ and Month embeddings.
+        hidden_size: Width of the LSTM hidden state.
+        num_layers: Number of stacked LSTM layers.
+        dropout: Dropout probability between stacked LSTM layers.
+        learning_rate: Adam learning rate.
+        weight_decay: Adam L2 regularization strength.
+        aez_embedding_dim: Width of the AEZ embedding.
+        month_embedding_dim: Width of the Month embedding.
+        max_epochs: Maximum training epochs before early stopping.
+        batch_size: Number of rows per optimization batch.
+        random_state: Seed for training randomness and the inner validation split.
+    """
+
+    def __init__(
+        self,
+        context_mode: LSTMContextMode = LSTM_STANDARD_CONTEXT,
+        hidden_size: int = LSTM_DEFAULT_HIDDEN_SIZE,
+        num_layers: int = LSTM_DEFAULT_NUM_LAYERS,
+        dropout: float = LSTM_DEFAULT_DROPOUT,
+        learning_rate: float = LSTM_DEFAULT_LEARNING_RATE,
+        weight_decay: float = LSTM_DEFAULT_WEIGHT_DECAY,
+        aez_embedding_dim: int = LSTM_DEFAULT_AEZ_EMBEDDING_DIM,
+        month_embedding_dim: int = LSTM_DEFAULT_MONTH_EMBEDDING_DIM,
+        max_epochs: int = LSTM_DEFAULT_MAX_EPOCHS,
+        batch_size: int = LSTM_DEFAULT_BATCH_SIZE,
+        random_state: int = SEED,
+    ) -> None:
+        """Store unfitted hyperparameters for sklearn cloning."""
+        self.context_mode = context_mode
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.aez_embedding_dim = aez_embedding_dim
+        self.month_embedding_dim = month_embedding_dim
+        self.max_epochs = max_epochs
+        self.batch_size = batch_size
+        self.random_state = random_state
