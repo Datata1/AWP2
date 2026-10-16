@@ -47,7 +47,7 @@ helfen. Label-Logik, Vorverarbeitung und Sequenzarchitektur bleiben dabei unver�
 | 5 | Entstehen problematische Paarvorhersagen? | **Abgeschlossen:** Die Dekodierung auf im Trainingsanteil beobachtete Paare beschränken und PCA-20 erneut mit CV auswählen und einmal bewerten. | Keine ungültigen Vorhersagen; CV-BAcc kombiniert steigt von 0,722 auf 0,728. |
 
 Der tabellarische Vergleich ist abgeschlossen. Als getrennte sequenzielle Erweiterung testet
-/#136 nun einen Multi-Task-LSTM: Er prüft, ob die Reihenfolge der Wellenlängen gegenüber der
+#136 nun einen Multi-Task-LSTM: Er prüft, ob die Reihenfolge der Wellenlängen gegenüber der
 tabellarischen Darstellung hilft, ohne die bestehende MLP-Referenz oder deren Holdout-Ergebnis
 nachträglich zu beeinflussen.
 
@@ -89,7 +89,7 @@ AEZ wird One-Hot-kodiert und Month zyklisch kodiert.
 - Die Paarbeschränkung gibt ausschließlich im jeweiligen Trainingsanteil beobachtete Crop/Stage-
         Kombinationen aus; im PCA-Holdout entstehen keine ungültigen Paare.
 
-### Multi-Task-LSTM mit spät fusioniertem Kontext (vor Evaluation)
+### Multi-Task-LSTM mit spät fusioniertem Kontext
 
 Ein gemeinsamer LSTM kodiert die skalierte Spektralfolge; getrennte Crop- und Stage-Heads sehen
 erst danach die spektrale Repräsentation mit optionalem Kontext. Die Paarbeschränkung wählt bei
@@ -101,8 +101,17 @@ der Vorhersage ausschließlich Kombinationen, die im jeweiligen Training beobach
 - **Kontrollen:** `none`, das bestehende One-Hot-/zyklische Encoding und lernbare
         AEZ-/Monatsembeddings unterscheiden sich nur in der späten Kontextfusion. Alle Varianten
         verwenden dieselbe standardisierte Spektralvorverarbeitung und den gleichen Suchraum.
-- **Auswertung:** Für jede Variante wählt `tune()` ausschließlich anhand der CV-BAcc kombiniert
-        den Kandidaten; `run()` bewertet diesen Gewinner einmal auf dem gemeinsamen Holdout.
+- Die Embedding-Variante wählt per CV einen Encoder mit 64 Einheiten und Dropout 0,2
+        (CV-BAcc kombiniert 0,458). Die einmalige Holdout-Bewertung erreicht BAcc Crop 0,796,
+        Stage 0,744 und kombiniert **0,417**, Macro-F1 kombiniert 0,388 sowie Samples-F1 0,717.
+- Die Paarbeschränkung erzeugt keine ungültigen Kombinationen. Gegen das tabellarische
+        Multi-Task-MLP mit PCA-20 verliert der LSTM 0,348 BAcc kombiniert (0,417 statt 0,765).
+- Die Varianten ohne Kontext und mit Standardkontext wurden nicht ausgeführt, weil bereits der
+        Embedding-Lauf keine Verbesserung erkennen ließ. Sie haben deshalb keine CV- oder
+        Holdout-Metrik und ändern die Referenz nicht.
+- Notebook: `notebooks/27_duac1011-multi-task-lstm-embeddings.ipynb`. MLflow konnte den Lauf
+        wegen eines nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständige Ausgabe steht im
+        Notebook-Output.
 
 #### CV-only: Regularisierung und Preprocessing
 

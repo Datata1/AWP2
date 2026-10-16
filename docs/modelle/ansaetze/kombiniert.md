@@ -356,7 +356,7 @@ einen getrennten Kontextzweig ein.
 
 ![Häufigste Verwechslungen](../img/combined_cnn_confusions.png)
 
-### LSTM mit spät fusioniertem Kontext (vor Evaluation)
+### LSTM mit spät fusioniertem Kontext
 
 Der kombinierte LSTM kodiert ausschließlich die skalierte Spektralfolge. Erst der letzte
 LSTM-Zustand wird mit Kontext verbunden und danach auf die 23 kombinierten Klassen abgebildet;
@@ -367,9 +367,19 @@ dadurch können nur im Training beobachtete Crop/Stage-Paare entstehen.
 - **Kontrollen:** `none` erhält keine Metadaten, `standard` nutzt AEZ one-hot sowie zyklischen
     Monat, `embeddings` lernt getrennte AEZ- und Monatsembeddings. Alle drei Varianten erhalten
     dieselben standardisierten Spektren und denselben kleinen CV-Suchraum.
-- **Auswertung:** Pro Variante bestimmt `tune()` den CV-Gewinner auf dem Trainingsteil; nur
-    dieser wird genau einmal mit `run()` auf dem gemeinsamen Holdout bewertet. Ergebnisse,
-    Verwechslungen und MLflow-IDs werden erst nach den Läufen ergänzt.
+- Die drei CV-Gewinner nutzen jeweils eine LSTM-Schicht mit 64 Einheiten und Dropout 0,2.
+    Ihre CV-BAcc kombiniert beträgt ohne Kontext 0,289, mit Standardkontext 0,632 und mit
+    Embeddings **0,711**. Die jeweilige Holdout-BAcc kombiniert beträgt 0,324, 0,673 und
+    **0,700**; damit verbessern Embeddings den Standardkontext um 0,028.
+- Die Embeddings verbessern besonders die Stadium-BAcc gegenüber dem Standardkontext
+    (0,793 statt 0,746); die Crop-BAcc bleibt fast unverändert (0,812 statt 0,810).
+- Alle drei Dekodierungen erzeugen ausschließlich gültige Paare. Selbst die beste Variante
+    bleibt mit 0,166 BAcc kombiniert deutlich hinter der kombinierten SVM-Referenz (0,866).
+- Notebook: `notebooks/19_duac1011_combined-lstm-none.ipynb`,
+    `notebooks/20_duac1011_combined-lstm-standard.ipynb` und
+    `notebooks/21_duac1011_combined-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
+    nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
+    Notebook-Outputs.
 
 ### Extra Trees
 

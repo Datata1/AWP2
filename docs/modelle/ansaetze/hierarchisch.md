@@ -395,7 +395,7 @@ sind etwa 5 verschiedene Entscheidungsregeln.
 
 ![Ensemble: CV je Mitgliedermenge](../img/hierarchical_ensemble_tuning.png)
 
-### LSTM → LSTM mit hartem Routing (vor Evaluation)
+### LSTM → LSTM mit hartem Routing
 
 Die LSTM-Variante behält die bestehende harte Hierarchie bei: Ein LSTM sagt zuerst die Kultur
 voraus, danach sagt ein separater LSTM je vorhergesagter Kultur das Stadium voraus. Beide
@@ -407,8 +407,20 @@ Kontext erst mit dem letzten LSTM-Zustand.
 - **Kontrollen:** Die identische LSTM-Hyperparametersuche vergleicht kein Kontextsignal,
   bestehendes AEZ-/Monat-Encoding und lernbare AEZ-/Monatsembeddings. Weiches Routing und
   Kalibrierung sind nicht Teil dieser Studie.
-- **Auswertung:** Jede Variante wird erst per `tune()` auf den Trainingsfolds ausgewählt und
-  anschließend genau einmal per `run()` auf dem gemeinsamen Holdout bewertet.
+- Die CV-BAcc kombiniert steigt von 0,175 ohne Kontext auf 0,497 mit Standardkontext und
+  **0,546** mit Embeddings. Auf dem Holdout erreichen die Varianten 0,139, 0,486 und
+  **0,568** BAcc kombiniert.
+- Der beste Embedding-Lauf nutzt 32 Einheiten für die Kulturstufe und 64 für die Stadiumsstufe.
+  Gegenüber dem Standardkontext steigt vor allem die Stage-BAcc von 0,657 auf 0,778; die
+  Crop-BAcc bleibt mit 0,812 praktisch gleich.
+- Alle Varianten erzeugen nur gültige Paare. Der Embedding-LSTM bleibt jedoch 0,276 BAcc
+  kombiniert hinter der hierarchischen SVM-Referenz (0,844); die geordnete Repräsentation löst
+  die Fehlerfortpflanzung der Kulturstufe nicht.
+- Notebook: `notebooks/22_jd-hierarchical-lstm-none.ipynb`,
+  `notebooks/23_jd-hierarchical-lstm-standard.ipynb` und
+  `notebooks/24_jd-hierarchical-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
+  nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
+  Notebook-Outputs.
 
 ## Fazit
 
@@ -432,5 +444,6 @@ Gegen die kombinierte SVM mit gleicher Vorverarbeitung liegt er in der CV knapp 
   ein (CV 0.844 vs. 0.839, unter der Schwelle) – wo die SVM irrt, hat meist nur ein einzelnes
   anderes Modell recht und unterliegt. Nächster Hebel sind Merkmale für die
   Kulturfehler an den Saisonrändern (#114).
-- **Vorbereitet:** Ein LSTM → LSTM mit hartem Routing vergleicht drei Kontextformen unter
-  demselben CV-/Holdout-Protokoll; Ergebnisse stehen vor der Evaluation noch aus.
+- **LSTM-Kontextvergleich:** Embeddings verbessern den harten LSTM gegenüber dem
+  Standardkontext (0,568 statt 0,486 BAcc kombiniert), bleiben aber weit unter der
+  SVM-Referenz (0,844). Die Architektur wird nicht weiter skaliert.
