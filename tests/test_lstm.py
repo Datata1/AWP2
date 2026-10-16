@@ -2,11 +2,14 @@
 
 import unittest
 
+import pandas as pd
 import torch
 
+from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, MONTH_COL
 from awp2.models.lstm import (
     _CategoricalContextEncoder,
     _EmbeddingFusionLSTMClassifier,
+    _LSTMInputAdapter,
     _LateFusionLSTMClassifier,
     _SpectralLSTMEncoder,
 )
@@ -101,3 +104,22 @@ class EmbeddingFusionLSTMClassifierTest(unittest.TestCase):
             hidden_size + aez_embedding_dim + month_embedding_dim,
         )
         self.assertEqual(tuple(logits.shape), (batch_size, n_classes))
+
+
+class LSTMInputAdapterTest(unittest.TestCase):
+    def test_separates_spectrum_and_categorical_context_codes(self) -> None:
+        features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [3, 9, 12],
+                "X427": [0.1, 0.2, 0.3],
+                "X437": [0.4, 0.5, 0.6],
+            }
+        )
+        adapter = _LSTMInputAdapter(LSTM_EMBEDDINGS_CONTEXT).fit(features)
+
+        inputs = adapter.transform(features)
+
+        self.assertEqual(tuple(inputs["spectrum"].shape), (3, 2, 1))
+        self.assertEqual(inputs["aez_codes"].tolist(), [1, 2, 3])
+        self.assertEqual(inputs["month_codes"].tolist(), [1, 2, 3])
