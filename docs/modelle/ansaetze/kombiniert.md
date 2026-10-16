@@ -58,11 +58,11 @@ PCA, SNV, Ableitungen, Merkmalsbildung und PLS werden als Transformer in
 eigene Preprocessing-Variante. Er wird nicht zusammen mit weiteren neuen Merkmalen verändert,
 damit ein möglicher Gewinn zuordenbar bleibt.
 
-Die 1D-CNN erreicht eine kombinierte BAcc von 0,626 und wird nicht weiter variiert. RNN, GRU und
-Transformer sind für die geordnete Wellenlängenachse keine naheliegendere Alternative und bei
-der vorhandenen Stichprobengröße nicht Teil dieses Arbeitsplans. Eine weitere sequenzielle
-Architektur ist erst begründet, wenn eine Formtransformation wie SNV oder die erste Ableitung
 die tabellarische SVM in der CV klar verbessert.
+Die 1D-CNN erreicht eine kombinierte BAcc von 0,626 und wird nicht weiter variiert. #136 ergänzt
+eine getrennte, kontrollierte LSTM-Studie: Sie prüft die geordnete Wellenlängenfolge gegen dieselbe
+Architektur ohne Kontext, mit bisherigem Kontext-Encoding und mit AEZ-/Monatsembeddings. Die
+Studie ändert weder Split noch Bewertungsprotokoll und folgt nicht aus dem CNN-Ergebnis.
 
 ### Erster Arbeitstag
 
@@ -356,6 +356,21 @@ einen getrennten Kontextzweig ein.
 
 ![Häufigste Verwechslungen](../img/combined_cnn_confusions.png)
 
+### LSTM mit spät fusioniertem Kontext (vor Evaluation)
+
+Der kombinierte LSTM kodiert ausschließlich die skalierte Spektralfolge. Erst der letzte
+LSTM-Zustand wird mit Kontext verbunden und danach auf die 23 kombinierten Klassen abgebildet;
+dadurch können nur im Training beobachtete Crop/Stage-Paare entstehen.
+
+- **Hypothese:** Die Reihenfolge benachbarter Wellenlängen und eine lernbare, kategoriale
+    Darstellung von AEZ und Monat ergänzen die tabellarische Referenz.
+- **Kontrollen:** `none` erhält keine Metadaten, `standard` nutzt AEZ one-hot sowie zyklischen
+    Monat, `embeddings` lernt getrennte AEZ- und Monatsembeddings. Alle drei Varianten erhalten
+    dieselben standardisierten Spektren und denselben kleinen CV-Suchraum.
+- **Auswertung:** Pro Variante bestimmt `tune()` den CV-Gewinner auf dem Trainingsteil; nur
+    dieser wird genau einmal mit `run()` auf dem gemeinsamen Holdout bewertet. Ergebnisse,
+    Verwechslungen und MLflow-IDs werden erst nach den Läufen ergänzt.
+
 ### Extra Trees
 
 Notebook: `notebooks/02_duac1011_combined-extra-trees.ipynb`. Extra Trees lernt 23
@@ -412,4 +427,5 @@ lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene S
 kombinierte BAcc gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, der PCA-Variante,
 Random Forest, Extra Trees und HistGradientBoosting deutlich und verhindert weiterhin ungültige
 Paare. Gegen hierarchische und Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu
-vergleichen; weitere sequenzielle Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.
+vergleichen. Die vorbereitete LSTM-Studie erweitert diesen Vergleich, ohne die bestehende
+SVM-Referenz vorwegzunehmen.

@@ -46,10 +46,10 @@ helfen. Label-Logik, Vorverarbeitung und Sequenzarchitektur bleiben dabei unver�
 | 4 | Generalisiert der beste CV-Kandidat? | **Abgeschlossen:** PCA-20 mit `weight_decay=0.0` auf den Trainingsfolds auswählen und einmal mit `run()` auf dem gemeinsamen Holdout bewerten. | BAcc Crop/Stage/kombiniert: 0,920 / 0,902 / 0,765; weiterhin unter der RBF-SVM-Referenz von 0,866. |
 | 5 | Entstehen problematische Paarvorhersagen? | **Abgeschlossen:** Die Dekodierung auf im Trainingsanteil beobachtete Paare beschränken und PCA-20 erneut mit CV auswählen und einmal bewerten. | Keine ungültigen Vorhersagen; CV-BAcc kombiniert steigt von 0,722 auf 0,728. |
 
-LSTM, GRU und Transformer sind keine Varianten dieses ersten Vergleichs. Sie testen zusätzlich,
-ob die Reihenfolge der Wellenlängen gegenüber der tabellarischen Darstellung hilft. Erst wenn das
-Multi-Task-MLP als sauberer Ausgangspunkt dokumentiert ist, folgt ein Multi-Task-GRU als erste
-sequenzielle Erweiterung; LSTM und Transformer bleiben davon getrennte Experimente.
+Der tabellarische Vergleich ist abgeschlossen. Als getrennte sequenzielle Erweiterung testet
+/#136 nun einen Multi-Task-LSTM: Er prüft, ob die Reihenfolge der Wellenlängen gegenüber der
+tabellarischen Darstellung hilft, ohne die bestehende MLP-Referenz oder deren Holdout-Ergebnis
+nachträglich zu beeinflussen.
 
 ## Bewertung und Dokumentation
 
@@ -88,6 +88,21 @@ AEZ wird One-Hot-kodiert und Month zyklisch kodiert.
         um 0,140. Die kombinierte BAcc bleibt jedoch 0,102 unter der RBF-SVM-Referenz (0,866).
 - Die Paarbeschränkung gibt ausschließlich im jeweiligen Trainingsanteil beobachtete Crop/Stage-
         Kombinationen aus; im PCA-Holdout entstehen keine ungültigen Paare.
+
+### Multi-Task-LSTM mit spät fusioniertem Kontext (vor Evaluation)
+
+Ein gemeinsamer LSTM kodiert die skalierte Spektralfolge; getrennte Crop- und Stage-Heads sehen
+erst danach die spektrale Repräsentation mit optionalem Kontext. Die Paarbeschränkung wählt bei
+der Vorhersage ausschließlich Kombinationen, die im jeweiligen Training beobachtet wurden.
+
+- **Hypothese:** Ein gemeinsamer sequenzieller Encoder lernt spektrale Muster, die gleichzeitig
+        Kultur und Stadium trennen; AEZ- und Monatsembeddings können dazu eine kompakte
+        Kontextdarstellung liefern.
+- **Kontrollen:** `none`, das bestehende One-Hot-/zyklische Encoding und lernbare
+        AEZ-/Monatsembeddings unterscheiden sich nur in der späten Kontextfusion. Alle Varianten
+        verwenden dieselbe standardisierte Spektralvorverarbeitung und den gleichen Suchraum.
+- **Auswertung:** Für jede Variante wählt `tune()` ausschließlich anhand der CV-BAcc kombiniert
+        den Kandidaten; `run()` bewertet diesen Gewinner einmal auf dem gemeinsamen Holdout.
 
 #### CV-only: Regularisierung und Preprocessing
 
@@ -166,5 +181,6 @@ voraus; die Paarbeschränkung erklärt den Abstand daher nicht.
 ## Fazit
 
 **In Arbeit.** PCA-20 verbessert den tabellarischen Multi-Task-MLP klar gegenüber dem
-Ausgangsmodell, erreicht aber die kombinierte SVM-Referenz nicht. Ein getrenntes MLP bleibt die
-notwendige Kontrollvariante, bevor der Nutzen geteilter Schichten beurteilt werden kann.
+Ausgangsmodell, erreicht aber die kombinierte SVM-Referenz nicht. Der vorbereitete Multi-Task-
+LSTM prüft getrennt davon die sequenzielle Repräsentation und drei Kontextformen; Ergebnisse
+stehen noch aus.

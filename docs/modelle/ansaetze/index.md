@@ -17,9 +17,9 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | --- | --- | --- | --- | --- |
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
-| [Multi-Task](multi-task.md) | in Arbeit | Tabellarisches MLP | `multi_task_mlp_pca20` (BAcc kombiniert 0.765) | PCA-20 mit Paarbeschränkung verbessert das MLP, bleibt aber unter der SVM-Referenz; getrenntes MLP als Kontrolle ausstehend |
-| [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM | `combined_svm_expanded` (BAcc kombiniert 0.866) | vorläufig führend; gegen weitere Ansätze vergleichen |
-| [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM (bester), Extra Trees, HistGradientBoosting, MLP, logistische Regression, kNN, PLS-DA, LDA | `hierarchical_svm` (BAcc kombiniert 0.844) | CV 0.839 vs. 0.845 (`combined_svm_cv_reference`, gleiche Vorverarbeitung) – knapp dahinter; Engpass ist die Kulturstufe, weiches Routing ohne Effekt (#88) |
+| [Multi-Task](multi-task.md) | in Arbeit | Tabellarisches MLP, LSTM (vor Evaluation) | `multi_task_mlp_pca20` (BAcc kombiniert 0.765) | PCA-20 mit Paarbeschränkung verbessert das MLP; LSTM vergleicht drei Kontextformen ohne weitere Holdout-Abfrage |
+| [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM, LSTM (vor Evaluation) | `combined_svm_expanded` (BAcc kombiniert 0.866) | vorläufig führend; LSTM vergleicht Spektralfolge und drei Kontextformen gegen die Referenz |
+| [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM (bester), Extra Trees, HistGradientBoosting, MLP, logistische Regression, kNN, PLS-DA, LDA, LSTM (vor Evaluation) | `hierarchical_svm` (BAcc kombiniert 0.844) | CV 0.839 vs. 0.845 (`combined_svm_cv_reference`, gleiche Vorverarbeitung) – knapp dahinter; LSTM bleibt bei hartem Routing |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.
 

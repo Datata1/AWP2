@@ -395,6 +395,21 @@ sind etwa 5 verschiedene Entscheidungsregeln.
 
 ![Ensemble: CV je Mitgliedermenge](../img/hierarchical_ensemble_tuning.png)
 
+### LSTM → LSTM mit hartem Routing (vor Evaluation)
+
+Die LSTM-Variante behält die bestehende harte Hierarchie bei: Ein LSTM sagt zuerst die Kultur
+voraus, danach sagt ein separater LSTM je vorhergesagter Kultur das Stadium voraus. Beide
+Stufen verarbeiten die Spektralfolge ohne Metadaten je Wellenlängenschritt und verbinden den
+Kontext erst mit dem letzten LSTM-Zustand.
+
+- **Hypothese:** Die geordnete Spektralrepräsentation hilft besonders innerhalb der kleineren
+  kulturbedingten Stadiumsaufgaben, ohne die Garantien für gültige Paare zu verlieren.
+- **Kontrollen:** Die identische LSTM-Hyperparametersuche vergleicht kein Kontextsignal,
+  bestehendes AEZ-/Monat-Encoding und lernbare AEZ-/Monatsembeddings. Weiches Routing und
+  Kalibrierung sind nicht Teil dieser Studie.
+- **Auswertung:** Jede Variante wird erst per `tune()` auf den Trainingsfolds ausgewählt und
+  anschließend genau einmal per `run()` auf dem gemeinsamen Holdout bewertet.
+
 ## Fazit
 
 **Stand nach #87–#89 und #98–#104:** Hierarchisch mit RBF-SVM auf beiden Stufen
@@ -417,3 +432,5 @@ Gegen die kombinierte SVM mit gleicher Vorverarbeitung liegt er in der CV knapp 
   ein (CV 0.844 vs. 0.839, unter der Schwelle) – wo die SVM irrt, hat meist nur ein einzelnes
   anderes Modell recht und unterliegt. Nächster Hebel sind Merkmale für die
   Kulturfehler an den Saisonrändern (#114).
+- **Vorbereitet:** Ein LSTM → LSTM mit hartem Routing vergleicht drei Kontextformen unter
+  demselben CV-/Holdout-Protokoll; Ergebnisse stehen vor der Evaluation noch aus.
