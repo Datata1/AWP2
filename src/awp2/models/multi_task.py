@@ -28,6 +28,8 @@ from awp2.config import (
     LSTM_DEFAULT_NUM_LAYERS,
     LSTM_DEFAULT_WEIGHT_DECAY,
     LSTM_EMBEDDINGS_CONTEXT,
+    LSTM_EARLY_STOPPING_PATIENCE,
+    LSTM_INNER_VALIDATION_FRACTION,
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
     LSTMContextMode,
@@ -553,3 +555,192 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
             dropout=self.dropout,
             n_context_features=n_context_features,
         )
+
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.DataFrame,
+        sample_weight: np.ndarray | None = None,
+    ) -> Self:
+        """Fit shared LSTM features and separate crop and stage heads.
+
+        Args:
+            X: Preprocessed spectral bands and context columns.
+            y: Target frame containing the project ``Crop`` and ``Stage`` columns.
+            sample_weight: Optional non-negative weight for each training row.
+
+        Returns:
+            This fitted classifier.
+
+        Raises:
+            TypeError: If features or targets are not pandas DataFrames.
+            ValueError: If inputs, target labels or sample weights are invalid.
+        """
+        self._validate_hyperparameters()
+        if not isinstance(y, pd.DataFrame):
+            raise TypeError(f"Expected y as a pandas DataFrame, got {type(y)}.")
+        if list(y.columns) != list(TARGET_COLS):
+            raise ValueError(f"Expected target columns {list(TARGET_COLS)}, got {list(y.columns)}.")
+        if not y.index.equals(X.index):
+            raise ValueError("X and y must have the same index")
+        if len(y) < 2:
+            raise ValueError("At least two rows are required for the inner validation split")
+        weights = self._validate_sample_weight(sample_weight, len(X))
+        adapter = _LSTMInputAdapter(self.context_mode).fit(X)
+        inputs = adapter.transform(X)
+        self._validate_inputs(inputs)
+        crop_codes = self._encode_targets(y[CROP_COL], CROPS, CROP_COL)
+        stage_codes = self._encode_targets(y[STAGE_COL], STAGES, STAGE_COL)
+        train_indices, validation_indices = train_test_split(
+            np.arange(len(X)),
+            test_size=LSTM_INNER_VALIDATION_FRACTION,
+            stratify=combined_label(y),
+            random_state=self.random_state,
+        )
+        torch.manual_seed(self.random_state)
+        np.random.seed(self.random_state)
+        self.input_adapter_ = adapter
+        self.feature_names_in_ = adapter.feature_names_in_
+        self.n_features_in_ = X.shape[1]
+        self.crop_classes_ = np.asarray(CROPS, dtype=object)
+        self.stage_classes_ = np.asarray(STAGES, dtype=object)
+        self.classes_ = [self.crop_classes_, self.stage_classes_]
+        self.allowed_pair_codes_ = np.unique(
+            np.column_stack((crop_codes, stage_codes)),
+            axis=0,
+        )
+        self.module_ = self._build_module(adapter)
+        crop_weights = self._class_weights(crop_codes[train_indices], len(CROPS))
+        stage_weights = self._class_weights(stage_codes[train_indices], len(STAGES))
+        optimizer = torch.optim.Adam(
+            self.module_.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+        best_state: dict[str, Tensor] | None = None
+        best_loss = float("inf")
+        epochs_without_improvement = 0
+        for epoch in range(self.max_epochs):
+            self.module_.train()
+            shuffled_indices = np.random.default_rng(self.random_state + epoch).permutation(
+                train_indices
+            )
+            for start in range(0, len(shuffled_indices), self.batch_size):
+                batch_indices = shuffled_indices[start : start + self.batch_size]
+                optimizer.zero_grad()
+                crop_logits, stage_logits = self._logits(inputs, batch_indices)
+                loss = self._loss(
+                    crop_logits,
+                    stage_logits,
+                    crop_codes[batch_indices],
+                    stage_codes[batch_indices],
+                    weights[batch_indices],
+                    crop_weights,
+                    stage_weights,
+                )
+                loss.backward()
+                optimizer.step()
+
+            crop_logits, stage_logits = self._logits(inputs, validation_indices)
+            validation_loss = self._loss(
+                crop_logits,
+                stage_logits,
+                crop_codes[validation_indices],
+                stage_codes[validation_indices],
+                np.ones(len(validation_indices), dtype=np.float32),
+                crop_weights,
+                stage_weights,
+            ).item()
+            if validation_loss < best_loss:
+                best_loss = validation_loss
+                best_state = copy.deepcopy(self.module_.state_dict())
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+                if epochs_without_improvement >= LSTM_EARLY_STOPPING_PATIENCE:
+                    self.n_epochs_ = epoch + 1
+                    break
+        else:
+            self.n_epochs_ = self.max_epochs
+
+        assert best_state is not None
+        self.module_.load_state_dict(best_state)
+        self.best_validation_loss_ = best_loss
+        return self
+
+    @staticmethod
+    def _validate_sample_weight(
+        sample_weight: np.ndarray | None, n_samples: int
+    ) -> np.ndarray:
+        if sample_weight is None:
+            return np.ones(n_samples, dtype=np.float32)
+        weights = np.asarray(sample_weight, dtype=np.float32)
+        if weights.shape != (n_samples,):
+            raise ValueError(f"sample_weight must have shape ({n_samples},), got {weights.shape}")
+        if not np.isfinite(weights).all() or (weights < 0).any() or weights.sum() == 0:
+            raise ValueError("sample_weight must be finite, non-negative and not all zero")
+        return weights
+
+    @staticmethod
+    def _validate_inputs(inputs: dict[str, np.ndarray]) -> None:
+        if not np.isfinite(inputs["spectrum"]).all():
+            raise ValueError("Spectral inputs must be finite")
+        if "context" in inputs and not np.isfinite(inputs["context"]).all():
+            raise ValueError("Context inputs must be finite")
+
+    @staticmethod
+    def _encode_targets(target: pd.Series, labels: tuple[str, ...], name: str) -> np.ndarray:
+        codes = {label: code for code, label in enumerate(labels)}
+        unknown = sorted(set(target) - set(codes))
+        if unknown:
+            raise ValueError(f"{name} contains unknown labels: {unknown}")
+        return np.asarray([codes[label] for label in target], dtype=np.int64)
+
+    @staticmethod
+    def _class_weights(codes: np.ndarray, n_classes: int) -> Tensor:
+        counts = np.bincount(codes, minlength=n_classes)
+        weights = np.zeros(n_classes, dtype=np.float32)
+        present = counts > 0
+        weights[present] = counts.sum() / (present.sum() * counts[present])
+        return torch.from_numpy(weights)
+
+    def _logits(
+        self, inputs: dict[str, np.ndarray], indices: np.ndarray
+    ) -> tuple[Tensor, Tensor]:
+        spectrum = torch.from_numpy(inputs["spectrum"][indices])
+        if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
+            return self.module_(
+                spectrum,
+                torch.from_numpy(inputs["aez_codes"][indices]),
+                torch.from_numpy(inputs["month_codes"][indices]),
+            )
+        context = torch.from_numpy(
+            inputs["context"][indices]
+            if "context" in inputs
+            else np.empty((len(indices), 0), dtype=np.float32)
+        )
+        return self.module_(spectrum, context)
+
+    def _loss(
+        self,
+        crop_logits: Tensor,
+        stage_logits: Tensor,
+        crop_codes: np.ndarray,
+        stage_codes: np.ndarray,
+        sample_weights: np.ndarray,
+        crop_class_weights: Tensor,
+        stage_class_weights: Tensor,
+    ) -> Tensor:
+        crop_loss = functional.cross_entropy(
+            crop_logits,
+            torch.from_numpy(crop_codes),
+            weight=crop_class_weights,
+            reduction="none",
+        )
+        stage_loss = functional.cross_entropy(
+            stage_logits,
+            torch.from_numpy(stage_codes),
+            weight=stage_class_weights,
+            reduction="none",
+        )
+        losses = self.crop_loss_weight * crop_loss + (1 - self.crop_loss_weight) * stage_loss
+        weights = torch.from_numpy(sample_weights)
+        return (losses * weights).sum() / weights.sum()

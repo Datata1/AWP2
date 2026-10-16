@@ -218,6 +218,38 @@ class MultiTaskLSTMClassifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "crop_loss_weight"):
             classifier._validate_hyperparameters()
 
+    def test_fit_learns_shared_lstm_representation(self) -> None:
+        generator = np.random.default_rng(42)
+        n_rows = 40
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=2,
+            batch_size=4,
+        )
+
+        fitted = classifier.fit(features, targets)
+
+        self.assertIs(fitted, classifier)
+        self.assertLessEqual(classifier.n_epochs_, classifier.max_epochs)
+        self.assertEqual(classifier.allowed_pair_codes_.shape, (2, 2))
+
 
 if __name__ == "__main__":
     unittest.main()
