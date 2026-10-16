@@ -312,7 +312,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
     def fit(
         self,
         X: pd.DataFrame,
-        y: pd.Series,
+        y: pd.Series | np.ndarray,
         sample_weight: np.ndarray | None = None,
     ) -> Self:
         """Fit one class label per spectrum with balanced weighted cross-entropy.
@@ -326,21 +326,27 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             This fitted classifier.
 
         Raises:
-            TypeError: If targets are not a pandas Series.
+            TypeError: If targets are neither a pandas Series nor a one-dimensional NumPy array.
             ValueError: If features, targets or sample weights are invalid.
         """
         self._validate_hyperparameters()
-        if not isinstance(y, pd.Series):
-            raise TypeError(f"Expected y as a pandas Series, got {type(y)}.")
-        if not y.index.equals(X.index):
+        if isinstance(y, pd.Series):
+            if not y.index.equals(X.index):
+                raise ValueError("X and y must have the same index")
+            target_values = y.to_numpy(dtype=str)
+        elif isinstance(y, np.ndarray) and y.ndim == 1:
+            target_values = y.astype(str, copy=False)
+        else:
+            raise TypeError(f"Expected y as a pandas Series or one-dimensional ndarray, got {type(y)}.")
+        if len(target_values) != len(X):
             raise ValueError("X and y must have the same index")
-        if len(y) < 2:
+        if len(target_values) < 2:
             raise ValueError("At least two rows are required for the inner validation split")
         weights = self._validate_sample_weight(sample_weight, len(X))
         adapter = _LSTMInputAdapter(self.context_mode).fit(X)
         inputs = adapter.transform(X)
         self._validate_inputs(inputs)
-        self.classes_, target_codes = np.unique(np.asarray(y, dtype=str), return_inverse=True)
+        self.classes_, target_codes = np.unique(target_values, return_inverse=True)
         train_indices, validation_indices = train_test_split(
             np.arange(len(X)),
             test_size=LSTM_INNER_VALIDATION_FRACTION,

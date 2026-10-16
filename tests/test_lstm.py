@@ -7,7 +7,15 @@ import pandas as pd
 import torch
 from sklearn.base import clone
 
-from awp2.config import AEZ_COL, LSTM_EMBEDDINGS_CONTEXT, LSTM_STANDARD_CONTEXT, MONTH_COL
+from awp2.config import (
+    AEZ_COL,
+    CROP_COL,
+    LSTM_EMBEDDINGS_CONTEXT,
+    LSTM_STANDARD_CONTEXT,
+    MONTH_COL,
+    STAGE_COL,
+    TARGET_COLS,
+)
 from awp2.models.combined import CombinedLabelClassifier, make_combined_spectral_lstm
 from awp2.models.hierarchical import HierarchicalClassifier, make_hierarchical_spectral_lstm
 from awp2.models.lstm import (
@@ -134,6 +142,68 @@ class LSTMInputAdapterTest(unittest.TestCase):
 
 
 class SpectralLSTMClassifierTest(unittest.TestCase):
+    @staticmethod
+    def _paired_training_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+        n_repeats = 10
+        pairs = [
+            ("corn", "Late"),
+            ("corn", "Harvest"),
+            ("rice", "Late"),
+            ("rice", "Harvest"),
+        ]
+        n_rows = n_repeats * len(pairs)
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            np.tile(pairs, (n_repeats, 1)),
+            columns=list(TARGET_COLS),
+            index=features.index,
+        )
+        return features, targets
+
+    def test_combined_lstm_fits_and_returns_target_frame(self) -> None:
+        features, targets = self._paired_training_data()
+        classifier = make_combined_spectral_lstm("none").set_params(
+            estimator__hidden_size=4,
+            estimator__num_layers=1,
+            estimator__dropout=0.0,
+            estimator__max_epochs=1,
+            estimator__batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        self.assertTrue(predicted.index.equals(features.index))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy()))))
+
+    def test_hierarchical_lstm_fits_and_returns_target_frame(self) -> None:
+        features, targets = self._paired_training_data()
+        classifier = make_hierarchical_spectral_lstm("none").set_params(
+            crop_estimator__hidden_size=4,
+            crop_estimator__num_layers=1,
+            crop_estimator__dropout=0.0,
+            crop_estimator__max_epochs=1,
+            crop_estimator__batch_size=4,
+            stage_estimator__hidden_size=4,
+            stage_estimator__num_layers=1,
+            stage_estimator__dropout=0.0,
+            stage_estimator__max_epochs=1,
+            stage_estimator__batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        self.assertTrue(predicted.index.equals(features.index))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(set(map(tuple, targets.to_numpy()))))
+
     def test_hierarchical_factory_configures_independent_lstm_prototypes(self) -> None:
         classifier = make_hierarchical_spectral_lstm(LSTM_EMBEDDINGS_CONTEXT)
 
