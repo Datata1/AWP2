@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
+from awp2.models.multi_task import _MultiTaskLateFusionLSTMModule
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 
@@ -116,6 +117,29 @@ class MultiTaskMLPClassifierTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Expected target columns"):
             self._model().fit(self.X[["X427", "X437", "X447"]], invalid_targets)
+
+
+class MultiTaskLateFusionLSTMModuleTest(unittest.TestCase):
+    def test_fuses_context_before_crop_and_stage_heads(self) -> None:
+        batch_size = 3
+        n_bands = 4
+        hidden_size = 5
+        n_context_features = 2
+        module = _MultiTaskLateFusionLSTMModule(
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            n_context_features=n_context_features,
+        )
+
+        crop_logits, stage_logits = module(
+            torch.rand(batch_size, n_bands, 1), torch.rand(batch_size, n_context_features)
+        )
+
+        self.assertEqual(module.crop_head.in_features, hidden_size + n_context_features)
+        self.assertEqual(module.stage_head.in_features, hidden_size + n_context_features)
+        self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
+        self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from awp2.config import (
     TARGET_COLS,
 )
 from awp2.data import combined_label
+from awp2.models.lstm import _SpectralLSTMEncoder
 
 
 class _MultiTaskMLPModule(nn.Module):
@@ -62,6 +63,33 @@ class _MultiTaskMLPModule(nn.Module):
     def forward(self, features: Tensor) -> tuple[Tensor, Tensor]:
         shared_features = self.shared_layers(features)
         return self.crop_head(shared_features), self.stage_head(shared_features)
+
+
+class _MultiTaskLateFusionLSTMModule(nn.Module):
+    """Predict crop and stage from shared LSTM features and static context."""
+
+    def __init__(
+        self,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float,
+        n_context_features: int,
+    ) -> None:
+        super().__init__()
+        self.spectral_encoder = _SpectralLSTMEncoder(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+        )
+        n_fused_features = hidden_size + n_context_features
+        self.crop_head = nn.Linear(n_fused_features, len(CROPS))
+        self.stage_head = nn.Linear(n_fused_features, len(STAGES))
+
+    def forward(self, spectrum: Tensor, context: Tensor) -> tuple[Tensor, Tensor]:
+        """Return crop and stage logits after fusing context with spectral features."""
+        features = torch.cat((self.spectral_encoder(spectrum), context), dim=1)
+        return self.crop_head(features), self.stage_head(features)
 
 
 class MultiTaskMLPClassifier(ClassifierMixin, BaseEstimator):
