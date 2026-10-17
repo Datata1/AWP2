@@ -30,6 +30,7 @@ from awp2.config import (
     MONTH_COS_COL,
     MONTH_SIN_COL,
     OSAVI_SOIL_ADJUSTMENT,
+    PCA_FEATURE_NAMES,
     REFLECTANCE_PERCENT_SCALE,
     REIP_LAGRANGIAN_MIN_BANDS,
     REIP_LAGRANGIAN_WINDOW_NM,
@@ -709,7 +710,9 @@ class AddVegetationIndices(_BandTransformer):
         X = self._check(X)
         self._set_input(X)
         implemented_specs = [
-            spec for spec in VEGETATION_INDEX_SPECS if spec.status == "implemented"
+            spec
+            for spec in VEGETATION_INDEX_SPECS
+            if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
         ]
         self.index_bands_ = {
             spec.name: tuple(
@@ -837,7 +840,7 @@ class SelectVegetationIndices(TransformerMixin, BaseEstimator):
             X: Bands plus vegetation indices, as produced by ``AddVegetationIndices``.
 
         Returns:
-            The four index columns.
+            The vegetation-index catalogue columns.
         """
         return self._check(X)[list(VEGETATION_INDEX_NAMES)]
 
@@ -857,9 +860,41 @@ class SelectVegetationIndices(TransformerMixin, BaseEstimator):
             input_features: Ignored; accepted for sklearn compatibility.
 
         Returns:
-            The four vegetation index names.
+            The vegetation-index catalogue names.
         """
         return np.asarray(VEGETATION_INDEX_NAMES, dtype=object)
+
+
+class PrincipalComponentFeatures(_BandTransformer):
+    """Reduce standardized spectral bands to the two named PCA features."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Fit PCA to the standardized training spectra.
+
+        Args:
+            X: Standardized band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        self.pca_ = PCA(n_components=len(PCA_FEATURE_NAMES), random_state=SEED).fit(X)
+        self.feature_names_out_ = list(PCA_FEATURE_NAMES)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Project spectra onto the fitted principal-component axes.
+
+        Args:
+            X: Standardized band columns with the same columns as in ``fit``.
+
+        Returns:
+            One ``PC_1`` and one ``PC_2`` feature per spectrum.
+        """
+        values = self.pca_.transform(self._check(X))
+        return pd.DataFrame(values, index=X.index, columns=self.feature_names_out_)
 
 
 class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
@@ -1088,6 +1123,11 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Compute the reproducible kickoff vegetation-index catalogue from interpolated "
         "bands in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
+    )
+    use_principal_components: bool = Field(
+        default=False,
+        description="Append PC_1 and PC_2 from a PCA fitted on standardized interpolated bands "
+        "in a parallel branch.",
     )
     use_cyclic_month: bool = Field(
         default=True,
@@ -1324,6 +1364,21 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                 make_column_selector(pattern=BAND_PATTERN),
             )
         )
+    if config.use_principal_components:
+        transformers.append(
+            (
+                "principal_components",
+                Pipeline(
+                    [
+                        ("drop_empty", DropEmptyBands()),
+                        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+                        ("standard_scale", StandardScaler()),
+                        ("pca", PrincipalComponentFeatures()),
+                    ]
+                ),
+                make_column_selector(pattern=BAND_PATTERN),
+            )
+        )
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
@@ -1360,6 +1415,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         )
     if name == "pca" and isinstance(step, PCA):
         return f"PCA to {step.n_components} components"
+    if name == "pca" and isinstance(step, PrincipalComponentFeatures):
+        return "PCA to PC_1 and PC_2"
     if name == "ica" and isinstance(step, FastICA):
         return f"ICA to {step.n_components} components"
     if name == "nmf" and isinstance(step, NMF):
@@ -1558,6 +1615,23 @@ _INDEX_SCALER_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("indices", "no_scaler", "keine Skalierung [Standard]", False),
 )
 
+_PRINCIPAL_COMPONENT_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("principal_components", "drop_empty", "Leere Bänder entfernen (immer)", True),
+    _OptionNode(
+        "principal_components",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        True,
+    ),
+    _OptionNode("principal_components", "standard_scale", "Standard (immer)", True),
+    _OptionNode(
+        "principal_components",
+        "pca",
+        "PC_1 + PC_2 [" + _config_fields("use_principal_components") + "]",
+        True,
+    ),
+)
+
 _SCALER_NODES: tuple[_OptionNode, ...] = (
     _OptionNode(
         "spectra",
@@ -1638,6 +1712,7 @@ def _diagram_steps() -> set[tuple[str, str]]:
         _ALBEDO_NODES,
         _INDICES_NODES,
         _INDEX_SCALER_NODES,
+        _PRINCIPAL_COMPONENT_NODES,
         _SPECTRA_PREFIX_NODES,
         _SCALER_NODES,
         _REDUCTION_NODES,
@@ -1670,6 +1745,7 @@ def pipeline_options_diagram() -> str:
     aez, cyclic, numeric = _META_NODES
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select = _INDICES_NODES
+    pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
     s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
@@ -1689,6 +1765,10 @@ def pipeline_options_diagram() -> str:
     for node in _INDICES_NODES:
         diagram.append(_node_line(node))
     for node in _INDEX_SCALER_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph hauptkomponenten")
+    for node in _PRINCIPAL_COMPONENT_NODES:
         diagram.append(_node_line(node))
     diagram.append("    end")
     diagram.append("    subgraph spektren")
@@ -1730,6 +1810,11 @@ def pipeline_options_diagram() -> str:
     for node in _INDEX_SCALER_NODES:
         link(_node_id(select), node)
         link(_node_id(node), concat)
+    link("X", pc_drop)
+    link(_node_id(pc_drop), pc_inter)
+    link(_node_id(pc_inter), pc_scale)
+    link(_node_id(pc_scale), pc_pca)
+    link(_node_id(pc_pca), concat)
     link(_node_id(s_drop), s_inter)
     link(_node_id(s_inter), savgol)
     link(_node_id(savgol), snv)

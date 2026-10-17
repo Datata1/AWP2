@@ -108,6 +108,31 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
 
         self.assertAlmostEqual(transformed["OSAVI"].mean(), 0.0)
 
+    def test_principal_component_branch_appends_named_components(self) -> None:
+        features = pd.concat(
+            [self.bands, self.bands * 2, self.bands * 3], ignore_index=True
+        ).assign(
+            **{AEZ_COL: [1, 1, 1], MONTH_COL: [3, 3, 3]}
+        )
+        preprocessor = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_principal_components=True)
+        )
+
+        transformed = preprocessor.fit_transform(features)
+        component_pipeline = next(
+            transformer
+            for name, transformer, _columns in preprocessor.transformers_
+            if name == "principal_components"
+        )
+
+        self.assertTrue({"PC_1", "PC_2"}.issubset(transformed.columns))
+        self.assertEqual([name for name, _step in component_pipeline.steps], [
+            "drop_empty",
+            "interpolate",
+            "standard_scale",
+            "pca",
+        ])
+
 
 class CategoricalContextPreprocessingTest(unittest.TestCase):
     def setUp(self) -> None:

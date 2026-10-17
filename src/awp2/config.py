@@ -47,6 +47,7 @@ REIP_LAGRANGIAN_WINDOW_NM = (680, 750)
 REIP_LAGRANGIAN_MIN_BANDS = 5
 REIP_POLYNOMIAL_WINDOW_NM = (650, 760)
 REIP_POLYNOMIAL_DEGREE = 4
+PCA_FEATURE_NAMES = ("PC_1", "PC_2")
 
 
 @dataclass(frozen=True)
@@ -352,8 +353,7 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         (),
         "Red edge / REIP",
         "Spatial Sciences (2003)",
-        "deferred",
-        "A data-dependent PCA transformer needs a separately specified band set.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "PC_2",
@@ -361,12 +361,13 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         (),
         "Red edge / REIP",
         "Spatial Sciences (2003)",
-        "deferred",
-        "A data-dependent PCA transformer needs a separately specified band set.",
+        "implemented",
     ),
 )
 VEGETATION_INDEX_NAMES = tuple(
-    spec.name for spec in VEGETATION_INDEX_SPECS if spec.status == "implemented"
+    spec.name
+    for spec in VEGETATION_INDEX_SPECS
+    if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
 )
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.

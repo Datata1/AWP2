@@ -305,8 +305,12 @@ Fenster 650--760 nm ein Polynom vierten Grades an und verwendet die innere Wende
 größten positiven Steigung. Ein Spektrum ohne gültiges inneres Maximum liefert für die jeweilige
 REIP-Spalte `NaN`.
 
-PC1 und PC2 bleiben außerhalb des Katalogs: Sie benötigen eine separat festgelegte,
-pro Trainingsfold angepasste PCA und sind keine festen Indexformeln.
+`PC_1` und `PC_2` sind als optionale PCA-Merkmalsgruppe mit
+`PreprocessingConfig(use_principal_components=True)` verfügbar. Ein separater Pipelinezweig
+entfernt leere Bänder, interpoliert Bandlücken, standardisiert die Spektren und passt darauf
+eine PCA mit zwei Komponenten ausschließlich auf dem jeweiligen Trainingsfold an. Die beiden
+Komponenten können neben Rohbändern und Vegetationsindizes verwendet werden, sind aber keine
+festen Indexformeln.
 
 [^4]: Tucker (1979), siehe [Quellen](quellen.md).
 [^5]: Huete et al. (2002), siehe [Quellen](quellen.md).
