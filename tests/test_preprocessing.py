@@ -37,6 +37,10 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
                 "X681": [55.0],
                 "X691": [60.0],
                 "X702": [65.0],
+                "X712": [67.0],
+                "X722": [68.0],
+                "X732": [69.0],
+                "X742": [70.0],
                 "X752": [70.0],
                 "X763": [72.0],
                 "X773": [74.0],
@@ -66,6 +70,21 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
             transformed.loc[0, "TCARI_OSAVI"],
             transformed.loc[0, "TCARI"] / transformed.loc[0, "OSAVI"],
         )
+
+    def test_reip_algorithms_locate_the_maximum_red_edge_slope(self) -> None:
+        red_edge_bands = [
+            column
+            for column in self.bands.columns
+            if 650 <= int(column.removeprefix("X")) <= 763
+        ]
+        for band in red_edge_bands:
+            centered_wavelength = int(band.removeprefix("X")) - 702
+            self.bands.loc[0, band] = 50 + centered_wavelength - centered_wavelength**3 / 10000
+
+        transformed = AddVegetationIndices().fit_transform(self.bands)
+
+        self.assertAlmostEqual(transformed.loc[0, "REIP_LAGRANGIAN"], 702.0, delta=3.0)
+        self.assertAlmostEqual(transformed.loc[0, "REIP_POLYNOMIAL"], 702.0, delta=1.0)
 
     def test_preprocessing_config_adds_only_implemented_catalogue_indices(self) -> None:
         features = self.bands.assign(**{AEZ_COL: 1, MONTH_COL: 3})

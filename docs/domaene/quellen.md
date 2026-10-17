@@ -26,6 +26,12 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 !!! todo
     - Literatur zu Hyperspektral-Fernerkundung und Vegetationsindizes
 
+- Broge, N. H. & Leblanc, E. (2001): *Comparing prediction power and stability of broadband
+    and hyperspectral vegetation indices for estimation of green leaf area index and canopy
+    chlorophyll density*. Remote Sensing of Environment, 76(2), 156-172.
+    https://doi.org/10.1016/S0034-4257(00)00197-8. - Polynom-Modell der Red-Edge-Inflection
+    Point (REIP).
+
 - Daughtry, C. S. T., Hunt, E. R. & McMurtrey, J. E. (2004): *Assessing crop residue cover
     using shortwave infrared reflectance*. Remote Sensing of Environment, 90(1), 126-134.
     https://doi.org/10.1016/j.rse.2003.10.023. - Cellulose Absorption Index und trockene
@@ -35,6 +41,11 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     (2000): *Estimating corn leaf chlorophyll concentration from leaf and canopy reflectance*.
     Remote Sensing of Environment, 74(2), 229-239. https://doi.org/10.1016/S0034-4257(00)00113-9.
     - Modified Chlorophyll Absorption in Reflectance Index (MCARI).
+
+- Dawson, T. P. & Curran, P. J. (1998): *Technical note: A new technique for interpolating
+    the reflectance red edge position*. International Journal of Remote Sensing, 19(11),
+    2133-2139. https://doi.org/10.1080/014311698214910. - Lagrange-Modell der
+    Red-Edge-Inflection Point (REIP).
 
 - Gamon, J. A., Peñuelas, J. & Field, C. B. (1992): *A narrow-waveband spectral index that
     tracks diurnal changes in photosynthetic efficiency*. Remote Sensing of Environment,

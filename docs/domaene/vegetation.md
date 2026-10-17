@@ -277,7 +277,7 @@ Macro-F1 und Samples-F1 auf der davon getrennten Validierung.[^9]
 
 ### Kickoff-Katalog in der Pipeline
 
-Der gemeinsame Preprocessor berechnet 27 eindeutig formulierte Indizes aus dem Katalog der
+Der gemeinsame Preprocessor berechnet 29 eindeutig formulierte Indizes aus dem Katalog der
 Kickoff-Folie. Die genaue Formel, Primärquelle, Kategorie und angeforderten Wellenlängen stehen
 zentral in `awp2.config.VEGETATION_INDEX_SPECS`. Für jede angeforderte Wellenlänge wählt der
 Transformer das nächstgelegene nicht leere Hyperion-Band, aber nur bei einem Abstand von höchstens
@@ -298,10 +298,15 @@ Folgende Katalogeinträge werden nicht berechnet:
 | `WI_900_970` | Das nächste nicht leere Band zu 970 nm ist `X983` und liegt 13 nm entfernt. |
 | Chlorophyll Well, Green Peak Well, Water Well bei 893 und 1205 nm sowie ihre PSSRa-Verhältnisse | Die in der Folie genannten CSIRO-VegSpectra-Quellen sind unveröffentlicht und liefern keine reproduzierbare Formel. |
 
-Die REIP-Verfahren und die beiden Hauptkomponenten bleiben vorerst außerhalb des Katalogs.
-Für REIP fehlen in der Folie die Stützstellen beziehungsweise das Fit-Fenster; PC1 und PC2
-benötigen zusätzlich eine separat festgelegte, pro Trainingsfold angepasste PCA. Beide sind daher
-keine festen Indexformeln.
+Die REIP-Verfahren nutzen die interpolierten Reflektanzen im Red-Edge-Bereich. REIP-Lagrange
+bestimmt im Fenster 680--750 nm das Maximum der ersten Ableitung und verfeinert dessen Position
+mit einem quadratischen Lagrange-Polynom über drei Ableitungswerte. REIP-Polynomial passt im
+Fenster 650--760 nm ein Polynom vierten Grades an und verwendet die innere Wendestelle mit der
+größten positiven Steigung. Ein Spektrum ohne gültiges inneres Maximum liefert für die jeweilige
+REIP-Spalte `NaN`.
+
+PC1 und PC2 bleiben außerhalb des Katalogs: Sie benötigen eine separat festgelegte,
+pro Trainingsfold angepasste PCA und sind keine festen Indexformeln.
 
 [^4]: Tucker (1979), siehe [Quellen](quellen.md).
 [^5]: Huete et al. (2002), siehe [Quellen](quellen.md).

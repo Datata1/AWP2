@@ -31,6 +31,10 @@ from awp2.config import (
     MONTH_SIN_COL,
     OSAVI_SOIL_ADJUSTMENT,
     REFLECTANCE_PERCENT_SCALE,
+    REIP_LAGRANGIAN_MIN_BANDS,
+    REIP_LAGRANGIAN_WINDOW_NM,
+    REIP_POLYNOMIAL_DEGREE,
+    REIP_POLYNOMIAL_WINDOW_NM,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
     TCARI_MULTIPLIER,
@@ -71,6 +75,106 @@ def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
             f"{target_wavelength_nm} nm; closest is {closest_band} ({distance_nm} nm away)"
         )
     return closest_band
+
+
+def _band_window(
+    band_names: Sequence[str], target_window_nm: tuple[int, int], minimum_bands: int
+) -> tuple[str, ...]:
+    """Resolve a target window and return its available bands in wavelength order.
+
+    Args:
+        band_names: Available Hyperion band names.
+        target_window_nm: Required lower and upper wavelength in nanometres.
+        minimum_bands: Minimum number of resolved bands needed by the algorithm.
+
+    Returns:
+        Band names within the resolved window, sorted by wavelength.
+
+    Raises:
+        ValueError: If the resolved window contains too few available bands.
+    """
+    start_band, end_band = (
+        nearest_band(target_nm, band_names) for target_nm in target_window_nm
+    )
+    start_nm, end_nm = sorted((wavelength(start_band), wavelength(end_band)))
+    window_bands = tuple(
+        sorted(
+            (band for band in band_names if start_nm <= wavelength(band) <= end_nm),
+            key=wavelength,
+        )
+    )
+    if len(window_bands) < minimum_bands:
+        raise ValueError(
+            f"REIP window {start_nm}-{end_nm} nm needs at least {minimum_bands} bands, "
+            f"got {len(window_bands)}"
+        )
+    return window_bands
+
+
+def _lagrangian_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.ndarray:
+    """Estimate the red-edge inflection point from local derivative interpolation.
+
+    Args:
+        reflectance: One row per spectrum and one column per red-edge band.
+        wavelength_nm: Wavelength of each reflectance column in nanometres.
+
+    Returns:
+        One inflection-point wavelength per spectrum; invalid local maxima are ``NaN``.
+    """
+    derivatives = np.gradient(reflectance, wavelength_nm, axis=1)
+    positions = np.full(reflectance.shape[0], np.nan)
+    for row_number, derivative in enumerate(derivatives):
+        peak = int(np.argmax(derivative[1:-1])) + 1
+        support_wavelengths = wavelength_nm[peak - 1 : peak + 2]
+        support_derivatives = derivative[peak - 1 : peak + 2]
+        coefficients = np.polyfit(support_wavelengths, support_derivatives, 2)
+        curvature, slope = coefficients[:2]
+        if np.isclose(curvature, 0.0):
+            continue
+        position = -slope / (2 * curvature)
+        if curvature < 0 and support_wavelengths[0] <= position <= support_wavelengths[-1]:
+            positions[row_number] = position
+    return positions
+
+
+def _polynomial_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.ndarray:
+    """Estimate the red-edge inflection point from a fourth-degree reflectance polynomial.
+
+    Args:
+        reflectance: One row per spectrum and one column per red-edge band.
+        wavelength_nm: Wavelength of each reflectance column in nanometres.
+
+    Returns:
+        One inflection-point wavelength per spectrum; missing inner maxima are ``NaN``.
+    """
+    center_nm = float(np.mean(wavelength_nm))
+    centered_wavelengths = wavelength_nm - center_nm
+    positions = np.full(reflectance.shape[0], np.nan)
+    for row_number, spectrum in enumerate(reflectance):
+        coefficients = np.polynomial.polynomial.polyfit(
+            centered_wavelengths, spectrum, REIP_POLYNOMIAL_DEGREE
+        )
+        second_derivative = np.array(
+            [2 * coefficients[2], 6 * coefficients[3], 12 * coefficients[4]]
+        )
+        roots = np.polynomial.polynomial.polyroots(second_derivative)
+        candidates = [
+            float(root.real)
+            for root in roots
+            if np.isclose(root.imag, 0.0)
+            and centered_wavelengths[0] <= root.real <= centered_wavelengths[-1]
+            and np.polynomial.polynomial.polyval(root.real, second_derivative) < 0
+        ]
+        if candidates:
+            first_derivative = np.array(
+                [coefficients[1], 2 * coefficients[2], 3 * coefficients[3], 4 * coefficients[4]]
+            )
+            best_candidate = max(
+                candidates,
+                key=lambda candidate: np.polynomial.polynomial.polyval(candidate, first_derivative),
+            )
+            positions[row_number] = best_candidate + center_nm
+    return positions
 
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
@@ -613,6 +717,14 @@ class AddVegetationIndices(_BandTransformer):
             )
             for spec in implemented_specs
         }
+        self.reip_lagrangian_bands_ = _band_window(
+            list(X.columns), REIP_LAGRANGIAN_WINDOW_NM, REIP_LAGRANGIAN_MIN_BANDS
+        )
+        self.reip_polynomial_bands_ = _band_window(
+            list(X.columns),
+            REIP_POLYNOMIAL_WINDOW_NM,
+            REIP_POLYNOMIAL_DEGREE + 1,
+        )
         self.feature_names_out_ = [*X.columns, *VEGETATION_INDEX_NAMES]
         return self
 
@@ -652,6 +764,14 @@ class AddVegetationIndices(_BandTransformer):
             (r700 - r670) - MCARI_GREEN_WEIGHT * (r700 - r550) * (r700 / r670)
         )
         osavi = (1 + OSAVI_SOIL_ADJUSTMENT) * (r800 - r670) / (r800 + r670 + OSAVI_SOIL_ADJUSTMENT)
+        reip_lagrangian = _lagrangian_reip(
+            reflectance[list(self.reip_lagrangian_bands_)].to_numpy(),
+            np.asarray([wavelength(band) for band in self.reip_lagrangian_bands_], dtype=float),
+        )
+        reip_polynomial = _polynomial_reip(
+            reflectance[list(self.reip_polynomial_bands_)].to_numpy(),
+            np.asarray([wavelength(band) for band in self.reip_polynomial_bands_], dtype=float),
+        )
         indices = pd.DataFrame(
             {
                 "SR_750_705": r750 / r705,
@@ -681,6 +801,8 @@ class AddVegetationIndices(_BandTransformer):
                 "NDWI_770_1200": (r770 - r1200) / (r770 + r1200),
                 "NDWI_860_1240": (r860 - r1240) / (r860 + r1240),
                 "MSI": r1600 / r820,
+                "REIP_LAGRANGIAN": reip_lagrangian,
+                "REIP_POLYNOMIAL": reip_polynomial,
             },
             index=X.index,
         )

@@ -43,6 +43,10 @@ REFLECTANCE_PERCENT_SCALE = 100.0
 MCARI_GREEN_WEIGHT = 0.2
 TCARI_MULTIPLIER = 3.0
 OSAVI_SOIL_ADJUSTMENT = 0.16
+REIP_LAGRANGIAN_WINDOW_NM = (680, 750)
+REIP_LAGRANGIAN_MIN_BANDS = 5
+REIP_POLYNOMIAL_WINDOW_NM = (650, 760)
+REIP_POLYNOMIAL_DEGREE = 4
 
 
 @dataclass(frozen=True)
@@ -328,21 +332,19 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
     ),
     VegetationIndexSpec(
         "REIP_LAGRANGIAN",
-        "Lagrangian red-edge inflection-point model",
-        (),
+        "maximum of a quadratic Lagrange interpolation of the first derivative",
+        REIP_LAGRANGIAN_WINDOW_NM,
         "Red edge / REIP",
         "Dawson & Curran (1998)",
-        "deferred",
-        "The slide does not define the interpolation support points.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "REIP_POLYNOMIAL",
-        "Polynomial red-edge inflection-point model",
-        (),
+        "maximum first derivative of a fourth-degree polynomial fit",
+        REIP_POLYNOMIAL_WINDOW_NM,
         "Red edge / REIP",
         "Broge & Leblanc (2001)",
-        "deferred",
-        "The slide does not define the fit window or polynomial degree.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "PC_1",
