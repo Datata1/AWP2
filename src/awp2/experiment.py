@@ -33,6 +33,8 @@ from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
 
 _MODEL_STEP = "model"
 _PREPROCESS_STEP = "preprocess"
+ParamGrid = dict[str, list[Any]]
+ParameterGrids = ParamGrid | list[ParamGrid]
 
 
 class _ExperimentConfig(BaseModel):
@@ -86,9 +88,9 @@ class RunConfig(_ExperimentConfig):
 class TuneConfig(_ExperimentConfig):
     """Everything that defines a hyperparameter search besides the model itself."""
 
-    param_grid: dict[str, list[Any]] = Field(
+    param_grid: ParameterGrids = Field(
         min_length=1,
-        description="Hyperparameters of the model and the values to try, e.g. "
+        description="Hyperparameter grid or conditional grids to try, e.g. "
         "{'max_depth': [10, 20, None]}; for wrapped models use sklearn's names "
         "('estimator__max_depth').",
     )
@@ -205,14 +207,18 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         )
         ```
     """
-    unknown = set(config.param_grid) - set(model.get_params(deep=True))
+    grids = config.param_grid if isinstance(config.param_grid, list) else [config.param_grid]
+    unknown = set().union(*(set(grid) for grid in grids)) - set(model.get_params(deep=True))
     if unknown:
         raise ValueError(f"{type(model).__name__} has no hyperparameter(s) {sorted(unknown)}.")
 
     split = load_split()
     search = GridSearchCV(
         _pipeline(model, config.preprocessing),
-        {f"{_MODEL_STEP}__{key}": values for key, values in config.param_grid.items()},
+        [
+            {f"{_MODEL_STEP}__{key}": values for key, values in grid.items()}
+            for grid in grids
+        ],
         scoring=scorer(config.metric),
         cv=load_folds(),
         refit=False,

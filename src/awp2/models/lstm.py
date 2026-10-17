@@ -43,19 +43,25 @@ class _SpectralLSTMEncoder(nn.Module):
         hidden_size: int,
         num_layers: int,
         dropout: float,
+        bidirectional: bool = False,
     ) -> None:
         super().__init__()
+        self.bidirectional = bidirectional
+        self.representation_size = hidden_size * (2 if bidirectional else 1)
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout if num_layers > 1 else 0.0,
             batch_first=True,
+            bidirectional=bidirectional,
         )
 
     def forward(self, spectrum: Tensor) -> Tensor:
         """Return the final hidden representation for each spectral sequence."""
         _outputs, (hidden_state, _cell_state) = self.lstm(spectrum)
+        if self.bidirectional:
+            return torch.cat((hidden_state[-2], hidden_state[-1]), dim=1)
         return hidden_state[-1]
 
 
@@ -89,6 +95,7 @@ class _LateFusionLSTMClassifier(nn.Module):
         dropout: float,
         n_context_features: int,
         n_classes: int,
+        bidirectional: bool = False,
     ) -> None:
         super().__init__()
         self.spectral_encoder = _SpectralLSTMEncoder(
@@ -96,8 +103,11 @@ class _LateFusionLSTMClassifier(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
+            bidirectional=bidirectional,
         )
-        self.classifier = nn.Linear(hidden_size + n_context_features, n_classes)
+        self.classifier = nn.Linear(
+            self.spectral_encoder.representation_size + n_context_features, n_classes
+        )
 
     def forward(self, spectrum: Tensor, context: Tensor) -> Tensor:
         """Return class logits after fusing the encoded spectrum and context."""
@@ -119,6 +129,7 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
         aez_embedding_dim: int,
         month_embedding_dim: int,
         n_classes: int,
+        bidirectional: bool = False,
     ) -> None:
         super().__init__()
         self.spectral_encoder = _SpectralLSTMEncoder(
@@ -126,6 +137,7 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
+            bidirectional=bidirectional,
         )
         self.context_encoder = _CategoricalContextEncoder(
             n_aez_categories=n_aez_categories,
@@ -134,7 +146,8 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
             month_embedding_dim=month_embedding_dim,
         )
         self.classifier = nn.Linear(
-            hidden_size + aez_embedding_dim + month_embedding_dim, n_classes
+            self.spectral_encoder.representation_size + aez_embedding_dim + month_embedding_dim,
+            n_classes,
         )
 
     def forward(self, spectrum: Tensor, aez_codes: Tensor, month_codes: Tensor) -> Tensor:
@@ -227,6 +240,8 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             AEZ and Month embeddings.
         hidden_size: Width of the LSTM hidden state.
         num_layers: Number of stacked LSTM layers.
+        bidirectional: Whether to concatenate encoder states from increasing and decreasing
+            wavelength order.
         dropout: Dropout probability between stacked LSTM layers.
         learning_rate: Adam learning rate.
         weight_decay: Adam L2 regularization strength.
@@ -242,6 +257,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         context_mode: LSTMContextMode = LSTM_STANDARD_CONTEXT,
         hidden_size: int = LSTM_DEFAULT_HIDDEN_SIZE,
         num_layers: int = LSTM_DEFAULT_NUM_LAYERS,
+        bidirectional: bool = False,
         dropout: float = LSTM_DEFAULT_DROPOUT,
         learning_rate: float = LSTM_DEFAULT_LEARNING_RATE,
         weight_decay: float = LSTM_DEFAULT_WEIGHT_DECAY,
@@ -255,6 +271,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         self.context_mode = context_mode
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.bidirectional = bidirectional
         self.dropout = dropout
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -273,6 +290,8 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             raise ValueError(f"Unknown context mode {self.context_mode!r}")
         if self.hidden_size < 1 or self.num_layers < 1:
             raise ValueError("hidden_size and num_layers must be positive")
+        if not isinstance(self.bidirectional, bool):
+            raise ValueError("bidirectional must be a boolean")
         if not 0 <= self.dropout < 1:
             raise ValueError("dropout must be in [0, 1)")
         if self.learning_rate <= 0:
@@ -291,6 +310,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
                 hidden_size=self.hidden_size,
                 num_layers=self.num_layers,
                 dropout=self.dropout,
+                bidirectional=self.bidirectional,
                 n_aez_categories=len(adapter.aez_codes_) + 1,
                 n_month_categories=len(adapter.month_codes_) + 1,
                 aez_embedding_dim=self.aez_embedding_dim,
@@ -305,6 +325,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
             dropout=self.dropout,
+            bidirectional=self.bidirectional,
             n_context_features=n_context_features,
             n_classes=n_classes,
         )

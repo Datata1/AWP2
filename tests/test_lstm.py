@@ -42,6 +42,22 @@ class SpectralLSTMEncoderTest(unittest.TestCase):
 
         self.assertEqual(tuple(representation.shape), (batch_size, hidden_size))
 
+    def test_concatenates_states_from_both_directions(self) -> None:
+        batch_size = 3
+        hidden_size = 5
+        encoder = _SpectralLSTMEncoder(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            bidirectional=True,
+        )
+
+        representation = encoder(torch.rand(batch_size, 4, 1))
+
+        self.assertEqual(tuple(representation.shape), (batch_size, hidden_size * 2))
+        self.assertEqual(encoder.representation_size, hidden_size * 2)
+
 
 class CategoricalContextEncoderTest(unittest.TestCase):
     def test_concatenates_one_embedding_per_context_category(self) -> None:
@@ -118,6 +134,28 @@ class EmbeddingFusionLSTMClassifierTest(unittest.TestCase):
             hidden_size + aez_embedding_dim + month_embedding_dim,
         )
         self.assertEqual(tuple(logits.shape), (batch_size, n_classes))
+
+    def test_expands_classifier_input_for_bidirectional_encoding(self) -> None:
+        hidden_size = 5
+        aez_embedding_dim = 4
+        month_embedding_dim = 3
+        classifier = _EmbeddingFusionLSTMClassifier(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=1,
+            dropout=0.0,
+            n_aez_categories=5,
+            n_month_categories=4,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+            n_classes=6,
+            bidirectional=True,
+        )
+
+        self.assertEqual(
+            classifier.classifier.in_features,
+            hidden_size * 2 + aez_embedding_dim + month_embedding_dim,
+        )
 
 
 class LSTMInputAdapterTest(unittest.TestCase):
@@ -223,12 +261,17 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
         self.assertEqual(classifier.estimator.context_mode, LSTM_EMBEDDINGS_CONTEXT)
 
     def test_clone_preserves_configured_hyperparameters(self) -> None:
-        classifier = SpectralLSTMClassifier(hidden_size=8, context_mode=LSTM_EMBEDDINGS_CONTEXT)
+        classifier = SpectralLSTMClassifier(
+            hidden_size=8,
+            context_mode=LSTM_EMBEDDINGS_CONTEXT,
+            bidirectional=True,
+        )
 
         cloned = clone(classifier)
 
         self.assertEqual(cloned.hidden_size, 8)
         self.assertEqual(cloned.context_mode, LSTM_EMBEDDINGS_CONTEXT)
+        self.assertTrue(cloned.bidirectional)
 
     def test_rejects_invalid_dropout(self) -> None:
         classifier = SpectralLSTMClassifier(dropout=1.0)

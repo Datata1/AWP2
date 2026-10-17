@@ -82,6 +82,10 @@ RECALL_COL = "recall"
 SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
 EXTRA_TREES_N_ESTIMATORS = 300
+SVM_REFERENCE_C = 100.0
+SVM_REFERENCE_GAMMA = 0.003
+SPECTRAL_JITTER_DEFAULT_MULTIPLIER = 0
+SPECTRAL_JITTER_DEFAULT_NOISE_STD = 0.0
 LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on ~140 features
 MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 # a CV gain below this is within the fold-to-fold noise of the reference (std about 0.010)
