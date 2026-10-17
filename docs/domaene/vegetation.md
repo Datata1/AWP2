@@ -275,6 +275,34 @@ Cross-Validation; das ungelabelte Testset darf diese Entscheidungen nicht beeinf
 Berechnung gehört in die Pipeline. Ob ein Kandidat nützt, entscheiden Balanced Accuracy,
 Macro-F1 und Samples-F1 auf der davon getrennten Validierung.[^9]
 
+### Kickoff-Katalog in der Pipeline
+
+Der gemeinsame Preprocessor berechnet 27 eindeutig formulierte Indizes aus dem Katalog der
+Kickoff-Folie. Die genaue Formel, Primärquelle, Kategorie und angeforderten Wellenlängen stehen
+zentral in `awp2.config.VEGETATION_INDEX_SPECS`. Für jede angeforderte Wellenlänge wählt der
+Transformer das nächstgelegene nicht leere Hyperion-Band, aber nur bei einem Abstand von höchstens
+5 nm. Die verwendeten Bänder werden beim Fit auf dem Trainingsanteil festgelegt und anschließend
+für die Transformation beibehalten.
+
+Die Rohreflektanzen liegen als Prozentwerte vor. Für die Berechnung werden sie zu Anteilen von
+0 bis 1 umgerechnet; das ist für Formeln mit additiven Konstanten wie OSAVI notwendig. Die
+ausgewählten Indexspalten können danach mit derselben konfigurierten Methode wie die Spektren
+standardisiert, Min-Max-skaliert oder zentriert werden. Der Skaler des Indexzweigs wird dabei
+getrennt und ausschließlich auf dem Trainingsanteil gefittet.
+
+Folgende Katalogeinträge werden nicht berechnet:
+
+| Einträge | Grund |
+| --- | --- |
+| `SR_895_420`, `SR_695_420` | Das nächste nicht leere Band zu 420 nm ist `X437` und liegt 17 nm entfernt. |
+| `WI_900_970` | Das nächste nicht leere Band zu 970 nm ist `X983` und liegt 13 nm entfernt. |
+| Chlorophyll Well, Green Peak Well, Water Well bei 893 und 1205 nm sowie ihre PSSRa-Verhältnisse | Die in der Folie genannten CSIRO-VegSpectra-Quellen sind unveröffentlicht und liefern keine reproduzierbare Formel. |
+
+Die REIP-Verfahren und die beiden Hauptkomponenten bleiben vorerst außerhalb des Katalogs.
+Für REIP fehlen in der Folie die Stützstellen beziehungsweise das Fit-Fenster; PC1 und PC2
+benötigen zusätzlich eine separat festgelegte, pro Trainingsfold angepasste PCA. Beide sind daher
+keine festen Indexformeln.
+
 [^4]: Tucker (1979), siehe [Quellen](quellen.md).
 [^5]: Huete et al. (2002), siehe [Quellen](quellen.md).
 [^6]: Gamon, Peñuelas & Field (1992), siehe [Quellen](quellen.md).

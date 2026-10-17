@@ -2,6 +2,7 @@
 
 import re
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Self
 
@@ -22,22 +23,54 @@ from awp2.config import (
     AEZ_COL,
     BAND_PATTERN,
     BAND_PREFIX,
+    INDEX_WAVELENGTH_TOLERANCE_NM,
+    MCARI_GREEN_WEIGHT,
     MEAN_ALBEDO_COL,
     MONTH_COL,
     MONTH_COS_COL,
     MONTH_SIN_COL,
-    NDRE_RED_EDGE_BAND,
-    NDVI_NIR_BAND,
-    NDVI_RED_BAND,
-    NDWI_SWIR_BAND,
-    PRI_FIRST_BAND,
-    PRI_SECOND_BAND,
+    OSAVI_SOIL_ADJUSTMENT,
+    REFLECTANCE_PERCENT_SCALE,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
-    VEGETATION_INDEX_BANDS,
+    TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
+    VEGETATION_INDEX_SPECS,
 )
-from awp2.data import wavelengths
+from awp2.data import wavelength, wavelengths
+
+
+def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
+    """Return the closest available band within the configured wavelength tolerance.
+
+    Ties resolve to the lower wavelength so that the mapping is independent of input order.
+
+    Args:
+        target_wavelength_nm: Wavelength required by an index formula in nanometres.
+        band_names: Available Hyperion band names in the ``X<nm>`` convention.
+
+    Returns:
+        The closest band name at most ``INDEX_WAVELENGTH_TOLERANCE_NM`` away.
+
+    Raises:
+        ValueError: If no band is supplied or the closest band exceeds the tolerance.
+    """
+    if not band_names:
+        raise ValueError("Cannot map an index wavelength without available bands")
+    closest_band = min(
+        band_names,
+        key=lambda band_name: (
+            abs(wavelength(band_name) - target_wavelength_nm),
+            wavelength(band_name),
+        ),
+    )
+    distance_nm = abs(wavelength(closest_band) - target_wavelength_nm)
+    if distance_nm > INDEX_WAVELENGTH_TOLERANCE_NM:
+        raise ValueError(
+            f"No band within {INDEX_WAVELENGTH_TOLERANCE_NM} nm of "
+            f"{target_wavelength_nm} nm; closest is {closest_band} ({distance_nm} nm away)"
+        )
+    return closest_band
 
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
@@ -553,24 +586,11 @@ class DeepBeliefFeatures(_BandTransformer):
         return pd.DataFrame(activations, index=X.index, columns=self.feature_names_out_)
 
 
-def ndvi(bands: pd.DataFrame) -> pd.Series:
-    """Normalised difference vegetation index – a proxy for green vegetation cover.
-
-    Args:
-        bands: Reflectance with at least the columns ``NDVI_NIR_BAND`` and ``NDVI_RED_BAND``.
-
-    Returns:
-        NDVI per row, between -1 and 1 (bare soil about 0.1-0.2, dense canopy above 0.6).
-    """
-    nir, red = bands[NDVI_NIR_BAND], bands[NDVI_RED_BAND]
-    return (nir - red) / (nir + red)
-
-
 class AddVegetationIndices(_BandTransformer):
-    """Append NDVI, NDRE, PRI and NDWI to a frame of spectral bands."""
+    """Append the reproducible kickoff-catalogue indices to spectral bands."""
 
     def fit(self, X: pd.DataFrame, y: object = None) -> Self:
-        """Validate the required bands and record output feature names.
+        """Resolve every catalogue wavelength against the fitted band columns.
 
         Args:
             X: Band columns after missing-value processing.
@@ -580,35 +600,87 @@ class AddVegetationIndices(_BandTransformer):
             The fitted transformer.
 
         Raises:
-            ValueError: If a required band is unavailable.
+            ValueError: If a required target wavelength has no band within the tolerance.
         """
         X = self._check(X)
         self._set_input(X)
-        missing_bands = sorted(set(VEGETATION_INDEX_BANDS) - set(X.columns))
-        if missing_bands:
-            raise ValueError(f"Vegetation indices require unavailable bands: {missing_bands}")
+        implemented_specs = [
+            spec for spec in VEGETATION_INDEX_SPECS if spec.status == "implemented"
+        ]
+        self.index_bands_ = {
+            spec.name: tuple(
+                nearest_band(target_nm, list(X.columns)) for target_nm in spec.target_wavelengths_nm
+            )
+            for spec in implemented_specs
+        }
         self.feature_names_out_ = [*X.columns, *VEGETATION_INDEX_NAMES]
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Append the four index columns.
+        """Append the configured catalogue values to the input bands.
 
         Args:
             X: Band columns with the same columns as in ``fit``.
 
         Returns:
-            The input bands plus the vegetation indices.
+            The input bands plus the reproducible vegetation-index catalogue.
         """
         X = self._check(X)
+        reflectance = X / REFLECTANCE_PERCENT_SCALE
+        index_bands = self.index_bands_
+        r750, r705 = (reflectance[band] for band in index_bands["SR_750_705"])
+        r800, r550 = (reflectance[band] for band in index_bands["SR_800_550"])
+        _, r650 = (reflectance[band] for band in index_bands["ND_750_650"])
+        _, r680 = (reflectance[band] for band in index_bands["ND_800_680"])
+        _, r445 = (reflectance[band] for band in index_bands["MSR_750_445"])
+        r700, r670, _ = (reflectance[band] for band in index_bands["MCARI"])
+        _, r500, _ = (reflectance[band] for band in index_bands["PSRI"])
+        r531, r570 = (reflectance[band] for band in index_bands["PRI"])
+        _, r635 = (reflectance[band] for band in index_bands["PSSRB"])
+        r695, r760 = (reflectance[band] for band in index_bands["SR_695_760"])
+        r1660, _ = (reflectance[band] for band in index_bands["DSWI_2"])
+        r770, r1200 = (reflectance[band] for band in index_bands["NDWI_770_1200"])
+        r860, r1240 = (reflectance[band] for band in index_bands["NDWI_860_1240"])
+        r1600, r820 = (reflectance[band] for band in index_bands["MSI"])
+        mean_start, mean_end = index_bands["MEAN_750_850"]
+        mean_bands = [
+            band
+            for band in X.columns
+            if wavelength(mean_start) <= wavelength(band) <= wavelength(mean_end)
+        ]
+        tcari = TCARI_MULTIPLIER * (
+            (r700 - r670) - MCARI_GREEN_WEIGHT * (r700 - r550) * (r700 / r670)
+        )
+        osavi = (1 + OSAVI_SOIL_ADJUSTMENT) * (r800 - r670) / (r800 + r670 + OSAVI_SOIL_ADJUSTMENT)
         indices = pd.DataFrame(
             {
-                "NDVI": ndvi(X),
-                "NDRE": (X[NDVI_NIR_BAND] - X[NDRE_RED_EDGE_BAND])
-                / (X[NDVI_NIR_BAND] + X[NDRE_RED_EDGE_BAND]),
-                "PRI": (X[PRI_FIRST_BAND] - X[PRI_SECOND_BAND])
-                / (X[PRI_FIRST_BAND] + X[PRI_SECOND_BAND]),
-                "NDWI": (X[NDVI_NIR_BAND] - X[NDWI_SWIR_BAND])
-                / (X[NDVI_NIR_BAND] + X[NDWI_SWIR_BAND]),
+                "SR_750_705": r750 / r705,
+                "SR_800_550": r800 / r550,
+                "ND_750_650": (r750 - r650) / (r750 + r650),
+                "ND_800_680": (r800 - r680) / (r800 + r680),
+                "ND_750_705": (r750 - r705) / (r750 + r705),
+                "MSR_750_445": (r750 - r445) / (r750 + r445),
+                "MND_750_705": (r750 - r445) / (r750 + r705 - 2 * r445),
+                "SR_750_550": r750 / r550,
+                "MEAN_750_850": reflectance[mean_bands].mean(axis=1),
+                "MCARI": ((r700 - r670) - MCARI_GREEN_WEIGHT * (r700 - r550)) * (r700 / r670),
+                "TCARI": tcari,
+                "OSAVI": osavi,
+                "TCARI_OSAVI": tcari / osavi,
+                "PSRI": (r680 - r500) / r750,
+                "SIPI": (r800 - r445) / (r800 - r680),
+                "PRI": (r531 - r570) / (r531 + r570),
+                "PSSRA": r800 / r680,
+                "PSSRB": r800 / r635,
+                "SR_695_760": r695 / r760,
+                "DSWI_1": r800 / (reflectance[index_bands["DSWI_1"][1]]),
+                "DSWI_2": r1660 / r550,
+                "DSWI_3": r1660 / r680,
+                "DSWI_4": r550 / r680,
+                "DSWI_5": (r800 + r550) / (r1660 + r680),
+                "NDWI_770_1200": (r770 - r1200) / (r770 + r1200),
+                "NDWI_860_1240": (r860 - r1240) / (r860 + r1240),
+                "MSI": r1600 / r820,
             },
             index=X.index,
         )
@@ -892,8 +964,8 @@ class PreprocessingConfig(BaseModel):
     )
     use_vegetation_indices: bool = Field(
         default=False,
-        description="Compute EDA-defined NDVI, NDRE, PRI and NDWI from interpolated bands "
-        "in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
+        description="Compute the reproducible kickoff vegetation-index catalogue from interpolated "
+        "bands in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
     )
     use_cyclic_month: bool = Field(
         default=True,
@@ -1111,17 +1183,22 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             )
         )
     if config.use_vegetation_indices:
+        index_steps: list[tuple[str, BaseEstimator]] = [
+            ("drop_empty", DropEmptyBands()),
+            ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+            ("indices", AddVegetationIndices()),
+            ("select", SelectVegetationIndices()),
+        ]
+        if config.use_spectral_standard_scale or config.scale:
+            index_steps.append(("standard_scale", StandardScaler()))
+        elif config.use_spectral_minmax_scale:
+            index_steps.append(("minmax_scale", MinMaxScaler()))
+        elif config.use_spectral_centering:
+            index_steps.append(("centering", StandardScaler(with_mean=True, with_std=False)))
         transformers.append(
             (
                 "indices",
-                Pipeline(
-                    [
-                        ("drop_empty", DropEmptyBands()),
-                        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
-                        ("indices", AddVegetationIndices()),
-                        ("select", SelectVegetationIndices()),
-                    ]
-                ),
+                Pipeline(index_steps),
                 make_column_selector(pattern=BAND_PATTERN),
             )
         )
@@ -1138,7 +1215,7 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
     known: dict[str, str] = {
         "drop_empty": "Drop empty bands",
         "snv": "SNV scatter correction per spectrum",
-        "indices": "Vegetation indices NDVI, NDRE, PRI and NDWI (from interpolated bands)",
+        "indices": "Vegetation-index catalogue (from interpolated bands)",
         "standard_scale": "Standardize bands (per-band mean and std)",
         "minmax_scale": "Min-max scale bands to [0, 1]",
         "centering": "Center bands (per-band mean)",
@@ -1286,9 +1363,7 @@ def _config_fields(*names: str) -> str:
 
 _META_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("aez", "aez", f"AEZ one-hot [{_config_fields('use_meta')}]", True),
-    _OptionNode(
-        "month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False
-    ),
+    _OptionNode("month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False),
     _OptionNode("month", "month", "Monat numerisch [use_cyclic_month = False]", False),
 )
 

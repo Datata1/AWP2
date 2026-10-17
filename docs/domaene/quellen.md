@@ -31,6 +31,11 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     https://doi.org/10.1016/j.rse.2003.10.023. - Cellulose Absorption Index und trockene
     Pflanzenbestandteile.
 
+- Daughtry, C. S. T., Walthall, C. L., Kim, M. S., de Colstoun, E. B. & McMurtrey, J. E.
+    (2000): *Estimating corn leaf chlorophyll concentration from leaf and canopy reflectance*.
+    Remote Sensing of Environment, 74(2), 229-239. https://doi.org/10.1016/S0034-4257(00)00113-9.
+    - Modified Chlorophyll Absorption in Reflectance Index (MCARI).
+
 - Gamon, J. A., Peñuelas, J. & Field, C. B. (1992): *A narrow-waveband spectral index that
     tracks diurnal changes in photosynthetic efficiency*. Remote Sensing of Environment,
     41(1), 35-44. https://doi.org/10.1016/0034-4257(92)90085-3. - Photochemical Reflectance
@@ -45,6 +50,16 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     Remote Sensing of Environment, 83(1-2), 195-213.
     https://doi.org/10.1016/S0034-4257(02)00096-2. - Enhanced Vegetation Index (EVI).
 
+- Haboudane, D., Miller, J. R., Tremblay, N., Zarco-Tejada, P. J. & Dextraze, L. (2002):
+    *Integrated narrow-band vegetation indices for prediction of crop chlorophyll content for
+    application to precision agriculture*. Remote Sensing of Environment, 81(2-3), 416-426.
+    https://doi.org/10.1016/S0034-4257(02)00018-4. - Transformed Chlorophyll Absorption in
+    Reflectance Index (TCARI) und Verhältnis TCARI/OSAVI.
+
+- Hunt, E. R. & Rock, B. N. (1989): *Detection of changes in leaf water content using near-
+    and middle-infrared reflectances*. Remote Sensing of Environment, 30(1), 43-54.
+    https://doi.org/10.1016/0034-4257(89)90051-0. - Moisture Stress Index (MSI).
+
 - Knipling, E. B. (1970): *Physical and physiological basis for the reflectance of visible
     and near-infrared radiation from vegetation*. Remote Sensing of Environment, 1, 155-159.
     https://doi.org/10.1016/0034-4257(70)90021-9. - Zusammenhang von Blattmerkmalen mit
@@ -54,6 +69,11 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     advances and remaining knowledge gaps*. Biosystems Engineering, 114(4), 358-371.
     https://doi.org/10.1016/j.biosystemseng.2012.08.009. - Wiederholte Fernerkundung für
     landwirtschaftliches Monitoring und mögliche Entscheidungsunterstützung.
+
+- Merzlyak, M. N., Gitelson, A. A., Chivkunova, O. B. & Rakitin, V. Y. (1999): *Non-destructive
+    optical detection of pigment changes during leaf senescence and fruit ripening*. Physiologia
+    Plantarum, 106(1), 135-141. https://doi.org/10.1034/j.1399-3054.1999.106119.x. - Plant
+    Senescence Reflectance Index (PSRI).
 
 - NASA Earthdata (o. J.): *Earth Observation Data Basics*. NASA.
     https://earthdata.nasa.gov/learn/backgrounders/remote-sensing. - Fernerkundung erfasst
@@ -67,6 +87,15 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
 - NASA (2025): *Earth Observing-1*. NASA Earth Observatory.
     https://science.nasa.gov/earth/earth-observatory/earth-observing-1. - Start, Orbit und
     Zweck der EO-1-Mission sowie räumliche und spektrale Kenndaten von Hyperion.
+
+- Peñuelas, J., Baret, F. & Filella, I. (1995): *Semi-empirical indices to assess carotenoids/
+    chlorophyll a ratio from leaf spectral reflectance*. Photosynthetica, 31(2), 221-230. -
+    Structure-Insensitive Pigment Index (SIPI).
+
+- Rondeaux, G., Steven, M. & Baret, F. (1996): *Optimization of soil-adjusted vegetation
+    indices*. Remote Sensing of Environment, 55(2), 95-107.
+    https://doi.org/10.1016/0034-4257(95)00186-7. - Optimized Soil-Adjusted Vegetation Index
+    (OSAVI).
 
 - Tucker, C. J. (1979): *Red and photographic infrared linear combinations for monitoring
     vegetation*. Remote Sensing of Environment, 8(2), 127-150.

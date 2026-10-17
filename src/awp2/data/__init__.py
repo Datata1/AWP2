@@ -7,7 +7,7 @@ from awp2.data.artifacts import (
     load_folds,
     load_split,
 )
-from awp2.data.load import band_columns, load_test, load_train, wavelengths
+from awp2.data.load import band_columns, load_test, load_train, wavelength, wavelengths
 from awp2.data.split import (
     CropStage,
     Dataset,
@@ -40,5 +40,6 @@ __all__ = [
     "prepare_dataset",
     "train_val_split",
     "valid_combinations",
+    "wavelength",
     "wavelengths",
 ]
