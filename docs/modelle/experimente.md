@@ -41,6 +41,12 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-16 | hierarchical_lstm_embeddings | QMoWo | Hierarchisch | 0.812 | 0.778 | 0.568 | 0.529 | 0.748 | – | Harter LSTM → LSTM mit Embeddings, 32 → 64 Einheiten; CV 0.546, keine ungültigen Paare. MLflow-Tracking fehlgeschlagen (`/C:`). |
 | 2026-10-16 | multi_task_lstm_embeddings | QMoWo | Multi-Task | 0.796 | 0.744 | 0.417 | 0.388 | 0.717 | – | Multi-Task-LSTM mit AEZ-/Monatsembeddings, 64 Einheiten; CV 0.458, keine ungültigen Paare. MLflow-Tracking fehlgeschlagen (`/C:`). |
 
+## Abweichende Split-Protokolle
+
+| Datum | ID | Autor | Ansatz | BAcc Crop | BAcc Stage | BAcc kombiniert | Macro-F1 kombiniert | Samples-F1 | MLflow-Run | Notiz |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 | combined_svm_split_80_20 | QMoWo | Kombinierte Klasse | 0.920 | 0.913 | 0.866 | 0.859 | 0.917 | 8fa9aeed | 80/20-Split, Tuning `combined_svm_split_80_20_search` (CV 0.859, MLflow `08fdabe4`); keine ungültigen Paare. Nicht direkt mit den 70/30-Läufen oben vergleichen. |
+
 ## CV-only Analysen
 
 Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Validierungsmetriken und

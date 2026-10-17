@@ -48,7 +48,7 @@ belegt deshalb keine robuste spektrale Klassifikation.
 Die ersten drei Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md)
 dokumentiert. Sie gelten für den dort getesteten Random Forest und dessen gemeinsamen Split,
 nicht als allgemeine Rangfolge aller denkbaren Merkmale. Das PCA-Ergebnis steht beim
-[kombinierten Ansatz](../modelle/ansaetze/kombiniert.md#rbf-svm-mit-pca-auf-spektralbandern).
+[kombinierten Ansatz](../modelle/ansaetze/kombiniert.md#rbf-svm-mit-dimensionsreduktion-auf-spektralbandern).
 
 ## Kandidaten für weitere, getrennte Vergleiche
 

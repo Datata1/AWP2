@@ -208,6 +208,26 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 
 ![Häufigste Verwechslungen](../img/combined_svm_expanded_confusions.png)
 
+### RBF-SVM unter dem 80/20-Split
+
+Notebook: `notebooks/19_qm_split-80-20.ipynb`. Dieser Lauf prueft das neue
+Split-Protokoll, nicht eine neue Modellvariante.
+
+- Der Builder erzeugte 4.471 Trainings- und 1.118 Validierungszeilen mit
+    `validation_size=0.2`.
+- Die CV-Suche mit skalierten Rohspektren, AEZ und zyklischem Month waehlte `C=300.0` und
+    `gamma=0.003` mit kombinierter BAcc 0.859 bei einer Standardabweichung von 0.023
+    (MLflow `08fdabe4`).
+- Die einmalige Bewertung erreicht BAcc 0.920 fuer Crop, 0.913 fuer Stage und **0.866
+    kombiniert** (MLflow `8fa9aeed`); alle Paare sind gueltig.
+- 88.8 % der Paare sind vollstaendig richtig; 8.1 % der Zeilen haben eine falsche Kultur und
+    3.0 % nur ein falsches Stadium. Am schwaechsten bleiben Soja/Emerge_VEarly (Recall 0.57)
+    und Baumwolle/Mature_Senesc (0.62); Winterweizen/Mature_Senesc wird neunmal als
+    Baumwolle/Early_Mid vorhergesagt.
+- Die Zahl ist nicht direkt gegen die 70/30-Referenz vergleichbar, weil Training und Holdout
+    andere Zeilen enthalten. Sie zeigt, dass die bewaehrte SVM-Repraesentation auch mit dem
+    neuen Protokoll stabil bleibt.
+
 ### RBF-SVM mit Standard Normal Variate
 
 Notebook: `notebooks/08_duac1011_combined-svm-snv.ipynb`. SNV normalisiert jedes interpolierte

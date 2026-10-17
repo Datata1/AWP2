@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold, train_test_split
 from sklearn.utils.class_weight import compute_sample_weight
 
@@ -36,6 +36,23 @@ class CropStage(BaseModel):
 
     crop: Crop
     stage: Stage
+
+
+class SplitConfig(BaseModel):
+    """Configuration for the shared train/validation split.
+
+    Attributes:
+        validation_size: Fraction of rows assigned to validation.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    validation_size: float = Field(
+        default=VAL_SIZE,
+        gt=0,
+        lt=1,
+        description="Fraction of rows assigned to validation.",
+    )
 
 
 class Dataset(NamedTuple):
@@ -138,21 +155,25 @@ def balanced_sample_weight(y: pd.DataFrame) -> np.ndarray:
     return compute_sample_weight("balanced", combined_label(y))
 
 
-def train_val_split(X: pd.DataFrame, y: pd.DataFrame) -> TrainValSplit:
+def train_val_split(
+    X: pd.DataFrame, y: pd.DataFrame, config: SplitConfig | None = None
+) -> TrainValSplit:
     """Compute the shared holdout split (used by ``make data``; load it with ``load_split``).
 
-    ``VAL_SIZE`` of the rows go to validation, stratified on crop+stage and seeded. Deliberately
-    not configurable, so all results stay comparable.
+    ``config.validation_size`` of the rows go to validation, stratified on crop+stage and seeded.
 
     Args:
         X: Features, e.g. ``Dataset.X``.
         y: Targets, e.g. ``Dataset.y``.
+        config: Validated split settings; uses the default settings when omitted.
 
     Returns:
         Training and validation part.
     """
+    if config is None:
+        config = SplitConfig()
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=VAL_SIZE, stratify=combined_label(y), random_state=SEED
+        X, y, test_size=config.validation_size, stratify=combined_label(y), random_state=SEED
     )
     return TrainValSplit(X_train, X_val, y_train, y_val)
 
