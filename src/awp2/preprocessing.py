@@ -30,7 +30,12 @@ from awp2.config import (
     MONTH_COS_COL,
     MONTH_SIN_COL,
     OSAVI_SOIL_ADJUSTMENT,
+    PCA_FEATURE_NAMES,
     REFLECTANCE_PERCENT_SCALE,
+    REIP_LAGRANGIAN_MIN_BANDS,
+    REIP_LAGRANGIAN_WINDOW_NM,
+    REIP_POLYNOMIAL_DEGREE,
+    REIP_POLYNOMIAL_WINDOW_NM,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
     TCARI_MULTIPLIER,
@@ -71,6 +76,106 @@ def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
             f"{target_wavelength_nm} nm; closest is {closest_band} ({distance_nm} nm away)"
         )
     return closest_band
+
+
+def _band_window(
+    band_names: Sequence[str], target_window_nm: tuple[int, int], minimum_bands: int
+) -> tuple[str, ...]:
+    """Resolve a target window and return its available bands in wavelength order.
+
+    Args:
+        band_names: Available Hyperion band names.
+        target_window_nm: Required lower and upper wavelength in nanometres.
+        minimum_bands: Minimum number of resolved bands needed by the algorithm.
+
+    Returns:
+        Band names within the resolved window, sorted by wavelength.
+
+    Raises:
+        ValueError: If the resolved window contains too few available bands.
+    """
+    start_band, end_band = (
+        nearest_band(target_nm, band_names) for target_nm in target_window_nm
+    )
+    start_nm, end_nm = sorted((wavelength(start_band), wavelength(end_band)))
+    window_bands = tuple(
+        sorted(
+            (band for band in band_names if start_nm <= wavelength(band) <= end_nm),
+            key=wavelength,
+        )
+    )
+    if len(window_bands) < minimum_bands:
+        raise ValueError(
+            f"REIP window {start_nm}-{end_nm} nm needs at least {minimum_bands} bands, "
+            f"got {len(window_bands)}"
+        )
+    return window_bands
+
+
+def _lagrangian_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.ndarray:
+    """Estimate the red-edge inflection point from local derivative interpolation.
+
+    Args:
+        reflectance: One row per spectrum and one column per red-edge band.
+        wavelength_nm: Wavelength of each reflectance column in nanometres.
+
+    Returns:
+        One inflection-point wavelength per spectrum; invalid local maxima are ``NaN``.
+    """
+    derivatives = np.gradient(reflectance, wavelength_nm, axis=1)
+    positions = np.full(reflectance.shape[0], np.nan)
+    for row_number, derivative in enumerate(derivatives):
+        peak = int(np.argmax(derivative[1:-1])) + 1
+        support_wavelengths = wavelength_nm[peak - 1 : peak + 2]
+        support_derivatives = derivative[peak - 1 : peak + 2]
+        coefficients = np.polyfit(support_wavelengths, support_derivatives, 2)
+        curvature, slope = coefficients[:2]
+        if np.isclose(curvature, 0.0):
+            continue
+        position = -slope / (2 * curvature)
+        if curvature < 0 and support_wavelengths[0] <= position <= support_wavelengths[-1]:
+            positions[row_number] = position
+    return positions
+
+
+def _polynomial_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.ndarray:
+    """Estimate the red-edge inflection point from a fourth-degree reflectance polynomial.
+
+    Args:
+        reflectance: One row per spectrum and one column per red-edge band.
+        wavelength_nm: Wavelength of each reflectance column in nanometres.
+
+    Returns:
+        One inflection-point wavelength per spectrum; missing inner maxima are ``NaN``.
+    """
+    center_nm = float(np.mean(wavelength_nm))
+    centered_wavelengths = wavelength_nm - center_nm
+    positions = np.full(reflectance.shape[0], np.nan)
+    for row_number, spectrum in enumerate(reflectance):
+        coefficients = np.polynomial.polynomial.polyfit(
+            centered_wavelengths, spectrum, REIP_POLYNOMIAL_DEGREE
+        )
+        second_derivative = np.array(
+            [2 * coefficients[2], 6 * coefficients[3], 12 * coefficients[4]]
+        )
+        roots = np.polynomial.polynomial.polyroots(second_derivative)
+        candidates = [
+            float(root.real)
+            for root in roots
+            if np.isclose(root.imag, 0.0)
+            and centered_wavelengths[0] <= root.real <= centered_wavelengths[-1]
+            and np.polynomial.polynomial.polyval(root.real, second_derivative) < 0
+        ]
+        if candidates:
+            first_derivative = np.array(
+                [coefficients[1], 2 * coefficients[2], 3 * coefficients[3], 4 * coefficients[4]]
+            )
+            best_candidate = max(
+                candidates,
+                key=lambda candidate: np.polynomial.polynomial.polyval(candidate, first_derivative),
+            )
+            positions[row_number] = best_candidate + center_nm
+    return positions
 
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
@@ -605,7 +710,9 @@ class AddVegetationIndices(_BandTransformer):
         X = self._check(X)
         self._set_input(X)
         implemented_specs = [
-            spec for spec in VEGETATION_INDEX_SPECS if spec.status == "implemented"
+            spec
+            for spec in VEGETATION_INDEX_SPECS
+            if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
         ]
         self.index_bands_ = {
             spec.name: tuple(
@@ -613,6 +720,14 @@ class AddVegetationIndices(_BandTransformer):
             )
             for spec in implemented_specs
         }
+        self.reip_lagrangian_bands_ = _band_window(
+            list(X.columns), REIP_LAGRANGIAN_WINDOW_NM, REIP_LAGRANGIAN_MIN_BANDS
+        )
+        self.reip_polynomial_bands_ = _band_window(
+            list(X.columns),
+            REIP_POLYNOMIAL_WINDOW_NM,
+            REIP_POLYNOMIAL_DEGREE + 1,
+        )
         self.feature_names_out_ = [*X.columns, *VEGETATION_INDEX_NAMES]
         return self
 
@@ -652,6 +767,14 @@ class AddVegetationIndices(_BandTransformer):
             (r700 - r670) - MCARI_GREEN_WEIGHT * (r700 - r550) * (r700 / r670)
         )
         osavi = (1 + OSAVI_SOIL_ADJUSTMENT) * (r800 - r670) / (r800 + r670 + OSAVI_SOIL_ADJUSTMENT)
+        reip_lagrangian = _lagrangian_reip(
+            reflectance[list(self.reip_lagrangian_bands_)].to_numpy(),
+            np.asarray([wavelength(band) for band in self.reip_lagrangian_bands_], dtype=float),
+        )
+        reip_polynomial = _polynomial_reip(
+            reflectance[list(self.reip_polynomial_bands_)].to_numpy(),
+            np.asarray([wavelength(band) for band in self.reip_polynomial_bands_], dtype=float),
+        )
         indices = pd.DataFrame(
             {
                 "SR_750_705": r750 / r705,
@@ -681,6 +804,8 @@ class AddVegetationIndices(_BandTransformer):
                 "NDWI_770_1200": (r770 - r1200) / (r770 + r1200),
                 "NDWI_860_1240": (r860 - r1240) / (r860 + r1240),
                 "MSI": r1600 / r820,
+                "REIP_LAGRANGIAN": reip_lagrangian,
+                "REIP_POLYNOMIAL": reip_polynomial,
             },
             index=X.index,
         )
@@ -715,7 +840,7 @@ class SelectVegetationIndices(TransformerMixin, BaseEstimator):
             X: Bands plus vegetation indices, as produced by ``AddVegetationIndices``.
 
         Returns:
-            The four index columns.
+            The vegetation-index catalogue columns.
         """
         return self._check(X)[list(VEGETATION_INDEX_NAMES)]
 
@@ -735,9 +860,41 @@ class SelectVegetationIndices(TransformerMixin, BaseEstimator):
             input_features: Ignored; accepted for sklearn compatibility.
 
         Returns:
-            The four vegetation index names.
+            The vegetation-index catalogue names.
         """
         return np.asarray(VEGETATION_INDEX_NAMES, dtype=object)
+
+
+class PrincipalComponentFeatures(_BandTransformer):
+    """Reduce standardized spectral bands to the two named PCA features."""
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Fit PCA to the standardized training spectra.
+
+        Args:
+            X: Standardized band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        self.pca_ = PCA(n_components=len(PCA_FEATURE_NAMES), random_state=SEED).fit(X)
+        self.feature_names_out_ = list(PCA_FEATURE_NAMES)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Project spectra onto the fitted principal-component axes.
+
+        Args:
+            X: Standardized band columns with the same columns as in ``fit``.
+
+        Returns:
+            One ``PC_1`` and one ``PC_2`` feature per spectrum.
+        """
+        values = self.pca_.transform(self._check(X))
+        return pd.DataFrame(values, index=X.index, columns=self.feature_names_out_)
 
 
 class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
@@ -966,6 +1123,11 @@ class PreprocessingConfig(BaseModel):
         default=False,
         description="Compute the reproducible kickoff vegetation-index catalogue from interpolated "
         "bands in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
+    )
+    use_principal_components: bool = Field(
+        default=False,
+        description="Append PC_1 and PC_2 from a PCA fitted on standardized interpolated bands "
+        "in a parallel branch.",
     )
     use_cyclic_month: bool = Field(
         default=True,
@@ -1202,6 +1364,21 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                 make_column_selector(pattern=BAND_PATTERN),
             )
         )
+    if config.use_principal_components:
+        transformers.append(
+            (
+                "principal_components",
+                Pipeline(
+                    [
+                        ("drop_empty", DropEmptyBands()),
+                        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
+                        ("standard_scale", StandardScaler()),
+                        ("pca", PrincipalComponentFeatures()),
+                    ]
+                ),
+                make_column_selector(pattern=BAND_PATTERN),
+            )
+        )
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
@@ -1238,6 +1415,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         )
     if name == "pca" and isinstance(step, PCA):
         return f"PCA to {step.n_components} components"
+    if name == "pca" and isinstance(step, PrincipalComponentFeatures):
+        return "PCA to PC_1 and PC_2"
     if name == "ica" and isinstance(step, FastICA):
         return f"ICA to {step.n_components} components"
     if name == "nmf" and isinstance(step, NMF):
@@ -1436,6 +1615,23 @@ _INDEX_SCALER_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("indices", "no_scaler", "keine Skalierung [Standard]", False),
 )
 
+_PRINCIPAL_COMPONENT_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("principal_components", "drop_empty", "Leere Bänder entfernen (immer)", True),
+    _OptionNode(
+        "principal_components",
+        "interpolate",
+        f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
+        True,
+    ),
+    _OptionNode("principal_components", "standard_scale", "Standard (immer)", True),
+    _OptionNode(
+        "principal_components",
+        "pca",
+        "PC_1 + PC_2 [" + _config_fields("use_principal_components") + "]",
+        True,
+    ),
+)
+
 _SCALER_NODES: tuple[_OptionNode, ...] = (
     _OptionNode(
         "spectra",
@@ -1516,6 +1712,7 @@ def _diagram_steps() -> set[tuple[str, str]]:
         _ALBEDO_NODES,
         _INDICES_NODES,
         _INDEX_SCALER_NODES,
+        _PRINCIPAL_COMPONENT_NODES,
         _SPECTRA_PREFIX_NODES,
         _SCALER_NODES,
         _REDUCTION_NODES,
@@ -1548,6 +1745,7 @@ def pipeline_options_diagram() -> str:
     aez, cyclic, numeric = _META_NODES
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select = _INDICES_NODES
+    pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
     s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
@@ -1567,6 +1765,10 @@ def pipeline_options_diagram() -> str:
     for node in _INDICES_NODES:
         diagram.append(_node_line(node))
     for node in _INDEX_SCALER_NODES:
+        diagram.append(_node_line(node))
+    diagram.append("    end")
+    diagram.append("    subgraph hauptkomponenten")
+    for node in _PRINCIPAL_COMPONENT_NODES:
         diagram.append(_node_line(node))
     diagram.append("    end")
     diagram.append("    subgraph spektren")
@@ -1608,6 +1810,11 @@ def pipeline_options_diagram() -> str:
     for node in _INDEX_SCALER_NODES:
         link(_node_id(select), node)
         link(_node_id(node), concat)
+    link("X", pc_drop)
+    link(_node_id(pc_drop), pc_inter)
+    link(_node_id(pc_inter), pc_scale)
+    link(_node_id(pc_scale), pc_pca)
+    link(_node_id(pc_pca), concat)
     link(_node_id(s_drop), s_inter)
     link(_node_id(s_inter), savgol)
     link(_node_id(savgol), snv)

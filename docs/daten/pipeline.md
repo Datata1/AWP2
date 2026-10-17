@@ -101,6 +101,12 @@ flowchart TD
         n_indices_centering["Zentrierung [use_spectral_centering]"]
         n_indices_no_scaler["keine Skalierung [Standard]"]
     end
+    subgraph hauptkomponenten
+        n_principal_components_drop_empty["Leere Bänder entfernen (immer)"]
+        n_principal_components_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_principal_components_standard_scale["Standard (immer)"]
+        n_principal_components_pca["PC_1 + PC_2 [use_principal_components]"]
+    end
     subgraph spektren
         n_spectra_drop_empty["Leere Bänder entfernen (immer)"]
         n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
@@ -146,6 +152,11 @@ flowchart TD
     n_indices_centering --> d_concat
     n_indices_select --> n_indices_no_scaler
     n_indices_no_scaler --> d_concat
+    X -.-> n_principal_components_drop_empty
+    n_principal_components_drop_empty -.-> n_principal_components_interpolate
+    n_principal_components_interpolate -.-> n_principal_components_standard_scale
+    n_principal_components_standard_scale -.-> n_principal_components_pca
+    n_principal_components_pca --> d_concat
     n_spectra_drop_empty --> n_spectra_interpolate
     n_spectra_interpolate -.-> n_spectra_savgol
     n_spectra_savgol -.-> n_spectra_snv

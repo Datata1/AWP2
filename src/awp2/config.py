@@ -43,6 +43,11 @@ REFLECTANCE_PERCENT_SCALE = 100.0
 MCARI_GREEN_WEIGHT = 0.2
 TCARI_MULTIPLIER = 3.0
 OSAVI_SOIL_ADJUSTMENT = 0.16
+REIP_LAGRANGIAN_WINDOW_NM = (680, 750)
+REIP_LAGRANGIAN_MIN_BANDS = 5
+REIP_POLYNOMIAL_WINDOW_NM = (650, 760)
+REIP_POLYNOMIAL_DEGREE = 4
+PCA_FEATURE_NAMES = ("PC_1", "PC_2")
 
 
 @dataclass(frozen=True)
@@ -328,21 +333,19 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
     ),
     VegetationIndexSpec(
         "REIP_LAGRANGIAN",
-        "Lagrangian red-edge inflection-point model",
-        (),
+        "maximum of a quadratic Lagrange interpolation of the first derivative",
+        REIP_LAGRANGIAN_WINDOW_NM,
         "Red edge / REIP",
         "Dawson & Curran (1998)",
-        "deferred",
-        "The slide does not define the interpolation support points.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "REIP_POLYNOMIAL",
-        "Polynomial red-edge inflection-point model",
-        (),
+        "maximum first derivative of a fourth-degree polynomial fit",
+        REIP_POLYNOMIAL_WINDOW_NM,
         "Red edge / REIP",
         "Broge & Leblanc (2001)",
-        "deferred",
-        "The slide does not define the fit window or polynomial degree.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "PC_1",
@@ -350,8 +353,7 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         (),
         "Red edge / REIP",
         "Spatial Sciences (2003)",
-        "deferred",
-        "A data-dependent PCA transformer needs a separately specified band set.",
+        "implemented",
     ),
     VegetationIndexSpec(
         "PC_2",
@@ -359,12 +361,13 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         (),
         "Red edge / REIP",
         "Spatial Sciences (2003)",
-        "deferred",
-        "A data-dependent PCA transformer needs a separately specified band set.",
+        "implemented",
     ),
 )
 VEGETATION_INDEX_NAMES = tuple(
-    spec.name for spec in VEGETATION_INDEX_SPECS if spec.status == "implemented"
+    spec.name
+    for spec in VEGETATION_INDEX_SPECS
+    if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
 )
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
