@@ -37,6 +37,10 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
                 "X681": [55.0],
                 "X691": [60.0],
                 "X702": [65.0],
+                "X712": [67.0],
+                "X722": [68.0],
+                "X732": [69.0],
+                "X742": [70.0],
                 "X752": [70.0],
                 "X763": [72.0],
                 "X773": [74.0],
@@ -67,6 +71,21 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
             transformed.loc[0, "TCARI"] / transformed.loc[0, "OSAVI"],
         )
 
+    def test_reip_algorithms_locate_the_maximum_red_edge_slope(self) -> None:
+        red_edge_bands = [
+            column
+            for column in self.bands.columns
+            if 650 <= int(column.removeprefix("X")) <= 763
+        ]
+        for band in red_edge_bands:
+            centered_wavelength = int(band.removeprefix("X")) - 702
+            self.bands.loc[0, band] = 50 + centered_wavelength - centered_wavelength**3 / 10000
+
+        transformed = AddVegetationIndices().fit_transform(self.bands)
+
+        self.assertAlmostEqual(transformed.loc[0, "REIP_LAGRANGIAN"], 702.0, delta=3.0)
+        self.assertAlmostEqual(transformed.loc[0, "REIP_POLYNOMIAL"], 702.0, delta=1.0)
+
     def test_preprocessing_config_adds_only_implemented_catalogue_indices(self) -> None:
         features = self.bands.assign(**{AEZ_COL: 1, MONTH_COL: 3})
         transformed = build_preprocessor(
@@ -88,6 +107,31 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
         ).fit_transform(features)
 
         self.assertAlmostEqual(transformed["OSAVI"].mean(), 0.0)
+
+    def test_principal_component_branch_appends_named_components(self) -> None:
+        features = pd.concat(
+            [self.bands, self.bands * 2, self.bands * 3], ignore_index=True
+        ).assign(
+            **{AEZ_COL: [1, 1, 1], MONTH_COL: [3, 3, 3]}
+        )
+        preprocessor = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_principal_components=True)
+        )
+
+        transformed = preprocessor.fit_transform(features)
+        component_pipeline = next(
+            transformer
+            for name, transformer, _columns in preprocessor.transformers_
+            if name == "principal_components"
+        )
+
+        self.assertTrue({"PC_1", "PC_2"}.issubset(transformed.columns))
+        self.assertEqual([name for name, _step in component_pipeline.steps], [
+            "drop_empty",
+            "interpolate",
+            "standard_scale",
+            "pca",
+        ])
 
 
 class CategoricalContextPreprocessingTest(unittest.TestCase):
