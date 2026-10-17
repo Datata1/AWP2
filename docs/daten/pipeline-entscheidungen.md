@@ -9,7 +9,7 @@ Die Entscheidungen hinter der [Pipeline](pipeline.md) – jeweils mit Grund, dam
 | --- | --- |
 | Rohdaten beim Laden per pandera-Schema prüfen | Formatfehler (falsche Labels, Spalten, Werte) fallen sofort auf statt erst im Modell |
 | 2 exakt doppelte Zeilen entfernen | Sonst kann dieselbe Messung in Train **und** Validierung landen – das Modell würde „auswendig“ richtig liegen |
-| Fixer 70/30-Holdout statt freier Wahl | Vorgabe für M1; alle vergleichen auf denselben Daten |
+| Konfigurierbarer, fixer Holdout (Standard: 70/30) | `make data DATA_ARGS="--validation-size …"` erzeugt einen reproduzierbaren Split; Vergleiche gelten nur innerhalb desselben Protokolls |
 | Split und Folds als Dateien in `data/` | Alle arbeiten nachweislich auf demselben Split; die Zuordnung ist ansehbar |
 | Vorverarbeitung **nicht** speichern | Sie wird je Modell nur auf dem Train-Teil gefittet – gespeicherte Features würden Informationen aus der Validierung enthalten |
 

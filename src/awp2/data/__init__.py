@@ -6,12 +6,14 @@ from awp2.data.artifacts import (
     load_dataset,
     load_folds,
     load_split,
+    load_split_config,
 )
 from awp2.data.load import band_columns, load_test, load_train, wavelength, wavelengths
 from awp2.data.split import (
     CropStage,
     Dataset,
     Fold,
+    SplitConfig,
     TrainValSplit,
     balanced_sample_weight,
     combined_label,
@@ -26,10 +28,12 @@ __all__ = [
     "build_artifacts",
     "load_dataset",
     "load_folds",
+    "load_split_config",
     "load_split",
     "CropStage",
     "Dataset",
     "Fold",
+    "SplitConfig",
     "TrainValSplit",
     "balanced_sample_weight",
     "band_columns",
