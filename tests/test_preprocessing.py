@@ -108,6 +108,25 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
 
         self.assertAlmostEqual(transformed["OSAVI"].mean(), 0.0)
 
+    def test_index_branch_imputes_undefined_reip_values(self) -> None:
+        features = pd.concat([self.bands, self.bands], ignore_index=True)
+        red_edge_bands = [
+            column
+            for column in self.bands.columns
+            if 650 <= int(column.removeprefix("X")) <= 763
+        ]
+        for band in red_edge_bands:
+            centered_wavelength = int(band.removeprefix("X")) - 702
+            features.loc[0, band] = 50 + centered_wavelength - centered_wavelength**3 / 10000
+            features.loc[1, band] = 50 + centered_wavelength
+        features = features.assign(**{AEZ_COL: [1, 1], MONTH_COL: [3, 3]})
+
+        transformed = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_vegetation_indices=True)
+        ).fit_transform(features)
+
+        self.assertFalse(transformed[list(VEGETATION_INDEX_NAMES)].isna().any().any())
+
     def test_principal_component_branch_appends_named_components(self) -> None:
         features = pd.concat(
             [self.bands, self.bands * 2, self.bands * 3], ignore_index=True

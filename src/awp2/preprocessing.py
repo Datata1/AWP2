@@ -14,6 +14,7 @@ from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.decomposition import NMF, PCA, FastICA
+from sklearn.impute import SimpleImputer
 from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
 from sklearn.pipeline import Pipeline
@@ -1350,6 +1351,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
             ("indices", AddVegetationIndices()),
             ("select", SelectVegetationIndices()),
+            ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
         ]
         if config.use_spectral_standard_scale or config.scale:
             index_steps.append(("standard_scale", StandardScaler()))
@@ -1591,6 +1593,7 @@ _INDICES_NODES: tuple[_OptionNode, ...] = (
         True,
     ),
     _OptionNode("indices", "select", "Nur Indizes behalten", False),
+    _OptionNode("indices", "impute", "Fehlende Indizes: Median (Training)", False),
 )
 
 _INDEX_SCALER_NODES: tuple[_OptionNode, ...] = (
@@ -1744,7 +1747,7 @@ def pipeline_options_diagram() -> str:
     """
     aez, cyclic, numeric = _META_NODES
     a_drop, a_inter, albedo = _ALBEDO_NODES
-    i_drop, i_inter, indices, select = _INDICES_NODES
+    i_drop, i_inter, indices, select, impute = _INDICES_NODES
     pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
     s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
@@ -1807,8 +1810,9 @@ def pipeline_options_diagram() -> str:
     link(_node_id(i_drop), i_inter)
     link(_node_id(i_inter), indices)
     link(_node_id(indices), select)
+    link(_node_id(select), impute)
     for node in _INDEX_SCALER_NODES:
-        link(_node_id(select), node)
+        link(_node_id(impute), node)
         link(_node_id(node), concat)
     link("X", pc_drop)
     link(_node_id(pc_drop), pc_inter)
