@@ -1414,6 +1414,28 @@ _INDICES_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("indices", "select", "Nur Indizes behalten", False),
 )
 
+_INDEX_SCALER_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode(
+        "indices",
+        "standard_scale",
+        f"Standard [{_config_fields('use_spectral_standard_scale')}]",
+        True,
+    ),
+    _OptionNode(
+        "indices",
+        "minmax_scale",
+        f"Min-Max [{_config_fields('use_spectral_minmax_scale')}]",
+        True,
+    ),
+    _OptionNode(
+        "indices",
+        "centering",
+        f"Zentrierung [{_config_fields('use_spectral_centering')}]",
+        True,
+    ),
+    _OptionNode("indices", "no_scaler", "keine Skalierung [Standard]", False),
+)
+
 _SCALER_NODES: tuple[_OptionNode, ...] = (
     _OptionNode(
         "spectra",
@@ -1493,6 +1515,7 @@ def _diagram_steps() -> set[tuple[str, str]]:
         _META_NODES,
         _ALBEDO_NODES,
         _INDICES_NODES,
+        _INDEX_SCALER_NODES,
         _SPECTRA_PREFIX_NODES,
         _SCALER_NODES,
         _REDUCTION_NODES,
@@ -1543,6 +1566,8 @@ def pipeline_options_diagram() -> str:
     diagram.append("    subgraph indizes")
     for node in _INDICES_NODES:
         diagram.append(_node_line(node))
+    for node in _INDEX_SCALER_NODES:
+        diagram.append(_node_line(node))
     diagram.append("    end")
     diagram.append("    subgraph spektren")
     for node in _SPECTRA_PREFIX_NODES:
@@ -1580,6 +1605,9 @@ def pipeline_options_diagram() -> str:
     link(_node_id(i_drop), i_inter)
     link(_node_id(i_inter), indices)
     link(_node_id(indices), select)
+    for node in _INDEX_SCALER_NODES:
+        link(_node_id(select), node)
+        link(_node_id(node), concat)
     link(_node_id(s_drop), s_inter)
     link(_node_id(s_inter), savgol)
     link(_node_id(savgol), snv)
@@ -1590,7 +1618,7 @@ def pipeline_options_diagram() -> str:
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, albedo, select):
+    for node in (aez, cyclic, numeric, albedo):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")
