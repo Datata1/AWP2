@@ -1,3 +1,5 @@
+DATA_ARGS ?=
+
 .PHONY: help setup data lab docs docs-build lint lint-ruff lint-ty format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
@@ -8,7 +10,7 @@ setup: ## Umgebung installieren + nbstripout-Git-Filter aktivieren
 	uv run nbstripout --install
 
 data: ## Pipeline-Artefakte erzeugen (bereinigter Datensatz + Split in data/)
-	uv run python -m awp2.data.artifacts
+	uv run python -m awp2.data.artifacts $(DATA_ARGS)
 
 lab: ## Jupyter Lab starten
 	uv run jupyter lab

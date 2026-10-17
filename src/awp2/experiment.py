@@ -18,6 +18,7 @@ from awp2.data import (
     balanced_sample_weight,
     load_folds,
     load_split,
+    load_split_config,
     valid_combinations,
 )
 from awp2.evaluation import (
@@ -166,13 +167,14 @@ def _pipeline_summary(config: _ExperimentConfig, pipeline: Pipeline | None = Non
     return f"Pipeline: {steps}"
 
 
-def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool]:
+def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool | float]:
     return {
         **{
             f"preprocessing.{key}": value
             for key, value in config.preprocessing.model_dump().items()
         },
         "balance_samples": config.balance_samples,
+        "split.validation_size": load_split_config().validation_size,
     }
 
 

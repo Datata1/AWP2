@@ -22,10 +22,12 @@ TRAIN_FILE = RAW_DATA_DIR / "train.csv"
 TEST_FILE = RAW_DATA_DIR / "test.csv"
 CLEAN_TRAIN_FILE = INTERIM_DATA_DIR / "train_clean.parquet"
 SPLIT_FILE = PROCESSED_DATA_DIR / "split.csv"
+SPLIT_CONFIG_FILE = PROCESSED_DATA_DIR / "split_config.json"
 
 ID_COL = "id"
 SUBSET_COL = "subset"
 FOLD_COL = "cv_fold"
+SPLIT_CONFIG_HASH_COL = "split_config_hash"
 CROP_COL = "Crop"
 STAGE_COL = "Stage"
 AEZ_COL = "AEZ"
@@ -75,7 +77,7 @@ LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMC
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
-VAL_SIZE = 0.3  # 70/30 holdout required for the M1 baseline
+VAL_SIZE = 0.3
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
 RECALL_COL = "recall"

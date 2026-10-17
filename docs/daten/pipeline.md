@@ -16,14 +16,21 @@ flowchart TD
 
 ```bash
 make data   # nach dem Kopieren der Rohdaten und wenn sich die Pipeline ändert
+# Für einen dokumentierten 80/20-Split:
+make data DATA_ARGS="--validation-size 0.2"
 ```
 
 | Datei | Inhalt |
 | --- | --- |
 | `data/interim/train_clean.parquet` | Validierte Trainingsdaten ohne Duplikate |
-| `data/processed/split.csv` | Je `id`: `subset` (`train`/`val`) und `cv_fold` (0–4) |
+| `data/processed/split.csv` | Je `id`: `subset` (`train`/`val`), `cv_fold` (0–4) und Fingerabdruck der Split-Konfiguration |
+| `data/processed/split_config.json` | Validierter Anteil der Validierungsdaten; sein Fingerabdruck wird beim Laden gegen `split.csv` geprüft |
 
 Die Dateien sind nicht in git, aber deterministisch – bei allen byte-identisch.
+
+Der Standard ist weiterhin 70/30. Ein anderer Split, etwa 80/20, ist ein anderes
+Evaluationsprotokoll: Ergebnisse dürfen nur mit Läufen verglichen werden, die dieselbe
+`split.validation_size` in MLflow haben.
 
 ## 2. Einen Ansatz aufsetzen
 
@@ -201,8 +208,8 @@ Kein Verfahren gewinnt überall: PCA/ICA/OSP sind mit wenigen Bändern am besten
 
 ## 3. Tunen
 
-Hyperparameter nur per Cross-Validation auf dem Train-Teil tunen – der 30-%-Holdout ist für
-den Endvergleich reserviert.
+Hyperparameter nur per Cross-Validation auf dem Train-Teil tunen – der konfigurierte Holdout ist
+für den Endvergleich reserviert.
 
 ```python
 from sklearn.model_selection import GridSearchCV
