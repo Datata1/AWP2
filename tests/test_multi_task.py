@@ -9,9 +9,24 @@ from sklearn.base import clone
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-from awp2.config import AEZ_COL, CROP_COL, CROPS, MONTH_COL, STAGE_COL, STAGES, TARGET_COLS
+from awp2.config import (
+    AEZ_COL,
+    CROP_COL,
+    CROPS,
+    LSTM_EMBEDDINGS_CONTEXT,
+    MONTH_COL,
+    STAGE_COL,
+    STAGES,
+    TARGET_COLS,
+)
 from awp2.evaluation import scorer
 from awp2.models import MultiTaskMLPClassifier
+from awp2.models.lstm import _LSTMInputAdapter
+from awp2.models.multi_task import (
+    MultiTaskLSTMClassifier,
+    _MultiTaskEmbeddingFusionLSTMModule,
+    _MultiTaskLateFusionLSTMModule,
+)
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 
@@ -116,6 +131,316 @@ class MultiTaskMLPClassifierTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Expected target columns"):
             self._model().fit(self.X[["X427", "X437", "X447"]], invalid_targets)
+
+
+class MultiTaskLateFusionLSTMModuleTest(unittest.TestCase):
+    def test_fuses_context_before_crop_and_stage_heads(self) -> None:
+        batch_size = 3
+        n_bands = 4
+        hidden_size = 5
+        n_context_features = 2
+        module = _MultiTaskLateFusionLSTMModule(
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            n_context_features=n_context_features,
+        )
+
+        crop_logits, stage_logits = module(
+            torch.rand(batch_size, n_bands, 1), torch.rand(batch_size, n_context_features)
+        )
+
+        self.assertEqual(module.crop_head.in_features, hidden_size + n_context_features)
+        self.assertEqual(module.stage_head.in_features, hidden_size + n_context_features)
+        self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
+        self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
+
+
+class MultiTaskEmbeddingFusionLSTMModuleTest(unittest.TestCase):
+    def test_fuses_context_embeddings_before_crop_and_stage_heads(self) -> None:
+        batch_size = 3
+        n_bands = 4
+        hidden_size = 5
+        aez_embedding_dim = 4
+        month_embedding_dim = 3
+        module = _MultiTaskEmbeddingFusionLSTMModule(
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.2,
+            n_aez_categories=5,
+            n_month_categories=4,
+            aez_embedding_dim=aez_embedding_dim,
+            month_embedding_dim=month_embedding_dim,
+        )
+
+        crop_logits, stage_logits = module(
+            torch.rand(batch_size, n_bands, 1),
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 2, 3]),
+        )
+
+        n_fused_features = hidden_size + aez_embedding_dim + month_embedding_dim
+        self.assertEqual(module.crop_head.in_features, n_fused_features)
+        self.assertEqual(module.stage_head.in_features, n_fused_features)
+        self.assertEqual(tuple(crop_logits.shape), (batch_size, len(CROPS)))
+        self.assertEqual(tuple(stage_logits.shape), (batch_size, len(STAGES)))
+
+
+class MultiTaskLSTMClassifierTest(unittest.TestCase):
+    def test_builds_embedding_module_for_embedding_context(self) -> None:
+        features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [3, 9, 12],
+                "X427": [0.1, 0.2, 0.3],
+                "X437": [0.4, 0.5, 0.6],
+            }
+        )
+        adapter = _LSTMInputAdapter(LSTM_EMBEDDINGS_CONTEXT).fit(features)
+
+        module = MultiTaskLSTMClassifier(context_mode=LSTM_EMBEDDINGS_CONTEXT)._build_module(
+            adapter
+        )
+
+        self.assertIsInstance(module, _MultiTaskEmbeddingFusionLSTMModule)
+
+    def test_clone_preserves_configured_hyperparameters(self) -> None:
+        classifier = MultiTaskLSTMClassifier(hidden_size=8, crop_loss_weight=0.6)
+
+        cloned = clone(classifier)
+
+        self.assertEqual(cloned.hidden_size, 8)
+        self.assertEqual(cloned.crop_loss_weight, 0.6)
+
+    def test_rejects_invalid_crop_loss_weight(self) -> None:
+        classifier = MultiTaskLSTMClassifier(crop_loss_weight=1.0)
+
+        with self.assertRaisesRegex(ValueError, "crop_loss_weight"):
+            classifier._validate_hyperparameters()
+
+    def test_fit_learns_shared_lstm_representation(self) -> None:
+        generator = np.random.default_rng(42)
+        n_rows = 40
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=2,
+            batch_size=4,
+        )
+
+        fitted = classifier.fit(features, targets)
+
+        self.assertIs(fitted, classifier)
+        self.assertLessEqual(classifier.n_epochs_, classifier.max_epochs)
+        self.assertEqual(classifier.allowed_pair_codes_.shape, (2, 2))
+
+    def test_fit_predict_supports_standard_context(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "AEZ_1": np.tile([1.0, 0.0], n_rows // 2),
+                "Month_sin": np.tile([0.5, -0.5], n_rows // 2),
+                "Month_cos": np.tile([0.5, -0.5], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="standard",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        observed_pairs = set(map(tuple, targets.to_numpy()))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+
+    def test_fit_predict_supports_context_embeddings(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                AEZ_COL: np.tile([1, 2], n_rows // 2),
+                MONTH_COL: np.tile([3, 9], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode=LSTM_EMBEDDINGS_CONTEXT,
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        )
+
+        predicted = classifier.fit(features, targets).predict(features)
+
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        observed_pairs = set(map(tuple, targets.to_numpy()))
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+
+    def test_pipeline_preserves_multi_output_prediction_contract(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                AEZ_COL: np.tile([1, 2], n_rows // 2),
+                MONTH_COL: np.tile([3, 9], n_rows // 2),
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        pipeline = Pipeline(
+            [
+                (
+                    "preprocess",
+                    build_preprocessor(PreprocessingConfig(use_spectral_standard_scale=True)),
+                ),
+                (
+                    "model",
+                    MultiTaskLSTMClassifier(
+                        hidden_size=4,
+                        num_layers=1,
+                        dropout=0.0,
+                        max_epochs=1,
+                        batch_size=4,
+                    ),
+                ),
+            ]
+        )
+
+        predicted = pipeline.fit(features, targets).predict(features)
+
+        self.assertIsInstance(predicted, pd.DataFrame)
+        self.assertEqual(list(predicted.columns), list(TARGET_COLS))
+        self.assertTrue(predicted.index.equals(features.index))
+
+    def test_grid_search_scores_multi_output_predictions(self) -> None:
+        n_rows = 40
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        search = GridSearchCV(
+            MultiTaskLSTMClassifier(
+                context_mode="none",
+                hidden_size=4,
+                num_layers=1,
+                dropout=0.0,
+                max_epochs=1,
+                batch_size=4,
+            ),
+            param_grid={"hidden_size": [4]},
+            scoring=scorer(),
+            cv=2,
+            error_score="raise",
+        )
+
+        search.fit(features, targets)
+
+        self.assertTrue(np.isfinite(search.cv_results_["mean_test_score"][0]))
+
+    def test_predict_limits_results_to_observed_crop_stage_pairs(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        features = pd.DataFrame(
+            {
+                "X427": generator.random(n_rows),
+                "X437": generator.random(n_rows),
+                "X447": generator.random(n_rows),
+            }
+        )
+        targets = pd.DataFrame(
+            {
+                CROP_COL: np.tile(["corn", "rice"], n_rows // 2),
+                STAGE_COL: np.tile(["Late", "Harvest"], n_rows // 2),
+            },
+            index=features.index,
+        )
+        classifier = MultiTaskLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=1,
+            batch_size=4,
+        ).fit(features, targets)
+
+        class IndependentHeads(torch.nn.Module):
+            def forward(
+                self, spectrum: torch.Tensor, context: torch.Tensor
+            ) -> tuple[torch.Tensor, torch.Tensor]:
+                crop_logits = torch.full((len(spectrum), len(CROPS)), -1.0)
+                stage_logits = torch.full((len(spectrum), len(STAGES)), -1.0)
+                crop_logits[:, CROPS.index("rice")] = 6.0
+                crop_logits[:, CROPS.index("corn")] = 5.0
+                stage_logits[:, STAGES.index("Late")] = 6.0
+                stage_logits[:, STAGES.index("Harvest")] = 5.0
+                return crop_logits, stage_logits
+
+        classifier.module_ = IndependentHeads()
+        predicted = classifier.predict(features)
+        observed_pairs = set(map(tuple, targets[[CROP_COL, STAGE_COL]].to_numpy()))
+
+        self.assertTrue(set(map(tuple, predicted.to_numpy())).issubset(observed_pairs))
+        self.assertNotIn(("rice", "Late"), set(map(tuple, predicted.to_numpy())))
 
 
 if __name__ == "__main__":

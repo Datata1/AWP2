@@ -46,10 +46,10 @@ helfen. Label-Logik, Vorverarbeitung und Sequenzarchitektur bleiben dabei unver�
 | 4 | Generalisiert der beste CV-Kandidat? | **Abgeschlossen:** PCA-20 mit `weight_decay=0.0` auf den Trainingsfolds auswählen und einmal mit `run()` auf dem gemeinsamen Holdout bewerten. | BAcc Crop/Stage/kombiniert: 0,920 / 0,902 / 0,765; weiterhin unter der RBF-SVM-Referenz von 0,866. |
 | 5 | Entstehen problematische Paarvorhersagen? | **Abgeschlossen:** Die Dekodierung auf im Trainingsanteil beobachtete Paare beschränken und PCA-20 erneut mit CV auswählen und einmal bewerten. | Keine ungültigen Vorhersagen; CV-BAcc kombiniert steigt von 0,722 auf 0,728. |
 
-LSTM, GRU und Transformer sind keine Varianten dieses ersten Vergleichs. Sie testen zusätzlich,
-ob die Reihenfolge der Wellenlängen gegenüber der tabellarischen Darstellung hilft. Erst wenn das
-Multi-Task-MLP als sauberer Ausgangspunkt dokumentiert ist, folgt ein Multi-Task-GRU als erste
-sequenzielle Erweiterung; LSTM und Transformer bleiben davon getrennte Experimente.
+Der tabellarische Vergleich ist abgeschlossen. Als getrennte sequenzielle Erweiterung testet
+#136 nun einen Multi-Task-LSTM: Er prüft, ob die Reihenfolge der Wellenlängen gegenüber der
+tabellarischen Darstellung hilft, ohne die bestehende MLP-Referenz oder deren Holdout-Ergebnis
+nachträglich zu beeinflussen.
 
 ## Bewertung und Dokumentation
 
@@ -88,6 +88,30 @@ AEZ wird One-Hot-kodiert und Month zyklisch kodiert.
         um 0,140. Die kombinierte BAcc bleibt jedoch 0,102 unter der RBF-SVM-Referenz (0,866).
 - Die Paarbeschränkung gibt ausschließlich im jeweiligen Trainingsanteil beobachtete Crop/Stage-
         Kombinationen aus; im PCA-Holdout entstehen keine ungültigen Paare.
+
+### Multi-Task-LSTM mit spät fusioniertem Kontext
+
+Ein gemeinsamer LSTM kodiert die skalierte Spektralfolge; getrennte Crop- und Stage-Heads sehen
+erst danach die spektrale Repräsentation mit optionalem Kontext. Die Paarbeschränkung wählt bei
+der Vorhersage ausschließlich Kombinationen, die im jeweiligen Training beobachtet wurden.
+
+- **Hypothese:** Ein gemeinsamer sequenzieller Encoder lernt spektrale Muster, die gleichzeitig
+        Kultur und Stadium trennen; AEZ- und Monatsembeddings können dazu eine kompakte
+        Kontextdarstellung liefern.
+- **Kontrollen:** `none`, das bestehende One-Hot-/zyklische Encoding und lernbare
+        AEZ-/Monatsembeddings unterscheiden sich nur in der späten Kontextfusion. Alle Varianten
+        verwenden dieselbe standardisierte Spektralvorverarbeitung und den gleichen Suchraum.
+- Die Embedding-Variante wählt per CV einen Encoder mit 64 Einheiten und Dropout 0,2
+        (CV-BAcc kombiniert 0,458). Die einmalige Holdout-Bewertung erreicht BAcc Crop 0,796,
+        Stage 0,744 und kombiniert **0,417**, Macro-F1 kombiniert 0,388 sowie Samples-F1 0,717.
+- Die Paarbeschränkung erzeugt keine ungültigen Kombinationen. Gegen das tabellarische
+        Multi-Task-MLP mit PCA-20 verliert der LSTM 0,348 BAcc kombiniert (0,417 statt 0,765).
+- Die Varianten ohne Kontext und mit Standardkontext wurden nicht ausgeführt, weil bereits der
+        Embedding-Lauf keine Verbesserung erkennen ließ. Sie haben deshalb keine CV- oder
+        Holdout-Metrik und ändern die Referenz nicht.
+- Notebook: `notebooks/27_duac1011-multi-task-lstm-embeddings.ipynb`. MLflow konnte den Lauf
+        wegen eines nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständige Ausgabe steht im
+        Notebook-Output.
 
 #### CV-only: Regularisierung und Preprocessing
 
@@ -166,5 +190,6 @@ voraus; die Paarbeschränkung erklärt den Abstand daher nicht.
 ## Fazit
 
 **In Arbeit.** PCA-20 verbessert den tabellarischen Multi-Task-MLP klar gegenüber dem
-Ausgangsmodell, erreicht aber die kombinierte SVM-Referenz nicht. Ein getrenntes MLP bleibt die
-notwendige Kontrollvariante, bevor der Nutzen geteilter Schichten beurteilt werden kann.
+Ausgangsmodell, erreicht aber die kombinierte SVM-Referenz nicht. Der vorbereitete Multi-Task-
+LSTM prüft getrennt davon die sequenzielle Repräsentation und drei Kontextformen; Ergebnisse
+stehen noch aus.

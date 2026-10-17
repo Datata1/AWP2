@@ -16,10 +16,12 @@ from awp2.config import (
     CROP_COL,
     EXTRA_TREES_N_ESTIMATORS,
     HARD_ROUTING,
+    LSTM_STANDARD_CONTEXT,
     SEED,
     SOFT_ROUTING,
     STAGE_COL,
     TARGET_COLS,
+    LSTMContextMode,
     Routing,
 )
 from awp2.data import combined_label
@@ -30,6 +32,7 @@ from awp2.evaluation import (
     error_breakdown,
     evaluate,
 )
+from awp2.models.lstm import SpectralLSTMClassifier
 
 
 class HierarchicalClassifier(ClassifierMixin, BaseEstimator):
@@ -230,6 +233,23 @@ def make_hierarchical_svm(routing: Routing = HARD_ROUTING) -> HierarchicalClassi
             ``PreprocessingConfig(use_spectral_standard_scale=True)`` before fitting.
     """
     return HierarchicalClassifier(_svm(routing), _svm(routing), routing=routing)
+
+
+def make_hierarchical_spectral_lstm(
+    context_mode: LSTMContextMode = LSTM_STANDARD_CONTEXT,
+) -> HierarchicalClassifier:
+    """Create the hard-routed LSTM hierarchy.
+
+    Args:
+        context_mode: How each LSTM receives AEZ and Month context.
+
+    Returns:
+        Unfitted hard-routed hierarchy with separate LSTMs for crop and stage models.
+    """
+    return HierarchicalClassifier(
+        SpectralLSTMClassifier(context_mode=context_mode),
+        SpectralLSTMClassifier(context_mode=context_mode),
+    )
 
 
 def make_hierarchical_extra_trees() -> HierarchicalClassifier:

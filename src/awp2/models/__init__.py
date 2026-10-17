@@ -6,6 +6,7 @@ from awp2.models.combined import (
     make_combined_extra_trees,
     make_combined_hist_gradient_boosting,
     make_combined_random_forest,
+    make_combined_spectral_lstm,
     make_combined_svm,
 )
 from awp2.models.ensemble import CropStageVotingClassifier
@@ -14,13 +15,15 @@ from awp2.models.hierarchical import (
     HierarchicalSummary,
     make_hierarchical_extra_trees,
     make_hierarchical_extra_trees_svm,
+    make_hierarchical_spectral_lstm,
     make_hierarchical_svm,
     oracle_crop_metrics,
     summarize_hierarchical,
     summary_table,
 )
 from awp2.models.linear import BalancedLinearDiscriminantAnalysis
-from awp2.models.multi_task import MultiTaskMLPClassifier
+from awp2.models.lstm import SpectralLSTMClassifier
+from awp2.models.multi_task import MultiTaskLSTMClassifier, MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
 
 __all__ = [
@@ -31,16 +34,20 @@ __all__ = [
     "BalancedLinearDiscriminantAnalysis",
     "PLSDAClassifier",
     "CombinedLabelClassifier",
+    "MultiTaskLSTMClassifier",
     "MultiTaskMLPClassifier",
     "HierarchicalClassifier",
     "SpectralCNNClassifier",
+    "SpectralLSTMClassifier",
     "make_combined_extra_trees",
     "make_combined_hist_gradient_boosting",
     "make_combined_random_forest",
     "make_combined_spectral_cnn",
+    "make_combined_spectral_lstm",
     "make_combined_svm",
     "make_hierarchical_extra_trees",
     "make_hierarchical_extra_trees_svm",
+    "make_hierarchical_spectral_lstm",
     "make_hierarchical_svm",
     "oracle_crop_metrics",
 ]
