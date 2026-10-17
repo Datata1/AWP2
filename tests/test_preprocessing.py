@@ -4,8 +4,153 @@ import unittest
 
 import pandas as pd
 
-from awp2.config import AEZ_COL, MONTH_COL
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor
+from awp2.config import AEZ_COL, MONTH_COL, VEGETATION_INDEX_NAMES
+from awp2.preprocessing import (
+    AddVegetationIndices,
+    PreprocessingConfig,
+    build_preprocessor,
+    nearest_band,
+)
+
+
+class NearestBandTest(unittest.TestCase):
+    def test_returns_closest_band_within_tolerance(self) -> None:
+        self.assertEqual(nearest_band(445, ["X437", "X447", "X498"]), "X447")
+
+    def test_rejects_closest_band_outside_tolerance(self) -> None:
+        with self.assertRaisesRegex(ValueError, "420 nm; closest is X437"):
+            nearest_band(420, ["X437", "X447", "X498"])
+
+
+class VegetationIndexCatalogueTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bands = pd.DataFrame(
+            {
+                "X447": [25.0],
+                "X498": [30.0],
+                "X529": [32.0],
+                "X549": [35.0],
+                "X569": [30.0],
+                "X630": [40.0],
+                "X651": [45.0],
+                "X671": [50.0],
+                "X681": [55.0],
+                "X691": [60.0],
+                "X702": [65.0],
+                "X712": [67.0],
+                "X722": [68.0],
+                "X732": [69.0],
+                "X742": [70.0],
+                "X752": [70.0],
+                "X763": [72.0],
+                "X773": [74.0],
+                "X803": [80.0],
+                "X824": [82.0],
+                "X854": [84.0],
+                "X864": [86.0],
+                "X1205": [70.0],
+                "X1235": [65.0],
+                "X1599": [50.0],
+                "X1649": [45.0],
+                "X1659": [44.0],
+            }
+        )
+
+    def test_catalogue_uses_mapped_bands_for_representative_formulas(self) -> None:
+        transformed = AddVegetationIndices().fit_transform(self.bands)
+
+        self.assertAlmostEqual(transformed.loc[0, "SR_750_705"], 70.0 / 65.0)
+        self.assertAlmostEqual(transformed.loc[0, "PRI"], (32.0 - 30.0) / (32.0 + 30.0))
+        self.assertAlmostEqual(transformed.loc[0, "PSRI"], (55.0 - 30.0) / 70.0)
+        self.assertAlmostEqual(
+            transformed.loc[0, "OSAVI"],
+            1.16 * (0.8 - 0.5) / (0.8 + 0.5 + 0.16),
+        )
+        self.assertAlmostEqual(
+            transformed.loc[0, "TCARI_OSAVI"],
+            transformed.loc[0, "TCARI"] / transformed.loc[0, "OSAVI"],
+        )
+
+    def test_reip_algorithms_locate_the_maximum_red_edge_slope(self) -> None:
+        red_edge_bands = [
+            column
+            for column in self.bands.columns
+            if 650 <= int(column.removeprefix("X")) <= 763
+        ]
+        for band in red_edge_bands:
+            centered_wavelength = int(band.removeprefix("X")) - 702
+            self.bands.loc[0, band] = 50 + centered_wavelength - centered_wavelength**3 / 10000
+
+        transformed = AddVegetationIndices().fit_transform(self.bands)
+
+        self.assertAlmostEqual(transformed.loc[0, "REIP_LAGRANGIAN"], 702.0, delta=3.0)
+        self.assertAlmostEqual(transformed.loc[0, "REIP_POLYNOMIAL"], 702.0, delta=1.0)
+
+    def test_preprocessing_config_adds_only_implemented_catalogue_indices(self) -> None:
+        features = self.bands.assign(**{AEZ_COL: 1, MONTH_COL: 3})
+        transformed = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_vegetation_indices=True)
+        ).fit_transform(features)
+
+        self.assertTrue(set(VEGETATION_INDEX_NAMES).issubset(transformed.columns))
+
+    def test_index_branch_uses_the_configured_standard_scaler(self) -> None:
+        features = pd.concat([self.bands, self.bands * 2], ignore_index=True).assign(
+            **{AEZ_COL: [1, 1], MONTH_COL: [3, 3]}
+        )
+        transformed = build_preprocessor(
+            PreprocessingConfig(
+                use_meta=False,
+                use_spectral_standard_scale=True,
+                use_vegetation_indices=True,
+            )
+        ).fit_transform(features)
+
+        self.assertAlmostEqual(transformed["OSAVI"].mean(), 0.0)
+
+    def test_index_branch_imputes_undefined_reip_values(self) -> None:
+        features = pd.concat([self.bands, self.bands], ignore_index=True)
+        red_edge_bands = [
+            column
+            for column in self.bands.columns
+            if 650 <= int(column.removeprefix("X")) <= 763
+        ]
+        for band in red_edge_bands:
+            centered_wavelength = int(band.removeprefix("X")) - 702
+            features.loc[0, band] = 50 + centered_wavelength - centered_wavelength**3 / 10000
+            features.loc[1, band] = 50 + centered_wavelength
+        features = features.assign(**{AEZ_COL: [1, 1], MONTH_COL: [3, 3]})
+
+        transformed = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_vegetation_indices=True)
+        ).fit_transform(features)
+
+        self.assertFalse(transformed[list(VEGETATION_INDEX_NAMES)].isna().any().any())
+
+    def test_principal_component_branch_appends_named_components(self) -> None:
+        features = pd.concat(
+            [self.bands, self.bands * 2, self.bands * 3], ignore_index=True
+        ).assign(
+            **{AEZ_COL: [1, 1, 1], MONTH_COL: [3, 3, 3]}
+        )
+        preprocessor = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_principal_components=True)
+        )
+
+        transformed = preprocessor.fit_transform(features)
+        component_pipeline = next(
+            transformer
+            for name, transformer, _columns in preprocessor.transformers_
+            if name == "principal_components"
+        )
+
+        self.assertTrue({"PC_1", "PC_2"}.issubset(transformed.columns))
+        self.assertEqual([name for name, _step in component_pipeline.steps], [
+            "drop_empty",
+            "interpolate",
+            "standard_scale",
+            "pca",
+        ])
 
 
 class CategoricalContextPreprocessingTest(unittest.TestCase):

@@ -1,6 +1,7 @@
 """Central paths and constants – always import from here, never hardcode them."""
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -37,21 +38,337 @@ MONTH_SIN_COL = f"{MONTH_COL}_sin"
 MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
 BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
-NDVI_RED_BAND = "X671"
-NDVI_NIR_BAND = "X854"
-NDRE_RED_EDGE_BAND = "X702"
-PRI_FIRST_BAND = "X529"
-PRI_SECOND_BAND = "X569"
-NDWI_SWIR_BAND = "X1235"
-VEGETATION_INDEX_BANDS = (
-    NDVI_RED_BAND,
-    NDVI_NIR_BAND,
-    NDRE_RED_EDGE_BAND,
-    PRI_FIRST_BAND,
-    PRI_SECOND_BAND,
-    NDWI_SWIR_BAND,
+INDEX_WAVELENGTH_TOLERANCE_NM = 5
+REFLECTANCE_PERCENT_SCALE = 100.0
+MCARI_GREEN_WEIGHT = 0.2
+TCARI_MULTIPLIER = 3.0
+OSAVI_SOIL_ADJUSTMENT = 0.16
+REIP_LAGRANGIAN_WINDOW_NM = (680, 750)
+REIP_LAGRANGIAN_MIN_BANDS = 5
+REIP_POLYNOMIAL_WINDOW_NM = (650, 760)
+REIP_POLYNOMIAL_DEGREE = 4
+PCA_FEATURE_NAMES = ("PC_1", "PC_2")
+
+
+@dataclass(frozen=True)
+class VegetationIndexSpec:
+    """Static definition of one candidate vegetation index.
+
+    Args:
+        name: Stable output feature name.
+        formula: Human-readable formula using ``R_<wavelength>`` reflectance values.
+        target_wavelengths_nm: Wavelengths required by the formula in nanometres.
+        category: The catalogue group from the kickoff table.
+        source: Primary source of the formula or the kickoff-table citation.
+        status: Whether the common transformer computes, defers or excludes the candidate.
+        reason: Explanation for a deferred or excluded candidate.
+    """
+
+    name: str
+    formula: str
+    target_wavelengths_nm: tuple[int, ...]
+    category: str
+    source: str
+    status: Literal["implemented", "deferred", "excluded"]
+    reason: str | None = None
+
+
+VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
+    VegetationIndexSpec(
+        "SR_750_705",
+        "R_750 / R_705",
+        (750, 705),
+        "Chlorophyll",
+        "Gitelson & Merzlyak (1994)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "SR_800_550",
+        "R_800 / R_550",
+        (800, 550),
+        "Chlorophyll",
+        "Gitelson & Merzlyak (1994)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "ND_750_650",
+        "(R_750 - R_650) / (R_750 + R_650)",
+        (750, 650),
+        "Chlorophyll",
+        "Sims & Gamon (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "ND_800_680",
+        "(R_800 - R_680) / (R_800 + R_680)",
+        (800, 680),
+        "Chlorophyll",
+        "Sims & Gamon (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "ND_750_705",
+        "(R_750 - R_705) / (R_750 + R_705)",
+        (750, 705),
+        "Chlorophyll",
+        "Gitelson & Merzlyak (1994)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "MSR_750_445",
+        "(R_750 - R_445) / (R_750 + R_445)",
+        (750, 445),
+        "Chlorophyll",
+        "Sims & Gamon (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "MND_750_705",
+        "(R_750 - R_445) / (R_750 + R_705 - 2 R_445)",
+        (750, 705, 445),
+        "Chlorophyll",
+        "Sims & Gamon (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "SR_750_550",
+        "R_750 / R_550",
+        (750, 550),
+        "Chlorophyll",
+        "Gitelson & Merzlyak (1994)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "MEAN_750_850",
+        "mean(R_750:R_850)",
+        (750, 850),
+        "Chlorophyll",
+        "Stachniewicz et al. (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "MCARI",
+        "[(R_700 - R_670) - 0.2 (R_700 - R_550)] (R_700 / R_670)",
+        (700, 670, 550),
+        "Chlorophyll",
+        "Daughtry et al. (2000)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "TCARI",
+        "3 [(R_700 - R_670) - 0.2 (R_700 - R_550) (R_700 / R_670)]",
+        (700, 670, 550),
+        "Chlorophyll",
+        "Haboudane et al. (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "OSAVI",
+        "1.16 (R_800 - R_670) / (R_800 + R_670 + 0.16)",
+        (800, 670),
+        "Chlorophyll",
+        "Rondeaux et al. (1996)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "TCARI_OSAVI",
+        "TCARI / OSAVI",
+        (700, 670, 550, 800),
+        "Chlorophyll",
+        "Haboudane et al. (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "PSRI",
+        "(R_680 - R_500) / R_750",
+        (680, 500, 750),
+        "Senescence",
+        "Merzlyak et al. (1999)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "SIPI",
+        "(R_800 - R_445) / (R_800 - R_680)",
+        (800, 445, 680),
+        "Senescence",
+        "Peñuelas et al. (1995)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "PRI",
+        "(R_531 - R_570) / (R_531 + R_570)",
+        (531, 570),
+        "Chlorophyll",
+        "Gamon et al. (1992)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "PSSRA", "R_800 / R_680", (800, 680), "Chlorophyll", "Blackburn (1998)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "PSSRB", "R_800 / R_635", (800, 635), "Chlorophyll", "Blackburn (1998)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "SR_695_760", "R_695 / R_760", (695, 760), "Chlorophyll", "Carter (1994)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "DSWI_1", "R_800 / R_1650", (800, 1650), "Water", "Spatial Sciences (2003)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "DSWI_2", "R_1660 / R_550", (1660, 550), "Water", "Spatial Sciences (2003)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "DSWI_3", "R_1660 / R_680", (1660, 680), "Water", "Spatial Sciences (2003)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "DSWI_4", "R_550 / R_680", (550, 680), "Water", "Spatial Sciences (2003)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "DSWI_5",
+        "(R_800 + R_550) / (R_1660 + R_680)",
+        (800, 550, 1660, 680),
+        "Water",
+        "Spatial Sciences (2003)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "NDWI_770_1200",
+        "(R_770 - R_1200) / (R_770 + R_1200)",
+        (770, 1200),
+        "Water",
+        "Ustin et al. (2002)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "NDWI_860_1240",
+        "(R_860 - R_1240) / (R_860 + R_1240)",
+        (860, 1240),
+        "Water",
+        "Gao (1996)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "MSI", "R_1600 / R_820", (1600, 820), "Water", "Hunt & Rock (1989)", "implemented"
+    ),
+    VegetationIndexSpec(
+        "SR_895_420",
+        "R_895 / R_420",
+        (895, 420),
+        "Chlorophyll",
+        "Carter (1994)",
+        "excluded",
+        "420 nm has no non-empty Hyperion band within 5 nm.",
+    ),
+    VegetationIndexSpec(
+        "SR_695_420",
+        "R_695 / R_420",
+        (695, 420),
+        "Chlorophyll",
+        "Carter (1994)",
+        "excluded",
+        "420 nm has no non-empty Hyperion band within 5 nm.",
+    ),
+    VegetationIndexSpec(
+        "WI_900_970",
+        "R_900 / R_970",
+        (900, 970),
+        "Water",
+        "Peñuelas et al. (1997)",
+        "excluded",
+        "970 nm has no non-empty Hyperion band within 5 nm.",
+    ),
+    VegetationIndexSpec(
+        "CHLOROPHYLL_WELL",
+        "unpublished well metric",
+        (),
+        "Chlorophyll",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "The source gives no reproducible formula.",
+    ),
+    VegetationIndexSpec(
+        "GREEN_PEAK_WELL",
+        "unpublished well metric",
+        (),
+        "Chlorophyll",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "The source gives no reproducible formula.",
+    ),
+    VegetationIndexSpec(
+        "WATER_WELL_893",
+        "unpublished three-point well metric",
+        (893,),
+        "Water",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "The source gives no reproducible formula.",
+    ),
+    VegetationIndexSpec(
+        "WATER_WELL_1205",
+        "unpublished three-point well metric",
+        (1205,),
+        "Water",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "The source gives no reproducible formula.",
+    ),
+    VegetationIndexSpec(
+        "WATER_WELL_893_PSSRA",
+        "WATER_WELL_893 / PSSRA",
+        (893, 800, 680),
+        "Water",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "It depends on an unpublished well metric.",
+    ),
+    VegetationIndexSpec(
+        "WATER_WELL_1205_PSSRA",
+        "WATER_WELL_1205 / PSSRA",
+        (1205, 800, 680),
+        "Water",
+        "CSIRO VegSpectra (unpublished)",
+        "excluded",
+        "It depends on an unpublished well metric.",
+    ),
+    VegetationIndexSpec(
+        "REIP_LAGRANGIAN",
+        "maximum of a quadratic Lagrange interpolation of the first derivative",
+        REIP_LAGRANGIAN_WINDOW_NM,
+        "Red edge / REIP",
+        "Dawson & Curran (1998)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "REIP_POLYNOMIAL",
+        "maximum first derivative of a fourth-degree polynomial fit",
+        REIP_POLYNOMIAL_WINDOW_NM,
+        "Red edge / REIP",
+        "Broge & Leblanc (2001)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "PC_1",
+        "first principal component",
+        (),
+        "Red edge / REIP",
+        "Spatial Sciences (2003)",
+        "implemented",
+    ),
+    VegetationIndexSpec(
+        "PC_2",
+        "second principal component",
+        (),
+        "Red edge / REIP",
+        "Spatial Sciences (2003)",
+        "implemented",
+    ),
 )
-VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
+VEGETATION_INDEX_NAMES = tuple(
+    spec.name
+    for spec in VEGETATION_INDEX_SPECS
+    if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
+)
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
 SAVGOL_SPLIT_GAP_NM = 20
