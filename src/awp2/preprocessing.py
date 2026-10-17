@@ -827,7 +827,8 @@ class PreprocessingConfig(BaseModel):
     use_mean_albedo: bool = Field(
         default=False,
         description="Append the per-spectrum mean reflectance (mean albedo, computed "
-        "after interpolation) as an extra feature; preserves the brightness that SNV removes.",
+        "after interpolation) as an extra feature; preserves the brightness that SNV removes. "
+        "Scaled with the same method as the spectra.",
     )
     use_savgol: bool = Field(
         default=False,
@@ -1046,12 +1047,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
-    if config.use_spectral_standard_scale or config.scale:
-        spectra.append(("standard_scale", StandardScaler()))
-    elif config.use_spectral_minmax_scale:
-        spectra.append(("minmax_scale", MinMaxScaler()))
-    elif config.use_spectral_centering:
-        spectra.append(("centering", StandardScaler(with_mean=True, with_std=False)))
+    spectra.extend(_spectral_scaler(config))
     pca_components = config.spectral_pca_components
     ica_components = config.spectral_ica_components
     nmf_components = config.spectral_nmf_components
@@ -1105,6 +1101,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                         ("drop_empty", DropEmptyBands()),
                         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
                         ("albedo", MeanAlbedo()),
+                        # unscaled, the albedo (std ~5 %) dominates distances to standardised bands
+                        *_spectral_scaler(config),
                     ]
                 ),
                 make_column_selector(pattern=BAND_PATTERN),
@@ -1128,6 +1126,16 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
+
+
+def _spectral_scaler(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:
+    if config.use_spectral_standard_scale or config.scale:
+        return [("standard_scale", StandardScaler())]
+    if config.use_spectral_minmax_scale:
+        return [("minmax_scale", MinMaxScaler())]
+    if config.use_spectral_centering:
+        return [("centering", StandardScaler(with_mean=True, with_std=False))]
+    return []
 
 
 def _describe_step(name: str, step: BaseEstimator | str) -> str:
@@ -1286,9 +1294,7 @@ def _config_fields(*names: str) -> str:
 
 _META_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("aez", "aez", f"AEZ one-hot [{_config_fields('use_meta')}]", True),
-    _OptionNode(
-        "month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False
-    ),
+    _OptionNode("month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False),
     _OptionNode("month", "month", "Monat numerisch [use_cyclic_month = False]", False),
 )
 
@@ -1301,6 +1307,13 @@ _ALBEDO_NODES: tuple[_OptionNode, ...] = (
         False,
     ),
     _OptionNode("albedo", "albedo", f"Mean Albedo [{_config_fields('use_mean_albedo')}]", True),
+)
+
+_ALBEDO_SCALER_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode("albedo", "standard_scale", "Standard (wie Spektren)", False),
+    _OptionNode("albedo", "minmax_scale", "Min-Max (wie Spektren)", False),
+    _OptionNode("albedo", "centering", "Zentrierung (wie Spektren)", False),
+    _OptionNode("albedo", "no_scaler", "keine Skalierung (wie Spektren)", False),
 )
 
 _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
@@ -1417,6 +1430,7 @@ def _diagram_steps() -> set[tuple[str, str]]:
     lanes = (
         _META_NODES,
         _ALBEDO_NODES,
+        _ALBEDO_SCALER_NODES,
         _INDICES_NODES,
         _SPECTRA_PREFIX_NODES,
         _SCALER_NODES,
@@ -1462,7 +1476,7 @@ def pipeline_options_diagram() -> str:
     diagram.append(_node_line(numeric))
     diagram.append("    end")
     diagram.append("    subgraph albedo")
-    for node in _ALBEDO_NODES:
+    for node in (*_ALBEDO_NODES, *_ALBEDO_SCALER_NODES):
         diagram.append(_node_line(node))
     diagram.append("    end")
     diagram.append("    subgraph indizes")
@@ -1502,6 +1516,9 @@ def pipeline_options_diagram() -> str:
     link("X", s_drop)
     link(_node_id(a_drop), a_inter)
     link(_node_id(a_inter), albedo)
+    for node in _ALBEDO_SCALER_NODES:
+        link(_node_id(albedo), node)
+        link(_node_id(node), concat)
     link(_node_id(i_drop), i_inter)
     link(_node_id(i_inter), indices)
     link(_node_id(indices), select)
@@ -1515,7 +1532,7 @@ def pipeline_options_diagram() -> str:
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, albedo, select):
+    for node in (aez, cyclic, numeric, select):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")
