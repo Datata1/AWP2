@@ -58,11 +58,11 @@ PCA, SNV, Ableitungen, Merkmalsbildung und PLS werden als Transformer in
 eigene Preprocessing-Variante. Er wird nicht zusammen mit weiteren neuen Merkmalen verändert,
 damit ein möglicher Gewinn zuordenbar bleibt.
 
-Die 1D-CNN erreicht eine kombinierte BAcc von 0,626 und wird nicht weiter variiert. RNN, GRU und
-Transformer sind für die geordnete Wellenlängenachse keine naheliegendere Alternative und bei
-der vorhandenen Stichprobengröße nicht Teil dieses Arbeitsplans. Eine weitere sequenzielle
-Architektur ist erst begründet, wenn eine Formtransformation wie SNV oder die erste Ableitung
 die tabellarische SVM in der CV klar verbessert.
+Die 1D-CNN erreicht eine kombinierte BAcc von 0,626 und wird nicht weiter variiert. #136 ergänzt
+eine getrennte, kontrollierte LSTM-Studie: Sie prüft die geordnete Wellenlängenfolge gegen dieselbe
+Architektur ohne Kontext, mit bisherigem Kontext-Encoding und mit AEZ-/Monatsembeddings. Die
+Studie ändert weder Split noch Bewertungsprotokoll und folgt nicht aus dem CNN-Ergebnis.
 
 ### Erster Arbeitstag
 
@@ -376,6 +376,31 @@ einen getrennten Kontextzweig ein.
 
 ![Häufigste Verwechslungen](../img/combined_cnn_confusions.png)
 
+### LSTM mit spät fusioniertem Kontext
+
+Der kombinierte LSTM kodiert ausschließlich die skalierte Spektralfolge. Erst der letzte
+LSTM-Zustand wird mit Kontext verbunden und danach auf die 23 kombinierten Klassen abgebildet;
+dadurch können nur im Training beobachtete Crop/Stage-Paare entstehen.
+
+- **Hypothese:** Die Reihenfolge benachbarter Wellenlängen und eine lernbare, kategoriale
+    Darstellung von AEZ und Monat ergänzen die tabellarische Referenz.
+- **Kontrollen:** `none` erhält keine Metadaten, `standard` nutzt AEZ one-hot sowie zyklischen
+    Monat, `embeddings` lernt getrennte AEZ- und Monatsembeddings. Alle drei Varianten erhalten
+    dieselben standardisierten Spektren und denselben kleinen CV-Suchraum.
+- Die drei CV-Gewinner nutzen jeweils eine LSTM-Schicht mit 64 Einheiten und Dropout 0,2.
+    Ihre CV-BAcc kombiniert beträgt ohne Kontext 0,289, mit Standardkontext 0,632 und mit
+    Embeddings **0,711**. Die jeweilige Holdout-BAcc kombiniert beträgt 0,324, 0,673 und
+    **0,700**; damit verbessern Embeddings den Standardkontext um 0,028.
+- Die Embeddings verbessern besonders die Stadium-BAcc gegenüber dem Standardkontext
+    (0,793 statt 0,746); die Crop-BAcc bleibt fast unverändert (0,812 statt 0,810).
+- Alle drei Dekodierungen erzeugen ausschließlich gültige Paare. Selbst die beste Variante
+    bleibt mit 0,166 BAcc kombiniert deutlich hinter der kombinierten SVM-Referenz (0,866).
+- Notebook: `notebooks/19_duac1011_combined-lstm-none.ipynb`,
+    `notebooks/20_duac1011_combined-lstm-standard.ipynb` und
+    `notebooks/21_duac1011_combined-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
+    nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
+    Notebook-Outputs.
+
 ### Extra Trees
 
 Notebook: `notebooks/02_duac1011_combined-extra-trees.ipynb`. Extra Trees lernt 23
@@ -432,4 +457,5 @@ lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene S
 kombinierte BAcc gegenüber ihrer Kontext-Ablation, der Indizes-Erweiterung, der PCA-Variante,
 Random Forest, Extra Trees und HistGradientBoosting deutlich und verhindert weiterhin ungültige
 Paare. Gegen hierarchische und Multi-Task-Ansätze bleibt der kombinierte Ansatz weiter zu
-vergleichen; weitere sequenzielle Architekturen sind ohne CNN-Gewinn nicht Teil des M2-Plans.
+vergleichen. Die vorbereitete LSTM-Studie erweitert diesen Vergleich, ohne die bestehende
+SVM-Referenz vorwegzunehmen.

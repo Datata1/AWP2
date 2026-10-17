@@ -15,12 +15,15 @@ from awp2.config import (
     CROP_COL,
     EXTRA_TREES_N_ESTIMATORS,
     LABEL_SEP,
+    LSTM_STANDARD_CONTEXT,
     RANDOM_FOREST_N_ESTIMATORS,
     SEED,
     STAGE_COL,
     TARGET_COLS,
+    LSTMContextMode,
 )
 from awp2.data import combined_label
+from awp2.models.lstm import SpectralLSTMClassifier
 
 
 class CombinedLabelClassifier(ClassifierMixin, BaseEstimator):
@@ -130,3 +133,17 @@ def make_combined_svm() -> CombinedLabelClassifier:
             ``PreprocessingConfig(use_spectral_standard_scale=True)`` before fitting.
     """
     return CombinedLabelClassifier(SVC(class_weight="balanced"))
+
+
+def make_combined_spectral_lstm(
+    context_mode: LSTMContextMode = LSTM_STANDARD_CONTEXT,
+) -> CombinedLabelClassifier:
+    """Create the LSTM classifier for the combined-label approach.
+
+    Args:
+        context_mode: How the LSTM receives AEZ and Month context.
+
+    Returns:
+        Unfitted LSTM wrapped to predict valid combined crop/stage labels.
+    """
+    return CombinedLabelClassifier(SpectralLSTMClassifier(context_mode=context_mode))
