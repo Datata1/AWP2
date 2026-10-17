@@ -303,7 +303,8 @@ bestimmt im Fenster 680--750 nm das Maximum der ersten Ableitung und verfeinert 
 mit einem quadratischen Lagrange-Polynom über drei Ableitungswerte. REIP-Polynomial passt im
 Fenster 650--760 nm ein Polynom vierten Grades an und verwendet die innere Wendestelle mit der
 größten positiven Steigung. Ein Spektrum ohne gültiges inneres Maximum liefert für die jeweilige
-REIP-Spalte `NaN`.
+REIP-Spalte `NaN`. Der Indexzweig ersetzt solche Werte vor dem Modell mit dem Median des
+jeweiligen Trainingsfolds.
 
 `PC_1` und `PC_2` sind als optionale PCA-Merkmalsgruppe mit
 `PreprocessingConfig(use_principal_components=True)` verfügbar. Ein separater Pipelinezweig

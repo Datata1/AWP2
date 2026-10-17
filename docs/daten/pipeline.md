@@ -96,6 +96,7 @@ flowchart TD
         n_indices_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
         n_indices_indices["Vegetationsindizes [use_vegetation_indices]"]
         n_indices_select["Nur Indizes behalten"]
+        n_indices_impute["Fehlende Indizes: Median (Training)"]
         n_indices_standard_scale["Standard [use_spectral_standard_scale]"]
         n_indices_minmax_scale["Min-Max [use_spectral_minmax_scale]"]
         n_indices_centering["Zentrierung [use_spectral_centering]"]
@@ -144,13 +145,14 @@ flowchart TD
     n_indices_drop_empty --> n_indices_interpolate
     n_indices_interpolate -.-> n_indices_indices
     n_indices_indices --> n_indices_select
-    n_indices_select -.-> n_indices_standard_scale
+    n_indices_select --> n_indices_impute
+    n_indices_impute -.-> n_indices_standard_scale
     n_indices_standard_scale --> d_concat
-    n_indices_select -.-> n_indices_minmax_scale
+    n_indices_impute -.-> n_indices_minmax_scale
     n_indices_minmax_scale --> d_concat
-    n_indices_select -.-> n_indices_centering
+    n_indices_impute -.-> n_indices_centering
     n_indices_centering --> d_concat
-    n_indices_select --> n_indices_no_scaler
+    n_indices_impute --> n_indices_no_scaler
     n_indices_no_scaler --> d_concat
     X -.-> n_principal_components_drop_empty
     n_principal_components_drop_empty -.-> n_principal_components_interpolate
