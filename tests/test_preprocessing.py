@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from awp2.config import AEZ_COL, MEAN_ALBEDO_COL, MONTH_COL
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor
+from awp2.preprocessing import AezMonthEncoder, PreprocessingConfig, build_preprocessor
 
 
 class CategoricalContextPreprocessingTest(unittest.TestCase):
@@ -66,3 +66,29 @@ class MeanAlbedoScalingTest(unittest.TestCase):
         pd.testing.assert_series_equal(
             albedo, self.features[["X427", "X437"]].mean(axis=1), check_names=False
         )
+
+
+class AezMonthEncoderTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.train = pd.DataFrame({AEZ_COL: [5, 5, 9], MONTH_COL: [5, 10, 5]})
+
+    def test_one_indicator_per_training_combination(self) -> None:
+        encoded = AezMonthEncoder().fit_transform(self.train)
+
+        self.assertEqual(
+            list(encoded.columns), ["aez_month_5_10", "aez_month_5_5", "aez_month_9_5"]
+        )
+        self.assertEqual(encoded.sum(axis=1).tolist(), [1.0, 1.0, 1.0])
+
+    def test_unseen_combination_gives_all_zeros(self) -> None:
+        encoder = AezMonthEncoder().fit(self.train)
+
+        encoded = encoder.transform(pd.DataFrame({AEZ_COL: [9], MONTH_COL: [10]}))
+
+        self.assertEqual(encoded.sum(axis=1).tolist(), [0.0])
+
+    def test_requires_numeric_context(self) -> None:
+        with self.assertRaises(ValueError):
+            PreprocessingConfig(use_aez_month=True, use_meta=False)
+        with self.assertRaises(ValueError):
+            PreprocessingConfig(use_aez_month=True, use_categorical_context=True)

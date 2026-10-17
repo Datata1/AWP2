@@ -17,9 +17,12 @@ from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
+from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import (
     AEZ_COL,
+    AEZ_MONTH_PREFIX,
+    AEZ_MONTH_SEP,
     BAND_PATTERN,
     BAND_PREFIX,
     MEAN_ALBEDO_COL,
@@ -780,6 +783,69 @@ class MeanAlbedo(TransformerMixin, BaseEstimator):
         return np.asarray([MEAN_ALBEDO_COL], dtype=object)
 
 
+class AezMonthEncoder(TransformerMixin, BaseEstimator):
+    """One-hot encode each AEZ × month combination seen in training.
+
+    Crop errors cluster in particular regions at particular times of the season; one indicator
+    per combination makes that context explicit (and gives it more weight in distance-based
+    models than separate AEZ and month features). Combinations unseen in training get all zeros.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Record the observed combinations.
+
+        Args:
+            X: DataFrame with the ``AEZ`` and ``Month`` columns.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        combinations = self._combinations(X)
+        self.categories_ = np.asarray(sorted(combinations.unique()), dtype=object)
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Return one indicator column per training combination.
+
+        Args:
+            X: DataFrame with the ``AEZ`` and ``Month`` columns.
+
+        Returns:
+            One 0/1 column per combination, named ``aez_month_<AEZ>_<Month>``.
+        """
+        combinations = self._combinations(X).to_numpy()
+        indicators = (combinations[:, np.newaxis] == self.categories_).astype(float)
+        return pd.DataFrame(indicators, columns=self.get_feature_names_out(), index=X.index)
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            One name per training combination.
+        """
+        check_is_fitted(self, "categories_")
+        return np.asarray(
+            [f"{AEZ_MONTH_PREFIX}{AEZ_MONTH_SEP}{combination}" for combination in self.categories_],
+            dtype=object,
+        )
+
+    @staticmethod
+    def _combinations(X: pd.DataFrame) -> pd.Series:
+        if not isinstance(X, pd.DataFrame) or list(X.columns) != [AEZ_COL, MONTH_COL]:
+            raise ValueError(f"Expected a DataFrame with the columns {[AEZ_COL, MONTH_COL]}.")
+        return (
+            X[AEZ_COL].astype(int).astype(str)
+            + AEZ_MONTH_SEP
+            + X[MONTH_COL].astype(int).astype(str)
+        )
+
+
 class PreprocessingConfig(BaseModel):
     """Options of the standard preprocessing.
 
@@ -896,6 +962,11 @@ class PreprocessingConfig(BaseModel):
         description="Compute EDA-defined NDVI, NDRE, PRI and NDWI from interpolated bands "
         "in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
     )
+    use_aez_month: bool = Field(
+        default=False,
+        description="One-hot encode each AEZ × month combination seen in training next to the "
+        "separate AEZ and month features; requires use_meta.",
+    )
     use_cyclic_month: bool = Field(
         default=True,
         description="Replace numeric Month with sine/cosine annual-cycle features.",
@@ -917,11 +988,15 @@ class PreprocessingConfig(BaseModel):
             The validated configuration.
 
         Raises:
-            ValueError: If more than one reduction method is selected; if centering,
+            ValueError: If ``use_aez_month`` is set without ``use_meta`` or with
+                ``use_categorical_context``; if more than one reduction method is selected; if
+                centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
                 if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
                 arguments are set without their method or missing with it.
         """
+        if self.use_aez_month and (not self.use_meta or self.use_categorical_context):
+            raise ValueError("use_aez_month requires use_meta without use_categorical_context")
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
             raise ValueError("use only one of use_spectral_standard_scale/minmax_scale")
         if self.use_spectral_centering and (
@@ -1123,6 +1198,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                 make_column_selector(pattern=BAND_PATTERN),
             )
         )
+    if config.use_aez_month:
+        transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
     transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
@@ -1155,6 +1232,7 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         "cyclic": "Cyclic month encoding (sin/cos)",
         "month": "Standardize month",
         "scale": "Standardize month",
+        "aez_month": "One-hot encode AEZ x month combinations",
     }
     if name in known:
         return known[name]
@@ -1192,6 +1270,7 @@ _BRANCH_LETTERS: dict[str, str] = {
     "albedo": "C",
     "indices": "D",
     "spectra": "E",
+    "aez_month": "F",
 }
 
 
@@ -1199,7 +1278,8 @@ def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
     r"""List the active preprocessing steps, grouped by independent branch.
 
     Reads the built transformer, so optional steps appear only when enabled. Each
-    branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra)
+    branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra,
+    F: AEZ x month)
     and steps are numbered per branch from 1, so the labels stay comparable across
     runs. Print the lines in the notebook to log which preprocessing a run used.
 
@@ -1296,6 +1376,9 @@ _META_NODES: tuple[_OptionNode, ...] = (
     _OptionNode("aez", "aez", f"AEZ one-hot [{_config_fields('use_meta')}]", True),
     _OptionNode("month", "cyclic", f"Monat sin/cos [{_config_fields('use_cyclic_month')}]", False),
     _OptionNode("month", "month", "Monat numerisch [use_cyclic_month = False]", False),
+    _OptionNode(
+        "aez_month", "aez_month", f"AEZ × Monat one-hot [{_config_fields('use_aez_month')}]", True
+    ),
 )
 
 _ALBEDO_NODES: tuple[_OptionNode, ...] = (
@@ -1461,7 +1544,7 @@ def pipeline_options_diagram() -> str:
     Returns:
         Complete mermaid code block for the docs.
     """
-    aez, cyclic, numeric = _META_NODES
+    aez, cyclic, numeric, aez_month = _META_NODES
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select = _INDICES_NODES
     s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
@@ -1474,6 +1557,7 @@ def pipeline_options_diagram() -> str:
     diagram.append(_node_line(month_diamond))
     diagram.append(_node_line(cyclic))
     diagram.append(_node_line(numeric))
+    diagram.append(_node_line(aez_month))
     diagram.append("    end")
     diagram.append("    subgraph albedo")
     for node in (*_ALBEDO_NODES, *_ALBEDO_SCALER_NODES):
@@ -1514,6 +1598,7 @@ def pipeline_options_diagram() -> str:
     link("X", a_drop)
     link("X", i_drop)
     link("X", s_drop)
+    link("X", aez_month)
     link(_node_id(a_drop), a_inter)
     link(_node_id(a_inter), albedo)
     for node in _ALBEDO_SCALER_NODES:
@@ -1532,7 +1617,7 @@ def pipeline_options_diagram() -> str:
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, select):
+    for node in (aez, cyclic, numeric, aez_month, select):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")
