@@ -30,8 +30,12 @@ def _probe_configs() -> list[PreprocessingConfig]:
             use_spectral_standard_scale=True,
             spectral_pca_components=5,
         ),
-        PreprocessingConfig(use_spectral_minmax_scale=True, spectral_dbn_layers=(64, 20)),
-        PreprocessingConfig(use_spectral_centering=True, spectral_ica_components=5),
+        PreprocessingConfig(
+            use_mean_albedo=True, use_spectral_minmax_scale=True, spectral_dbn_layers=(64, 20)
+        ),
+        PreprocessingConfig(
+            use_mean_albedo=True, use_spectral_centering=True, spectral_ica_components=5
+        ),
         PreprocessingConfig(use_meta=False, spectral_nmf_components=5),
         PreprocessingConfig(spectral_osp_components=5),
         PreprocessingConfig(spectral_lpp_components=5, spectral_lpp_neighbors=5),

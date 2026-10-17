@@ -97,6 +97,10 @@ flowchart TD
         n_albedo_drop_empty["Leere Bänder entfernen (immer)"]
         n_albedo_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
         n_albedo_albedo["Mean Albedo [use_mean_albedo]"]
+        n_albedo_standard_scale["Standard (wie Spektren)"]
+        n_albedo_minmax_scale["Min-Max (wie Spektren)"]
+        n_albedo_centering["Zentrierung (wie Spektren)"]
+        n_albedo_no_scaler["keine Skalierung (wie Spektren)"]
     end
     subgraph indizes
         n_indices_drop_empty["Leere Bänder entfernen (immer)"]
@@ -138,6 +142,14 @@ flowchart TD
     X --> n_spectra_drop_empty
     n_albedo_drop_empty --> n_albedo_interpolate
     n_albedo_interpolate -.-> n_albedo_albedo
+    n_albedo_albedo --> n_albedo_standard_scale
+    n_albedo_standard_scale --> d_concat
+    n_albedo_albedo --> n_albedo_minmax_scale
+    n_albedo_minmax_scale --> d_concat
+    n_albedo_albedo --> n_albedo_centering
+    n_albedo_centering --> d_concat
+    n_albedo_albedo --> n_albedo_no_scaler
+    n_albedo_no_scaler --> d_concat
     n_indices_drop_empty --> n_indices_interpolate
     n_indices_interpolate -.-> n_indices_indices
     n_indices_indices --> n_indices_select
@@ -172,7 +184,6 @@ flowchart TD
     n_aez_aez --> d_concat
     n_month_cyclic --> d_concat
     n_month_month --> d_concat
-    n_albedo_albedo --> d_concat
     n_indices_select --> d_concat
 ```
 <!-- pipeline-options-diagram:end -->
