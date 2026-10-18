@@ -93,9 +93,9 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         "implemented",
     ),
     VegetationIndexSpec(
-        "ND_750_650",
-        "(R_750 - R_650) / (R_750 + R_650)",
-        (750, 650),
+        "ND_750_660",
+        "(R_750 - R_660) / (R_750 + R_660)",
+        (750, 660),
         "Chlorophyll",
         "Sims & Gamon (2002)",
         "implemented",
