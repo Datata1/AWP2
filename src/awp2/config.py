@@ -371,6 +371,9 @@ VEGETATION_INDEX_NAMES = tuple(
     for spec in VEGETATION_INDEX_SPECS
     if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
 )
+VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
+AEZ_MONTH_PREFIX = "aez_month"
+AEZ_MONTH_SEP = "_"
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
 SAVGOL_SPLIT_GAP_NM = 20
