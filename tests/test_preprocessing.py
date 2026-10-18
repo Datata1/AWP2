@@ -64,7 +64,8 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
         )
 
     def test_catalogue_uses_mapped_bands_for_representative_formulas(self) -> None:
-        transformed = AddVegetationIndices().fit_transform(self.bands)
+        transformer = AddVegetationIndices().fit(self.bands)
+        transformed = transformer.transform(self.bands)
 
         self.assertAlmostEqual(transformed.loc[0, "SR_750_705"], 70.0 / 65.0)
         self.assertAlmostEqual(transformed.loc[0, "MSR_750_445"], (70.0 - 25.0) / (65.0 - 25.0))
@@ -81,6 +82,7 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
             transformed.loc[0, "TCARI_OSAVI"],
             transformed.loc[0, "TCARI"] / transformed.loc[0, "OSAVI"],
         )
+        self.assertEqual(list(transformed.columns), list(transformer.get_feature_names_out()))
 
     def test_reip_algorithms_locate_the_maximum_red_edge_slope(self) -> None:
         red_edge_bands = [
