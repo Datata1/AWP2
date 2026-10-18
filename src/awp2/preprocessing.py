@@ -748,14 +748,16 @@ class AddVegetationIndices(_BandTransformer):
         r800, r550 = (reflectance[band] for band in index_bands["SR_800_550"])
         _, r650 = (reflectance[band] for band in index_bands["ND_750_650"])
         _, r680 = (reflectance[band] for band in index_bands["ND_800_680"])
-        _, r445 = (reflectance[band] for band in index_bands["MSR_750_445"])
+        r750_msr, r705_msr, r445 = (
+            reflectance[band] for band in index_bands["MSR_750_445"]
+        )
         r700, r670, _ = (reflectance[band] for band in index_bands["MCARI"])
         _, r500, _ = (reflectance[band] for band in index_bands["PSRI"])
         r531, r570 = (reflectance[band] for band in index_bands["PRI"])
         _, r635 = (reflectance[band] for band in index_bands["PSSRB"])
         r695, r760 = (reflectance[band] for band in index_bands["SR_695_760"])
         r1660, _ = (reflectance[band] for band in index_bands["DSWI_2"])
-        r770, r1200 = (reflectance[band] for band in index_bands["NDWI_770_1200"])
+        r1070, r1200 = (reflectance[band] for band in index_bands["NDWI_1070_1200"])
         r860, r1240 = (reflectance[band] for band in index_bands["NDWI_860_1240"])
         r1600, r820 = (reflectance[band] for band in index_bands["MSI"])
         mean_start, mean_end = index_bands["MEAN_750_850"]
@@ -783,7 +785,7 @@ class AddVegetationIndices(_BandTransformer):
                 "ND_750_650": (r750 - r650) / (r750 + r650),
                 "ND_800_680": (r800 - r680) / (r800 + r680),
                 "ND_750_705": (r750 - r705) / (r750 + r705),
-                "MSR_750_445": (r750 - r445) / (r750 + r445),
+                "MSR_750_445": (r750_msr - r445) / (r705_msr - r445),
                 "MND_750_705": (r750 - r445) / (r750 + r705 - 2 * r445),
                 "SR_750_550": r750 / r550,
                 "MEAN_750_850": reflectance[mean_bands].mean(axis=1),
@@ -802,7 +804,7 @@ class AddVegetationIndices(_BandTransformer):
                 "DSWI_3": r1660 / r680,
                 "DSWI_4": r550 / r680,
                 "DSWI_5": (r800 + r550) / (r1660 + r680),
-                "NDWI_770_1200": (r770 - r1200) / (r770 + r1200),
+                "NDWI_1070_1200": (r1070 - r1200) / (r1070 + r1200),
                 "NDWI_860_1240": (r860 - r1240) / (r860 + r1240),
                 "MSI": r1600 / r820,
                 "REIP_LAGRANGIAN": reip_lagrangian,

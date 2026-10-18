@@ -48,6 +48,7 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
                 "X824": [82.0],
                 "X854": [84.0],
                 "X864": [86.0],
+                "X1069": [75.0],
                 "X1205": [70.0],
                 "X1235": [65.0],
                 "X1599": [50.0],
@@ -60,7 +61,11 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
         transformed = AddVegetationIndices().fit_transform(self.bands)
 
         self.assertAlmostEqual(transformed.loc[0, "SR_750_705"], 70.0 / 65.0)
+        self.assertAlmostEqual(transformed.loc[0, "MSR_750_445"], (70.0 - 25.0) / (65.0 - 25.0))
         self.assertAlmostEqual(transformed.loc[0, "PRI"], (32.0 - 30.0) / (32.0 + 30.0))
+        self.assertAlmostEqual(
+            transformed.loc[0, "NDWI_1070_1200"], (75.0 - 70.0) / (75.0 + 70.0)
+        )
         self.assertAlmostEqual(transformed.loc[0, "PSRI"], (55.0 - 30.0) / 70.0)
         self.assertAlmostEqual(
             transformed.loc[0, "OSAVI"],
