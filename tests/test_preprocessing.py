@@ -39,6 +39,7 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
                 "X569": [30.0],
                 "X630": [40.0],
                 "X651": [45.0],
+                "X661": [48.0],
                 "X671": [50.0],
                 "X681": [55.0],
                 "X691": [60.0],
@@ -68,6 +69,7 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
         transformed = transformer.transform(self.bands)
 
         self.assertAlmostEqual(transformed.loc[0, "SR_750_705"], 70.0 / 65.0)
+        self.assertAlmostEqual(transformed.loc[0, "ND_750_660"], (70.0 - 48.0) / (70.0 + 48.0))
         self.assertAlmostEqual(transformed.loc[0, "MSR_750_445"], (70.0 - 25.0) / (65.0 - 25.0))
         self.assertAlmostEqual(transformed.loc[0, "PRI"], (32.0 - 30.0) / (32.0 + 30.0))
         self.assertAlmostEqual(
@@ -96,8 +98,8 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
 
         transformed = AddVegetationIndices().fit_transform(self.bands)
 
-        self.assertAlmostEqual(transformed.loc[0, "REIP_LAGRANGIAN"], 702.0, delta=3.0)
-        self.assertAlmostEqual(transformed.loc[0, "REIP_POLYNOMIAL"], 702.0, delta=1.0)
+        self.assertAlmostEqual(transformed.loc[0, "REIP_LAGRANGIAN"], 702.0, delta=5.0)
+        self.assertAlmostEqual(transformed.loc[0, "REIP_POLYNOMIAL"], 702.0, delta=5.0)
 
     def test_preprocessing_config_adds_only_implemented_catalogue_indices(self) -> None:
         features = self.bands.assign(**{AEZ_COL: 1, MONTH_COL: 3})

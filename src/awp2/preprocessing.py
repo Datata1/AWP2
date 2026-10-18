@@ -749,7 +749,7 @@ class AddVegetationIndices(_BandTransformer):
         index_bands = self.index_bands_
         r750, r705 = (reflectance[band] for band in index_bands["SR_750_705"])
         r800, r550 = (reflectance[band] for band in index_bands["SR_800_550"])
-        _, r650 = (reflectance[band] for band in index_bands["ND_750_650"])
+        _, r660 = (reflectance[band] for band in index_bands["ND_750_660"])
         _, r680 = (reflectance[band] for band in index_bands["ND_800_680"])
         r750_msr, r705_msr, r445 = (
             reflectance[band] for band in index_bands["MSR_750_445"]
@@ -785,7 +785,7 @@ class AddVegetationIndices(_BandTransformer):
             {
                 "SR_750_705": r750 / r705,
                 "SR_800_550": r800 / r550,
-                "ND_750_650": (r750 - r650) / (r750 + r650),
+                "ND_750_660": (r750 - r660) / (r750 + r660),
                 "ND_800_680": (r800 - r680) / (r800 + r680),
                 "ND_750_705": (r750 - r705) / (r750 + r705),
                 "MSR_750_445": (r750_msr - r445) / (r705_msr - r445),
