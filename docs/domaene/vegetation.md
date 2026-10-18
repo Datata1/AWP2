@@ -275,6 +275,44 @@ Cross-Validation; das ungelabelte Testset darf diese Entscheidungen nicht beeinf
 Berechnung gehört in die Pipeline. Ob ein Kandidat nützt, entscheiden Balanced Accuracy,
 Macro-F1 und Samples-F1 auf der davon getrennten Validierung.[^9]
 
+### Kickoff-Katalog in der Pipeline
+
+Der gemeinsame Preprocessor berechnet 29 eindeutig formulierte Indizes aus dem Katalog der
+Kickoff-Folie. Die genaue Formel, Primärquelle, Kategorie und angeforderten Wellenlängen stehen
+zentral in `awp2.config.VEGETATION_INDEX_SPECS`. Für jede angeforderte Wellenlänge wählt der
+Transformer das nächstgelegene nicht leere Hyperion-Band, aber nur bei einem Abstand von höchstens
+5 nm. Die verwendeten Bänder werden beim Fit auf dem Trainingsanteil festgelegt und anschließend
+für die Transformation beibehalten.
+
+Die Rohreflektanzen liegen als Prozentwerte vor. Für die Berechnung werden sie zu Anteilen von
+0 bis 1 umgerechnet; das ist für Formeln mit additiven Konstanten wie OSAVI notwendig. Die
+ausgewählten Indexspalten können danach mit derselben konfigurierten Methode wie die Spektren
+standardisiert, Min-Max-skaliert oder zentriert werden. Der Skaler des Indexzweigs wird dabei
+getrennt und ausschließlich auf dem Trainingsanteil gefittet.
+
+Folgende Katalogeinträge werden nicht berechnet:
+
+| Einträge | Grund |
+| --- | --- |
+| `SR_895_420`, `SR_695_420` | Das nächste nicht leere Band zu 420 nm ist `X437` und liegt 17 nm entfernt. |
+| `WI_900_970` | Das nächste nicht leere Band zu 970 nm ist `X983` und liegt 13 nm entfernt. |
+| Chlorophyll Well, Green Peak Well, Water Well bei 893 und 1205 nm sowie ihre PSSRa-Verhältnisse | Die in der Folie genannten CSIRO-VegSpectra-Quellen sind unveröffentlicht und liefern keine reproduzierbare Formel. |
+
+Die REIP-Verfahren nutzen die interpolierten Reflektanzen im Red-Edge-Bereich. REIP-Lagrange
+bestimmt im Fenster 680--750 nm das Maximum der ersten Ableitung und verfeinert dessen Position
+mit einem quadratischen Lagrange-Polynom über drei Ableitungswerte. REIP-Polynomial passt im
+Fenster 650--760 nm ein Polynom vierten Grades an und verwendet die innere Wendestelle mit der
+größten positiven Steigung. Ein Spektrum ohne gültiges inneres Maximum liefert für die jeweilige
+REIP-Spalte `NaN`. Der Indexzweig ersetzt solche Werte vor dem Modell mit dem Median des
+jeweiligen Trainingsfolds.
+
+`PC_1` und `PC_2` sind als optionale PCA-Merkmalsgruppe mit
+`PreprocessingConfig(use_principal_components=True)` verfügbar. Ein separater Pipelinezweig
+entfernt leere Bänder, interpoliert Bandlücken, standardisiert die Spektren und passt darauf
+eine PCA mit zwei Komponenten ausschließlich auf dem jeweiligen Trainingsfold an. Die beiden
+Komponenten können neben Rohbändern und Vegetationsindizes verwendet werden, sind aber keine
+festen Indexformeln.
+
 [^4]: Tucker (1979), siehe [Quellen](quellen.md).
 [^5]: Huete et al. (2002), siehe [Quellen](quellen.md).
 [^6]: Gamon, Peñuelas & Field (1992), siehe [Quellen](quellen.md).

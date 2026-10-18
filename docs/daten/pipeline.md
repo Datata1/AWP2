@@ -108,6 +108,17 @@ flowchart TD
         n_indices_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
         n_indices_indices["Vegetationsindizes [use_vegetation_indices]"]
         n_indices_select["Nur Indizes behalten"]
+        n_indices_impute["Fehlende Indizes: Median (Training)"]
+        n_indices_standard_scale["Standard [use_spectral_standard_scale]"]
+        n_indices_minmax_scale["Min-Max [use_spectral_minmax_scale]"]
+        n_indices_centering["Zentrierung [use_spectral_centering]"]
+        n_indices_no_scaler["keine Skalierung [Standard]"]
+    end
+    subgraph hauptkomponenten
+        n_principal_components_drop_empty["Leere Bänder entfernen (immer)"]
+        n_principal_components_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_principal_components_standard_scale["Standard (immer)"]
+        n_principal_components_pca["PC_1 + PC_2 [use_principal_components]"]
     end
     subgraph spektren
         n_spectra_drop_empty["Leere Bänder entfernen (immer)"]
@@ -155,6 +166,20 @@ flowchart TD
     n_indices_drop_empty --> n_indices_interpolate
     n_indices_interpolate -.-> n_indices_indices
     n_indices_indices --> n_indices_select
+    n_indices_select --> n_indices_impute
+    n_indices_impute -.-> n_indices_standard_scale
+    n_indices_standard_scale --> d_concat
+    n_indices_impute -.-> n_indices_minmax_scale
+    n_indices_minmax_scale --> d_concat
+    n_indices_impute -.-> n_indices_centering
+    n_indices_centering --> d_concat
+    n_indices_impute --> n_indices_no_scaler
+    n_indices_no_scaler --> d_concat
+    X -.-> n_principal_components_drop_empty
+    n_principal_components_drop_empty -.-> n_principal_components_interpolate
+    n_principal_components_interpolate -.-> n_principal_components_standard_scale
+    n_principal_components_standard_scale -.-> n_principal_components_pca
+    n_principal_components_pca --> d_concat
     n_spectra_drop_empty --> n_spectra_interpolate
     n_spectra_interpolate -.-> n_spectra_savgol
     n_spectra_savgol -.-> n_spectra_snv
@@ -186,6 +211,7 @@ flowchart TD
     n_aez_aez --> d_concat
     n_month_cyclic --> d_concat
     n_month_month --> d_concat
+    n_albedo_albedo --> d_concat
     n_aez_month_aez_month --> d_concat
     n_indices_select --> d_concat
 ```
