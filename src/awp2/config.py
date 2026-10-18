@@ -41,6 +41,8 @@ MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
 BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
 INDEX_WAVELENGTH_TOLERANCE_NM = 5
+# Hyperion samples every ~10 nm; a larger step marks a block of deleted bands.
+BAND_GAP_NM = 20
 REFLECTANCE_PERCENT_SCALE = 100.0
 MCARI_GREEN_WEIGHT = 0.2
 TCARI_MULTIPLIER = 3.0
@@ -380,6 +382,33 @@ SAVGOL_SPLIT_GAP_NM = 20
 AEZ_RANGE = (1, 20)
 MONTH_RANGE = (1, 12)
 
+
+@dataclass(frozen=True)
+class SpectralRegion:
+    """A named wavelength interval of the vegetation spectrum.
+
+    Args:
+        name: Display name.
+        start_nm: Lower bound in nanometres (inclusive).
+        end_nm: Upper bound in nanometres (exclusive).
+    """
+
+    name: str
+    start_nm: int
+    end_nm: int
+
+
+# Boundaries follow docs/domaene/vegetation.md: red edge 680-750 nm, SWIR from about 1300 nm.
+SPECTRAL_REGIONS: tuple[SpectralRegion, ...] = (
+    SpectralRegion("Blau", 400, 500),
+    SpectralRegion("Grün", 500, 600),
+    SpectralRegion("Rot", 600, 680),
+    SpectralRegion("Red Edge", 680, 750),
+    SpectralRegion("NIR", 750, 1300),
+    SpectralRegion("SWIR 1", 1300, 1800),
+    SpectralRegion("SWIR 2", 1800, 2500),
+)
+
 Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
 CROPS: tuple[str, ...] = get_args(Crop)
@@ -435,6 +464,15 @@ MLP_DEFAULT_MAX_EPOCHS = 50
 MLP_DEFAULT_BATCH_SIZE = 64
 MLP_EARLY_STOPPING_PATIENCE = 8
 MLP_INNER_VALIDATION_FRACTION = 0.1
+PERMUTATION_REPEATS = 3
+PERMUTATION_N_JOBS = -1
+ImportanceGrouping = Literal["band", "region"]
+ImportanceKind = Literal["metric", "crop", "stage", "pair"]
+BAND_GROUPING, REGION_GROUPING = get_args(ImportanceGrouping)
+METRIC_KIND, CROP_KIND, STAGE_KIND, PAIR_KIND = get_args(ImportanceKind)
+IMPORTANCE_LEVELS = ("group", "fold", "repeat")
+IMPORTANCE_COLUMN_LEVELS = ("kind", "target")
+IMPORTANCE_METRICS = ("bacc_crop", "bacc_stage", "bacc_combined")
 SLUG_PATTERN = (
     r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: names of runs, approaches, experiments
 )
