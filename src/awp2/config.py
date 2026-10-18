@@ -118,8 +118,8 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
     ),
     VegetationIndexSpec(
         "MSR_750_445",
-        "(R_750 - R_445) / (R_750 + R_445)",
-        (750, 445),
+        "(R_750 - R_445) / (R_705 - R_445)",
+        (750, 705, 445),
         "Chlorophyll",
         "Sims & Gamon (2002)",
         "implemented",
@@ -234,9 +234,9 @@ VEGETATION_INDEX_SPECS: tuple[VegetationIndexSpec, ...] = (
         "implemented",
     ),
     VegetationIndexSpec(
-        "NDWI_770_1200",
-        "(R_770 - R_1200) / (R_770 + R_1200)",
-        (770, 1200),
+        "NDWI_1070_1200",
+        "(R_1070 - R_1200) / (R_1070 + R_1200)",
+        (1070, 1200),
         "Water",
         "Ustin et al. (2002)",
         "implemented",
@@ -371,6 +371,9 @@ VEGETATION_INDEX_NAMES = tuple(
     for spec in VEGETATION_INDEX_SPECS
     if spec.status == "implemented" and spec.name not in PCA_FEATURE_NAMES
 )
+VEGETATION_INDEX_NAMES = ("NDVI", "NDRE", "PRI", "NDWI")
+AEZ_MONTH_PREFIX = "aez_month"
+AEZ_MONTH_SEP = "_"
 
 # Deleted band blocks leave 60-303 nm gaps at 10 nm sampling; smoothing must not cross them.
 SAVGOL_SPLIT_GAP_NM = 20

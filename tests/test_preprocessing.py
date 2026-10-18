@@ -4,14 +4,14 @@ import unittest
 
 import pandas as pd
 
-from awp2.config import AEZ_COL, MONTH_COL, VEGETATION_INDEX_NAMES
+from awp2.config import AEZ_COL, MEAN_ALBEDO_COL, MONTH_COL, VEGETATION_INDEX_NAMES
 from awp2.preprocessing import (
     AddVegetationIndices,
+    AezMonthEncoder,
     PreprocessingConfig,
     build_preprocessor,
     nearest_band,
 )
-
 
 class NearestBandTest(unittest.TestCase):
     def test_returns_closest_band_within_tolerance(self) -> None:
@@ -48,6 +48,7 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
                 "X824": [82.0],
                 "X854": [84.0],
                 "X864": [86.0],
+                "X1069": [75.0],
                 "X1205": [70.0],
                 "X1235": [65.0],
                 "X1599": [50.0],
@@ -60,7 +61,11 @@ class VegetationIndexCatalogueTest(unittest.TestCase):
         transformed = AddVegetationIndices().fit_transform(self.bands)
 
         self.assertAlmostEqual(transformed.loc[0, "SR_750_705"], 70.0 / 65.0)
+        self.assertAlmostEqual(transformed.loc[0, "MSR_750_445"], (70.0 - 25.0) / (65.0 - 25.0))
         self.assertAlmostEqual(transformed.loc[0, "PRI"], (32.0 - 30.0) / (32.0 + 30.0))
+        self.assertAlmostEqual(
+            transformed.loc[0, "NDWI_1070_1200"], (75.0 - 70.0) / (75.0 + 70.0)
+        )
         self.assertAlmostEqual(transformed.loc[0, "PSRI"], (55.0 - 30.0) / 70.0)
         self.assertAlmostEqual(
             transformed.loc[0, "OSAVI"],
@@ -173,3 +178,67 @@ class CategoricalContextPreprocessingTest(unittest.TestCase):
         pd.testing.assert_frame_equal(
             transformed[[AEZ_COL, MONTH_COL]], self.features[[AEZ_COL, MONTH_COL]]
         )
+
+
+class MeanAlbedoScalingTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [5, 7, 9],
+                "X427": [10.0, 20.0, 45.0],
+                "X437": [12.0, 25.0, 50.0],
+            }
+        )
+
+    def _albedo(self, config: PreprocessingConfig) -> pd.Series:
+        return build_preprocessor(config).fit_transform(self.features)[MEAN_ALBEDO_COL]
+
+    def test_albedo_follows_the_standard_scaling_of_the_spectra(self) -> None:
+        albedo = self._albedo(
+            PreprocessingConfig(use_mean_albedo=True, use_spectral_standard_scale=True)
+        )
+
+        self.assertAlmostEqual(albedo.mean(), 0.0)
+        self.assertAlmostEqual(albedo.std(ddof=0), 1.0)
+
+    def test_albedo_follows_the_minmax_scaling_of_the_spectra(self) -> None:
+        albedo = self._albedo(
+            PreprocessingConfig(use_mean_albedo=True, use_spectral_minmax_scale=True)
+        )
+
+        self.assertAlmostEqual(albedo.min(), 0.0)
+        self.assertAlmostEqual(albedo.max(), 1.0)
+
+    def test_albedo_stays_in_reflectance_units_without_spectral_scaling(self) -> None:
+        albedo = self._albedo(PreprocessingConfig(use_mean_albedo=True))
+
+        pd.testing.assert_series_equal(
+            albedo, self.features[["X427", "X437"]].mean(axis=1), check_names=False
+        )
+
+
+class AezMonthEncoderTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.train = pd.DataFrame({AEZ_COL: [5, 5, 9], MONTH_COL: [5, 10, 5]})
+
+    def test_one_indicator_per_training_combination(self) -> None:
+        encoded = AezMonthEncoder().fit_transform(self.train)
+
+        self.assertEqual(
+            list(encoded.columns), ["aez_month_5_10", "aez_month_5_5", "aez_month_9_5"]
+        )
+        self.assertEqual(encoded.sum(axis=1).tolist(), [1.0, 1.0, 1.0])
+
+    def test_unseen_combination_gives_all_zeros(self) -> None:
+        encoder = AezMonthEncoder().fit(self.train)
+
+        encoded = encoder.transform(pd.DataFrame({AEZ_COL: [9], MONTH_COL: [10]}))
+
+        self.assertEqual(encoded.sum(axis=1).tolist(), [0.0])
+
+    def test_requires_numeric_context(self) -> None:
+        with self.assertRaises(ValueError):
+            PreprocessingConfig(use_aez_month=True, use_meta=False)
+        with self.assertRaises(ValueError):
+            PreprocessingConfig(use_aez_month=True, use_categorical_context=True)
