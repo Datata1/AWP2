@@ -4,11 +4,21 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.container import BarContainer
 
-from awp2.config import DOCS_FIGURES_DIR, FIGURE_DPI, RECALL_COL, SUPPORT_COL, TARGET_COLS
-from awp2.data import band_columns, wavelengths
+from awp2.config import (
+    BAND_GAP_NM,
+    DOCS_FIGURES_DIR,
+    FIGURE_DPI,
+    RECALL_COL,
+    SPECTRAL_REGIONS,
+    SUPPORT_COL,
+    TARGET_COLS,
+    SpectralRegion,
+)
+from awp2.data import band_columns, wavelength, wavelengths
 from awp2.evaluation import METRIC_LABELS, ErrorBreakdown, MetricName, Metrics
 
 
@@ -341,4 +351,97 @@ def plot_error_rate_by(
     ax.set_ylabel("Fehlerrate")
     ax.legend(fontsize="small")
     ax.grid(axis="y", alpha=0.3)
+    return ax
+
+
+def plot_importance_spectrum(
+    importance: pd.Series,
+    std: pd.Series | None = None,
+    regions: Sequence[SpectralRegion] = SPECTRAL_REGIONS,
+    ax: plt.Axes | None = None,
+    title: str | None = None,
+) -> plt.Axes:
+    """Plot the importance of every band over the wavelength with the spectral regions behind it.
+
+    Args:
+        importance: Importance per band, indexed by band name (``X<nm>``) – bands only.
+        std: Spread per band, drawn as a shaded band; omitted if ``None``.
+        regions: Spectral regions to shade and label.
+        ax: Axes to draw on; a new figure is created if omitted.
+        title: Optional plot title.
+
+    Returns:
+        The axes the importance was drawn on.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(12, 4.5))
+    x = [wavelength(band) for band in importance.index]
+    after_gap = np.flatnonzero(np.diff(x) > BAND_GAP_NM) + 1
+
+    def with_breaks(values: np.ndarray) -> np.ndarray:
+        return np.insert(values.astype(float), after_gap, np.nan)
+
+    x_plot = with_breaks(np.asarray(x))
+    for number, region in enumerate(regions):
+        ax.axvspan(region.start_nm, region.end_nm, color="0.93" if number % 2 else "1", zorder=0)
+        ax.text(
+            (region.start_nm + region.end_nm) / 2,
+            1.01 + 0.05 * (number % 2),
+            region.name,
+            ha="center",
+            fontsize="small",
+            transform=ax.get_xaxis_transform(),
+        )
+    ax.plot(
+        x_plot,
+        with_breaks(importance.to_numpy()),
+        marker="o",
+        markersize=3,
+        linewidth=1,
+        color="C0",
+    )
+    if std is not None:
+        ax.fill_between(
+            x_plot,
+            with_breaks((importance - std).to_numpy()),
+            with_breaks((importance + std).to_numpy()),
+            color="C0",
+            alpha=0.2,
+        )
+    ax.axhline(0, color="0.4", linewidth=0.8)
+    ax.set_xlim(min(x), max(x))
+    ax.set_xlabel("Wellenlänge [nm]")
+    ax.set_ylabel("Abfall der BAcc beim Mischen")
+    if title:
+        ax.set_title(title, pad=34)
+    ax.grid(alpha=0.3)
+    return ax
+
+
+def plot_importance_heatmap(
+    importance: pd.DataFrame, title: str | None = None, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Show the importance of each feature group (rows) for each class (columns) as a heatmap.
+
+    Args:
+        importance: Drop in recall per feature group (index) and class (columns).
+        title: Optional plot title.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with the annotated heatmap.
+    """
+    if ax is None:
+        _, ax = plt.subplots(
+            figsize=(1.1 * len(importance.columns) + 2, 0.55 * len(importance) + 1)
+        )
+    image = ax.imshow(importance.to_numpy(), cmap="viridis", aspect="auto")
+    ax.set_xticks(range(len(importance.columns)), importance.columns, rotation=45, ha="right")
+    ax.set_yticks(range(len(importance)), importance.index)
+    for row, values in enumerate(importance.to_numpy()):
+        for column, value in enumerate(values):
+            ax.text(column, row, f"{value:.2f}", ha="center", va="center", color="w", fontsize=8)
+    ax.figure.colorbar(image, ax=ax, label="Abfall des Recalls")
+    if title:
+        ax.set_title(title)
     return ax
