@@ -4,7 +4,12 @@ import unittest
 
 import pandas as pd
 
-from awp2.config import AEZ_COL, MEAN_ALBEDO_COL, MONTH_COL, VEGETATION_INDEX_NAMES
+from awp2.config import (
+    AEZ_COL,
+    MEAN_ALBEDO_COL,
+    MONTH_COL,
+    VEGETATION_INDEX_NAMES,
+)
 from awp2.preprocessing import (
     AddVegetationIndices,
     AezMonthEncoder,
@@ -12,6 +17,7 @@ from awp2.preprocessing import (
     build_preprocessor,
     nearest_band,
 )
+
 
 class NearestBandTest(unittest.TestCase):
     def test_returns_closest_band_within_tolerance(self) -> None:
