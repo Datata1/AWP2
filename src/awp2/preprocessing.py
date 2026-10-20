@@ -29,6 +29,7 @@ from awp2.config import (
     BAND_PATTERN,
     BAND_PREFIX,
     F_CLASSIF_SCORE,
+    HYPERION_SENSOR,
     INDEX_WAVELENGTH_TOLERANCE_NM,
     MCARI_GREEN_WEIGHT,
     MEAN_ALBEDO_COL,
@@ -44,10 +45,14 @@ from awp2.config import (
     REIP_POLYNOMIAL_WINDOW_NM,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
+    SENTINEL2_BANDS,
+    SENTINEL2_SENSOR,
     TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
     VEGETATION_INDEX_SPECS,
     BandScore,
+    Sensor,
+    SensorBand,
 )
 from awp2.data import combined_label, wavelength, wavelengths
 
@@ -501,6 +506,63 @@ class KeepEveryNthBand(_BandTransformer):
             ``X`` reduced to every ``step``-th band.
         """
         return self._check(X)[self.feature_names_out_]
+
+
+class SimulateSensor(_BandTransformer):
+    """Resample the hyperspectral bands to the bands of a multispectral sensor.
+
+    Each sensor band is the plain mean of the bands inside its bandwidth, a box-shaped
+    approximation of the real spectral response. Outputs keep the band-column format
+    (``X<center nm>``), so all later spectral steps and wavelength plots still apply.
+    """
+
+    def __init__(self, bands: tuple[SensorBand, ...] = SENTINEL2_BANDS) -> None:
+        """Set the sensor bands to simulate.
+
+        Args:
+            bands: Central wavelength and bandwidth of every sensor band.
+        """
+        self.bands = bands
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Assign the input bands to the sensor bands.
+
+        Args:
+            X: Gap-free band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a sensor band contains no input band.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        input_wavelengths = np.asarray(wavelengths(X))
+        self.members_: dict[str, list[str]] = {}
+        for band in self.bands:
+            inside = np.abs(input_wavelengths - band.center_nm) <= band.width_nm / 2
+            if not inside.any():
+                raise ValueError(f"no input band inside sensor band {band.name}")
+            self.members_[f"{BAND_PREFIX}{band.center_nm}"] = list(X.columns[inside])
+        self.feature_names_out_ = list(self.members_)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Average the input bands per sensor band.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column per sensor band, named by its central wavelength.
+        """
+        X = self._check(X)
+        return pd.DataFrame(
+            {name: X[members].mean(axis=1) for name, members in self.members_.items()},
+            index=X.index,
+        )
 
 
 class SelectBands(_BandTransformer):
@@ -1201,6 +1263,11 @@ class PreprocessingConfig(BaseModel):
         description="Use the spectral bands as features; False keeps only the other enabled "
         "groups (meta, indices, albedo, PC_1/PC_2), e.g. for an indices-only model.",
     )
+    spectral_sensor: Sensor = Field(
+        default=HYPERION_SENSOR,
+        description="Spectral sampling of the input: hyperion keeps all bands, sentinel2 "
+        "averages them into the 10 Sentinel-2 surface bands (after interpolation).",
+    )
     spectral_band_step: int | None = Field(
         default=None,
         ge=2,
@@ -1362,6 +1429,12 @@ class PreprocessingConfig(BaseModel):
         """
         if not self.use_spectra:
             self._check_without_spectra()
+        if self.spectral_sensor == SENTINEL2_SENSOR and (
+            self.use_savgol or self.spectral_band_step is not None
+        ):
+            raise ValueError(
+                "spectral_sensor='sentinel2' must not combine with savgol or spectral_band_step"
+            )
         if self.use_aez_month and (not self.use_meta or self.use_categorical_context):
             raise ValueError("use_aez_month requires use_meta without use_categorical_context")
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
@@ -1452,6 +1525,7 @@ class PreprocessingConfig(BaseModel):
         spectral_steps = {
             "use_savgol": self.use_savgol,
             "use_spectral_snv": self.use_spectral_snv,
+            "spectral_sensor": self.spectral_sensor != HYPERION_SENSOR,
             "spectral_band_step": self.spectral_band_step is not None,
             "spectral_pca_components": self.spectral_pca_components is not None,
             "spectral_select_k": self.spectral_select_k is not None,
@@ -1508,6 +1582,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
+    if config.spectral_sensor == SENTINEL2_SENSOR:
+        spectra.append(("sensor", SimulateSensor(SENTINEL2_BANDS)))
     if config.use_savgol:
         assert config.savgol_window_length is not None and config.savgol_polyorder is not None
         spectra.append(
@@ -1661,6 +1737,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return known[name]
     if name == "interpolate" and isinstance(step, InterpolateBands):
         return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "sensor" and isinstance(step, SimulateSensor):
+        return f"Simulate {len(step.bands)} multispectral sensor bands"
     if name == "band_step" and isinstance(step, KeepEveryNthBand):
         return f"Keep every {step.step}. band"
     if name == "select" and isinstance(step, SelectVegetationIndices):
@@ -1840,6 +1918,12 @@ _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
         "interpolate",
         f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
         False,
+    ),
+    _OptionNode(
+        "spectra",
+        "sensor",
+        f"Sentinel-2 simulieren [{_config_fields('spectral_sensor')} = sentinel2]",
+        True,
     ),
     _OptionNode(
         "spectra",
@@ -2038,7 +2122,7 @@ def pipeline_options_diagram() -> str:
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select, impute = _INDICES_NODES
     pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
-    s_drop, s_inter, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
+    s_drop, s_inter, sensor, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
     diagram: list[str] = ["```mermaid", "flowchart TD"]
@@ -2114,7 +2198,8 @@ def pipeline_options_diagram() -> str:
     link(_node_id(pc_scale), pc_pca)
     link(_node_id(pc_pca), concat)
     link(_node_id(s_drop), s_inter)
-    link(_node_id(s_inter), savgol)
+    link(_node_id(s_inter), sensor)
+    link(_node_id(sensor), savgol)
     link(_node_id(savgol), snv)
     link(_node_id(snv), band_step)
     link(_node_id(band_step), scaler_diamond)
