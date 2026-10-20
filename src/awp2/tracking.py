@@ -216,6 +216,7 @@ def log_tuning(
     metric: str,
     candidates: pd.DataFrame,
     train: pd.DataFrame,
+    extra_metrics: Mapping[str, float] | None = None,
     system_metrics: bool = False,
 ) -> str:
     """Record a hyperparameter search as one tuning run with a nested run per candidate.
@@ -234,6 +235,7 @@ def log_tuning(
         candidates: One row per candidate with the columns ``params`` (dict of hyperparameters),
             ``mean``, ``std``, ``rank`` and ``fold_<i>`` (score per fold).
         train: Training data the cross-validation ran on.
+        extra_metrics: Further numbers of the parent run, e.g. the input size.
         system_metrics: Also record CPU/memory usage during the search.
 
     Returns:
@@ -254,7 +256,13 @@ def log_tuning(
             {f"best.{k}": repr(v)[:MLFLOW_PARAM_MAX_CHARS] for k, v in best["params"].items()}
         )
         _log_datasets({"training": train})
-        mlflow.log_metrics({f"cv_{metric}_mean": best["mean"], f"cv_{metric}_std": best["std"]})
+        mlflow.log_metrics(
+            {
+                f"cv_{metric}_mean": best["mean"],
+                f"cv_{metric}_std": best["std"],
+                **(extra_metrics or {}),
+            }
+        )
         mlflow.log_text(candidates.to_csv(index=False), "cv_results.csv")
         for number, candidate in candidates.iterrows():
             with mlflow.start_run(

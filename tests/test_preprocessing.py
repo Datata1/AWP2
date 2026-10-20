@@ -18,10 +18,12 @@ from awp2.config import (
 from awp2.preprocessing import (
     AddVegetationIndices,
     AezMonthEncoder,
+    InputSize,
     PreprocessingConfig,
     SelectBands,
     SimulateSensor,
     build_preprocessor,
+    input_size,
     nearest_band,
 )
 
@@ -361,3 +363,41 @@ class SimulateSensorTest(unittest.TestCase):
 
         expected = [f"X{band.center_nm}" for band in SENTINEL2_BANDS]
         self.assertEqual(list(simulated.columns), expected)
+
+
+class InputSizeTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 1, 2],
+                MONTH_COL: [5, 7, 9, 11],
+                "X427": [1.0, 1.1, 5.0, 5.1],
+                "X437": [3.0, 1.0, 3.0, 1.0],
+                "X447": [9.0, 9.2, 1.0, 1.2],
+                "X457": [np.nan] * 4,
+            }
+        )
+        self.targets = pd.DataFrame(
+            {CROP_COL: ["corn", "corn", "rice", "rice"], STAGE_COL: ["Late"] * 4}
+        )
+
+    def _size(self, config: PreprocessingConfig) -> InputSize:
+        preprocessor = build_preprocessor(config).fit(self.features, self.targets)
+        return input_size(preprocessor)
+
+    def test_all_measured_bands_without_reduction(self) -> None:
+        self.assertEqual(self._size(PreprocessingConfig(use_meta=False)), InputSize(3, 3))
+
+    def test_band_selection_measures_only_the_selected_bands(self) -> None:
+        size = self._size(PreprocessingConfig(spectral_select_k=1))
+
+        self.assertEqual(size.n_measured_bands, 1)
+        self.assertEqual(size.n_input_features, size.n_measured_bands + 4)
+
+    def test_snv_before_selection_still_needs_every_band(self) -> None:
+        size = self._size(PreprocessingConfig(use_spectral_snv=True, spectral_select_k=1))
+
+        self.assertEqual(size.n_measured_bands, 3)
+
+    def test_metadata_only_measures_no_band(self) -> None:
+        self.assertEqual(self._size(PreprocessingConfig(use_spectra=False)).n_measured_bands, 0)
