@@ -14,6 +14,7 @@ from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.decomposition import NMF, PCA, FastICA
+from sklearn.feature_selection import f_classif, mutual_info_classif
 from sklearn.impute import SimpleImputer
 from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
@@ -27,6 +28,7 @@ from awp2.config import (
     AEZ_MONTH_SEP,
     BAND_PATTERN,
     BAND_PREFIX,
+    F_CLASSIF_SCORE,
     INDEX_WAVELENGTH_TOLERANCE_NM,
     MCARI_GREEN_WEIGHT,
     MEAN_ALBEDO_COL,
@@ -45,8 +47,9 @@ from awp2.config import (
     TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
     VEGETATION_INDEX_SPECS,
+    BandScore,
 )
-from awp2.data import wavelength, wavelengths
+from awp2.data import combined_label, wavelength, wavelengths
 
 
 def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
@@ -497,6 +500,66 @@ class KeepEveryNthBand(_BandTransformer):
         Returns:
             ``X`` reduced to every ``step``-th band.
         """
+        return self._check(X)[self.feature_names_out_]
+
+
+class SelectBands(_BandTransformer):
+    """Keep the ``k`` bands that separate the crop/stage pairs best on their own.
+
+    Scores every band univariately against the combined crop/stage label, so a band that
+    helps for either target counts. Belongs inside the model pipeline: fitted on a training
+    fold, the choice never sees validation labels.
+    """
+
+    def __init__(self, k: int, score: BandScore = F_CLASSIF_SCORE) -> None:
+        """Set the number of bands and the scoring function.
+
+        Args:
+            k: Number of bands to keep.
+            score: ``"f_classif"`` (ANOVA F, linear separability) or ``"mutual_info"``
+                (also non-linear dependence, slower).
+        """
+        self.k = k
+        self.score = score
+
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame | pd.Series) -> Self:
+        """Score the bands and remember the ``k`` best.
+
+        Args:
+            X: Band columns of the training part.
+            y: Targets with ``Crop`` and ``Stage``, or one label per row.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``k`` exceeds the number of bands.
+        """
+        X = self._check(X)
+        if not 1 <= self.k <= X.shape[1]:
+            raise ValueError(f"k must be between 1 and {X.shape[1]} bands, got {self.k}")
+        self._set_input(X)
+        labels = combined_label(y) if isinstance(y, pd.DataFrame) else y
+        if self.score == F_CLASSIF_SCORE:
+            scores, _p_values = f_classif(X, labels)
+        else:
+            scores = mutual_info_classif(X, labels, random_state=SEED)
+        self.scores_ = pd.Series(np.nan_to_num(scores), index=X.columns)
+        best = set(self.scores_.nlargest(self.k).index)
+        self.feature_names_out_ = [band for band in X.columns if band in best]
+        self.selected_wavelengths_ = [wavelength(band) for band in self.feature_names_out_]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to the selected bands, in wavelength order.
+        """
+        check_is_fitted(self, "feature_names_out_")
         return self._check(X)[self.feature_names_out_]
 
 
@@ -1201,6 +1264,16 @@ class PreprocessingConfig(BaseModel):
         description="Reduce the spectral bands to this many principal components; "
         "None keeps all bands. Requires use_spectral_standard_scale or use_spectral_centering.",
     )
+    spectral_select_k: int | None = Field(
+        default=None,
+        gt=0,
+        description="Keep the k bands with the highest univariate score against the crop/stage "
+        "label, fitted per training fold; None keeps all bands.",
+    )
+    spectral_select_score: BandScore = Field(
+        default=F_CLASSIF_SCORE,
+        description="Band score for spectral_select_k: f_classif (ANOVA F) or mutual_info.",
+    )
     spectral_ica_components: int | None = Field(
         default=None,
         gt=0,
@@ -1301,6 +1374,7 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
         reductions = [
             self.spectral_pca_components,
+            self.spectral_select_k,
             self.spectral_ica_components,
             self.spectral_nmf_components,
             self.spectral_osp_components,
@@ -1380,6 +1454,7 @@ class PreprocessingConfig(BaseModel):
             "use_spectral_snv": self.use_spectral_snv,
             "spectral_band_step": self.spectral_band_step is not None,
             "spectral_pca_components": self.spectral_pca_components is not None,
+            "spectral_select_k": self.spectral_select_k is not None,
             "spectral_ica_components": self.spectral_ica_components is not None,
             "spectral_nmf_components": self.spectral_nmf_components is not None,
             "spectral_osp_components": self.spectral_osp_components is not None,
@@ -1452,6 +1527,10 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     dbn_layers = config.spectral_dbn_layers
     if pca_components is not None:
         spectra.append(("pca", PCA(n_components=pca_components, random_state=SEED)))
+    elif config.spectral_select_k is not None:
+        spectra.append(
+            ("select_k", SelectBands(config.spectral_select_k, config.spectral_select_score))
+        )
     elif ica_components is not None:
         spectra.append(("ica", FastICA(n_components=ica_components, random_state=SEED)))
     elif nmf_components is not None:
@@ -1593,6 +1672,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         )
     if name == "pca" and isinstance(step, PCA):
         return f"PCA to {step.n_components} components"
+    if name == "select_k" and isinstance(step, SelectBands):
+        return f"Select {step.k} bands ({step.score})"
     if name == "pca" and isinstance(step, PrincipalComponentFeatures):
         return "PCA to PC_1 and PC_2"
     if name == "ica" and isinstance(step, FastICA):
@@ -1855,6 +1936,14 @@ _REDUCTION_NODES: tuple[_OptionNode, ...] = (
         "spectra",
         "pca",
         f"PCA [{_config_fields('spectral_pca_components')} | braucht Standard/Center]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "select_k",
+        "Bandauswahl ["
+        + _config_fields("spectral_select_k", "spectral_select_score")
+        + " | überwacht, je Fold]",
         False,
     ),
     _OptionNode(
