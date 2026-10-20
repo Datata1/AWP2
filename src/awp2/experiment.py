@@ -29,6 +29,13 @@ from awp2.evaluation import (
     plot_confusion_matrices,
     scorer,
 )
+from awp2.importance import (
+    Groups,
+    ImportanceConfig,
+    ImportanceResult,
+    permutation_drops,
+    summarize_drops,
+)
 from awp2.preprocessing import (
     InputSize,
     PreprocessingConfig,
@@ -344,6 +351,44 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
             as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)
         )
     return pd.concat(predictions).loc[split.y_train.index]
+
+
+def out_of_fold_importance(
+    model: BaseEstimator,
+    config: TuneConfig | RunConfig,
+    groups: Groups,
+    importance: ImportanceConfig | None = None,
+) -> ImportanceResult:
+    """Permutation importance of column groups, measured on every held-out training fold.
+
+    Fits like :func:`out_of_fold_predictions` and never touches the validation part, so the
+    result may guide a band or feature selection. Drops are averaged over folds and repeats.
+
+    Args:
+        model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
+        config: Configuration the model was tuned or evaluated with.
+        groups: Raw input columns to permute together, e.g. ``region_groups(split.X_train)``.
+        importance: Repeats and metrics; the defaults of ``ImportanceConfig`` if omitted.
+
+    Returns:
+        Mean and std of the score drop per group and metric over all folds.
+    """
+    split = load_split()
+    drops = []
+    for fold in load_folds():
+        y_fold = split.y_train.iloc[fold.train]
+        pipeline = _pipeline(model, config.preprocessing)
+        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        drops.append(
+            permutation_drops(
+                pipeline,
+                split.X_train.iloc[fold.val],
+                split.y_train.iloc[fold.val],
+                groups,
+                importance,
+            )
+        )
+    return summarize_drops(pd.concat(drops, ignore_index=True))
 
 
 def _track_run(
