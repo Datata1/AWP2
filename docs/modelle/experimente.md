@@ -4,6 +4,9 @@ Jedes Experiment bekommt eine Zeile (wird von `/experiment` automatisch ergänzt
 `run()` auf dem gemeinsamen Validierungs-Split; Details jedes Laufs lokal in MLflow unter der
 Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 
+**Split:** Seit 2026-10-20 ist der Standard 80/20. Ältere Zeilen beruhen auf 70/30 und sind nur
+über Läufe mit derselben `split.validation_size` vergleichbar.
+
 | Datum | ID | Autor | Ansatz | BAcc Crop | BAcc Stage | BAcc kombiniert | Macro-F1 kombiniert | Samples-F1 | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-09-30 | dummy_most_frequent | Datata1 | Baseline | 0.200 | 0.167 | 0.044 | 0.009 | 0.326 | f8cf4ecc | Untergrenze: immer die häufigste Klasse |
