@@ -45,6 +45,7 @@ def _probe_configs() -> list[PreprocessingConfig]:
         PreprocessingConfig(use_aez_month=True),
         PreprocessingConfig(spectral_band_step=2),
         PreprocessingConfig(spectral_select_k=5),
+        PreprocessingConfig(spectral_sensor="sentinel2"),
         PreprocessingConfig(use_spectra=False, use_vegetation_indices=True),
     ]
 

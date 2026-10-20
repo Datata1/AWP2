@@ -10,14 +10,17 @@ from awp2.config import (
     CROP_COL,
     MEAN_ALBEDO_COL,
     MONTH_COL,
+    SENTINEL2_BANDS,
     STAGE_COL,
     VEGETATION_INDEX_NAMES,
+    SensorBand,
 )
 from awp2.preprocessing import (
     AddVegetationIndices,
     AezMonthEncoder,
     PreprocessingConfig,
     SelectBands,
+    SimulateSensor,
     build_preprocessor,
     nearest_band,
 )
@@ -330,3 +333,31 @@ class SelectBandsTest(unittest.TestCase):
                 spectral_pca_components=5,
                 spectral_select_k=5,
             )
+
+
+class SimulateSensorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bands = pd.DataFrame({"X650": [1.0, 4.0], "X660": [3.0, 6.0], "X700": [9.0, 9.0]})
+        self.sensor = (SensorBand("red", 655, 20), SensorBand("edge", 700, 4))
+
+    def test_averages_the_bands_inside_each_bandwidth(self) -> None:
+        simulated = SimulateSensor(self.sensor).fit_transform(self.bands)
+
+        self.assertEqual(list(simulated.columns), ["X655", "X700"])
+        self.assertEqual(list(simulated["X655"]), [2.0, 5.0])
+
+    def test_rejects_a_sensor_band_without_input_bands(self) -> None:
+        with self.assertRaisesRegex(ValueError, "nir"):
+            SimulateSensor((SensorBand("nir", 850, 10),)).fit(self.bands)
+
+    def test_sentinel2_config_yields_ten_surface_bands(self) -> None:
+        wavelengths_nm = range(430, 2400, 10)
+        spectra = pd.DataFrame(
+            [[0.3] * len(wavelengths_nm)], columns=[f"X{nm}" for nm in wavelengths_nm]
+        )
+        simulated = build_preprocessor(
+            PreprocessingConfig(use_meta=False, spectral_sensor="sentinel2")
+        ).fit_transform(spectra)
+
+        expected = [f"X{band.center_nm}" for band in SENTINEL2_BANDS]
+        self.assertEqual(list(simulated.columns), expected)

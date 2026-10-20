@@ -123,6 +123,7 @@ flowchart TD
     subgraph spektren
         n_spectra_drop_empty["Leere Bänder entfernen [use_spectra, Standard]"]
         n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_spectra_sensor["Sentinel-2 simulieren [spectral_sensor = sentinel2]"]
         n_spectra_savgol["Savitzky-Golay [use_savgol + savgol_window_length + savgol_polyorder]"]
         n_spectra_snv["SNV [use_spectral_snv]"]
         n_spectra_band_step["Jedes n-te Band [spectral_band_step]"]
@@ -183,7 +184,8 @@ flowchart TD
     n_principal_components_standard_scale -.-> n_principal_components_pca
     n_principal_components_pca --> d_concat
     n_spectra_drop_empty --> n_spectra_interpolate
-    n_spectra_interpolate -.-> n_spectra_savgol
+    n_spectra_interpolate -.-> n_spectra_sensor
+    n_spectra_sensor -.-> n_spectra_savgol
     n_spectra_savgol -.-> n_spectra_snv
     n_spectra_snv -.-> n_spectra_band_step
     n_spectra_band_step --> d_scaler
