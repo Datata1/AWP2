@@ -453,6 +453,9 @@ REDUCTION_MAX_CV_LOSS = 0.01
 N_INPUT_FEATURES_COL = "n_input_features"  # field names of preprocessing.InputSize
 N_MEASURED_BANDS_COL = "n_measured_bands"
 STD_SUFFIX = "_std"
+# group folds keep every group in one fold, so a model is scored on acquisitions it never saw
+FoldGrouping = Literal["random", "aez_month", "month", "aez"]
+RANDOM_FOLDS, AEZ_MONTH_FOLDS, MONTH_FOLDS, AEZ_FOLDS = get_args(FoldGrouping)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
@@ -526,6 +529,7 @@ MLFLOW_ARTIFACTS_DIR = Path(
 ).resolve()
 MLFLOW_EXPERIMENT = "crop-stage"  # main question: which approach predicts crop and stage best
 MLFLOW_REDUCTION_EXPERIMENT = "band-reduction"  # how much input does the quality need
+MLFLOW_SPLIT_EXPERIMENT = "split-leakage"  # do the scores hold for unseen acquisitions
 # Marks the experiment as classic ML so the MLflow UI opens the "Model training" view.
 MLFLOW_EXPERIMENT_KIND_TAG = ("mlflow.experimentKind", "custom_model_development")
 MLFLOW_SYSTEM_METRICS_INTERVAL_S = (

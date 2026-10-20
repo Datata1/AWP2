@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from awp2.config import AEZ_COL, CROP_COL, MONTH_COL, STAGE_COL
 from awp2.data import artifacts
-from awp2.data.split import SplitConfig, train_val_split
+from awp2.data.split import SplitConfig, cv_splits, train_val_split
 
 
 class SplitConfigTest(unittest.TestCase):
@@ -94,3 +94,16 @@ class SplitConfigTest(unittest.TestCase):
                 )
                 with self.assertRaisesRegex(artifacts.StaleArtifactsError, "configuration"):
                     artifacts.load_split()
+
+
+class GroupFoldsTest(unittest.TestCase):
+    def test_each_group_stays_within_one_fold(self) -> None:
+        n_rows = 60
+        X = pd.DataFrame({MONTH_COL: [5 + row % 6 for row in range(n_rows)]})
+        y = pd.DataFrame(
+            {CROP_COL: ["corn", "rice"] * (n_rows // 2), STAGE_COL: ["Late"] * n_rows}
+        )
+
+        for fold in cv_splits(X, y, groups=X[MONTH_COL]):
+            shared = set(X[MONTH_COL].iloc[fold.train]) & set(X[MONTH_COL].iloc[fold.val])
+            self.assertEqual(shared, set())
