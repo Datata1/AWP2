@@ -422,6 +422,11 @@ Kontext erst mit dem letzten LSTM-Zustand.
   nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
   Notebook-Outputs.
 
+## Datenreduktion
+
+Mit 10 simulierten Sentinel-2-Bändern statt 131 Hyperion-Bändern bleibt die Qualität praktisch
+gleich. Ergebnisse, Grenzen und Empfehlung: [Datenreduktion](../datenreduktion.md).
+
 ## Fazit
 
 **Stand nach #87–#89 und #98–#104:** Hierarchisch mit RBF-SVM auf beiden Stufen

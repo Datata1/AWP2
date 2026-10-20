@@ -59,7 +59,7 @@ nicht als allgemeine Rangfolge aller denkbaren Merkmale. Das PCA-Ergebnis steht 
 | Vorab definierte Bandverhältnisse | Die Projektbeschreibung nennt Band-Ratios als Feature Engineering. Verhältnisse können spektrale Kontraste verdichten. | Eine kleine, fachlich begründete Liste, etwa NIR/Rot oder NIR/SWIR, gegen Rohbänder vergleichen. | Nicht alle möglichen Bandpaare durchsuchen: Das würde zufällige Treffer und Overfitting begünstigen. |
 | Regionsmerkmale für VIS, Red Edge, NIR und SWIR | Diese Bereiche stehen für unterschiedliche Teile des Vegetationsspektrums. Mittelwert, Spannweite oder lokale Steigung können sie kompakt zusammenfassen. | Eine wenige Kennzahlen umfassende, vorab festgelegte Merkmalsmenge gegen Rohspektren und gegen Indizes vergleichen. | Regionen müssen nur verfügbare, physikalisch zusammenhängende Bänder enthalten; große Lücken werden nicht überbrückt. |
 | PCA | Benachbarte Bänder sind stark redundant; zwei Komponenten erklären in der EDA mehr als 90 % der Spektralvarianz. | Für die kombinierte RBF-SVM wurden 20, 40 und 80 Komponenten nur auf dem Trainingsanteil verglichen. | 20 Komponenten gewannen knapp die CV, blieben aber auf der Validierung hinter Rohspektren; PCA wird pro Trainingsfold gelernt und nicht übernommen. |
-| Überwachte Bandauswahl | Die EDA zeigt univariate Klassenunterschiede an einzelnen Wellenlängen. | Eine kleine Anzahl von Bändern ausschließlich innerhalb jedes Trainingsfolds auswählen und gegen Rohbänder vergleichen. | Ein hoher EDA-F-Wert ist kein Leistungsnachweis; Auswahl auf allen Daten wäre Leakage. |
+| Überwachte Bandauswahl | Die EDA zeigt univariate Klassenunterschiede an einzelnen Wellenlängen. | **Geprüft, nicht übernommen** ([Datenreduktion](../modelle/datenreduktion.md)): Auswahl im Trainingsfold verliert deutlich (10 Bänder: 0,739 statt 0,859), weil sie benachbarte Bänder wählt. Breite Abdeckung (Sentinel-2, jedes n-te Band) hält die Qualität. | Ein hoher EDA-F-Wert ist kein Leistungsnachweis; Auswahl auf allen Daten wäre Leakage. |
 
 Die fachliche Motivation für sichtbares Licht, Red Edge, NIR, SWIR und die Vegetationsindizes
 ist in [Spektrale Signatur von Vegetation](../domaene/vegetation.md) mit Quellen erläutert. Die
@@ -83,9 +83,8 @@ Feature Selection ausdrücklich als mögliche Varianten.
    machen.
 3. Die standardmäßige zyklische Monatskodierung gegen `use_cyclic_month=False` vergleichen.
 4. Danach genau eine kleine spektrale Hypothese wählen: EVI **oder** Red-Edge-Steigungen.
-5. PCA ist für die kombinierte RBF-SVM geprüft und nicht übernommen; als nächste spektrale
-  Hypothese eine vorab festgelegte Formtransformation oder trainingsfold-basierte Bandauswahl
-  wählen.
+5. PCA und trainingsfold-basierte Bandauswahl sind geprüft und nicht übernommen; als
+  Datenreduktion reichen 10 Sentinel-2-Bänder ([Datenreduktion](../modelle/datenreduktion.md)).
 
 Jede Variante folgt demselben Ablauf: `tune()` sucht Parameter und Merkmalskonfigurationen
 innerhalb der Cross-Validation auf dem Trainingsanteil; `run()` bewertet ausschließlich den
