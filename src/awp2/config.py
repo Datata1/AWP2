@@ -393,6 +393,8 @@ Routing = Literal["hard", "soft"]
 HARD_ROUTING, SOFT_ROUTING = get_args(Routing)
 LSTMContextMode = Literal["none", "standard", "embeddings"]
 LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMContextMode)
+BandScore = Literal["f_classif", "mutual_info"]
+F_CLASSIF_SCORE, MUTUAL_INFO_SCORE = get_args(BandScore)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
