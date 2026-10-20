@@ -65,7 +65,7 @@ result.metrics.bacc_combined
 ```
 
 `run()` trainiert die gefundene Einstellung auf dem ganzen Train-Teil und bewertet sie **einmal**
-auf der Validierung (30 %). Das ist die Zahl, die zählt. Der Bewertungslauf verweist über
+auf der Validierung (20 %). Das ist die Zahl, die zählt. Der Bewertungslauf verweist über
 `tuning_run` auf die Suche und speichert das Modell (`result.model_uri`).
 
 !!! warning "Nicht zurück zu Schritt 3 wegen des Validierungs-Scores"

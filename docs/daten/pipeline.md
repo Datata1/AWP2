@@ -15,9 +15,9 @@ flowchart TD
 ## 1. Artefakte erzeugen
 
 ```bash
-make data   # nach dem Kopieren der Rohdaten und wenn sich die Pipeline ändert
-# Für einen dokumentierten 80/20-Split:
-make data DATA_ARGS="--validation-size 0.2"
+make data   # nach dem Kopieren der Rohdaten und wenn sich die Pipeline ändert (80/20)
+# Für ein anderes Protokoll, z. B. die früheren 70/30:
+make data DATA_ARGS="--validation-size 0.3"
 ```
 
 | Datei | Inhalt |
@@ -28,7 +28,7 @@ make data DATA_ARGS="--validation-size 0.2"
 
 Die Dateien sind nicht in git, aber deterministisch – bei allen byte-identisch.
 
-Der Standard ist weiterhin 70/30. Ein anderer Split, etwa 80/20, ist ein anderes
+Der Standard ist 80/20 (bis 2026-10-20: 70/30). Ein anderer Split ist ein anderes
 Evaluationsprotokoll: Ergebnisse dürfen nur mit Läufen verglichen werden, die dieselbe
 `split.validation_size` in MLflow haben.
 

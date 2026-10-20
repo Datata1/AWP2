@@ -236,13 +236,13 @@ Ein **Holdout** ist ein Teil der beschrifteten Daten, der vor jeder Modellarbeit
 und erst ganz am Ende einmal zur Bewertung genutzt wird – das Modell hat ihn nie gesehen, und
 keine Entscheidung wurde anhand seiner Ergebnisse getroffen. Nur dann ist sein Score eine
 ehrliche Schätzung für neue Daten. Bei uns sind „Holdout“ und „Validierung“ derselbe
-30-%-Anteil; die unbeschrifteten Testdaten sind etwas anderes, weil sie keine Zielwerte haben.
+20-%-Anteil; die unbeschrifteten Testdaten sind etwas anderes, weil sie keine Zielwerte haben.
 
-Unser gemeinsamer Split reserviert 30 % der beschrifteten Daten als Validierung und stratifiziert
+Unser gemeinsamer Split reserviert 20 % der beschrifteten Daten als Validierung und stratifiziert
 nach dem kombinierten Crop-Stage-Label. Dadurch sind seltene, aber vorhandene Paare möglichst
-in Training und Validierung vertreten. Im 70%-Trainingsanteil sucht `tune()` per fünffacher
+in Training und Validierung vertreten. Im 80-%-Trainingsanteil sucht `tune()` per fünffacher
 Cross-Validation nach Hyperparametern; `run()` bewertet die ausgewählte Konfiguration einmal
-auf den 30 % Validierung.[^3]
+auf den 20 % Validierung (bis 2026-10-20: 70/30).[^3]
 
 ### Räumliche Ähnlichkeit als Risiko
 
