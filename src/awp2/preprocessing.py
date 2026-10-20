@@ -54,7 +54,7 @@ from awp2.config import (
     Sensor,
     SensorBand,
 )
-from awp2.data import combined_label, wavelength, wavelengths
+from awp2.data import band_columns, combined_label, wavelength, wavelengths
 
 
 def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
@@ -1183,6 +1183,61 @@ class MeanAlbedo(TransformerMixin, BaseEstimator):
         return np.asarray([MEAN_ALBEDO_COL], dtype=object)
 
 
+class AcquisitionCentering(TransformerMixin, BaseEstimator):
+    """Subtract the mean training spectrum of each AEZ x month acquisition.
+
+    Rows of one AEZ x month cell probably share an acquisition, i.e. its atmosphere and
+    illumination; removing the cell mean takes out that common offset. Cells unseen in training
+    fall back to the overall mean. Takes AEZ, Month and the bands, returns the bands only.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Learn the mean spectrum per acquisition and overall.
+
+        Args:
+            X: ``AEZ``, ``Month`` and band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        self.bands_ = band_columns(X)
+        self.cell_means_ = X[self.bands_].groupby(_acquisition(X)).mean()
+        self.overall_mean_ = X[self.bands_].mean()
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Subtract the mean spectrum of each row's acquisition.
+
+        Args:
+            X: ``AEZ``, ``Month`` and band columns.
+
+        Returns:
+            The centered band columns; missing values stay missing.
+        """
+        check_is_fitted(self, "cell_means_")
+        means = self.cell_means_.reindex(_acquisition(X).to_numpy())
+        means = means.fillna(self.overall_mean_).set_axis(X.index)
+        return X[self.bands_] - means
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The band column names.
+        """
+        return np.asarray(self.bands_, dtype=object)
+
+
+def _acquisition(X: pd.DataFrame) -> pd.Series:
+    return X[AEZ_COL].astype(int).astype(str) + AEZ_MONTH_SEP + X[MONTH_COL].astype(int).astype(str)
+
+
 class AezMonthEncoder(TransformerMixin, BaseEstimator):
     """One-hot encode each AEZ × month combination seen in training.
 
@@ -1398,6 +1453,11 @@ class PreprocessingConfig(BaseModel):
         description="One-hot encode each AEZ × month combination seen in training next to the "
         "separate AEZ and month features; requires use_meta.",
     )
+    use_acquisition_centering: bool = Field(
+        default=False,
+        description="Subtract the mean training spectrum of each AEZ x month acquisition from "
+        "the spectra before all other spectral steps; unseen acquisitions use the overall mean.",
+    )
     use_cyclic_month: bool = Field(
         default=True,
         description="Replace numeric Month with sine/cosine annual-cycle features.",
@@ -1429,6 +1489,10 @@ class PreprocessingConfig(BaseModel):
         """
         if not self.use_spectra:
             self._check_without_spectra()
+        if self.use_acquisition_centering and (
+            self.spectral_nmf_components is not None or self.spectral_osp_components is not None
+        ):
+            raise ValueError("acquisition centering must not combine with NMF or OSP (raw spectra)")
         if self.spectral_sensor == SENTINEL2_SENSOR and (
             self.use_savgol or self.spectral_band_step is not None
         ):
@@ -1578,10 +1642,11 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             DeprecationWarning,
             stacklevel=2,
         )
-    spectra: list[tuple[str, BaseEstimator]] = [
-        ("drop_empty", DropEmptyBands()),
-        ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
-    ]
+    spectra: list[tuple[str, BaseEstimator]] = []
+    if config.use_acquisition_centering:
+        spectra.append(("acquisition_centering", AcquisitionCentering()))
+    spectra.append(("drop_empty", DropEmptyBands()))
+    spectra.append(("interpolate", InterpolateBands(config.max_interpolation_gap_nm)))
     if config.spectral_sensor == SENTINEL2_SENSOR:
         spectra.append(("sensor", SimulateSensor(SENTINEL2_BANDS)))
     if config.use_savgol:
@@ -1698,7 +1763,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
     if config.use_spectra:
         transformers.append(
-            ("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN))
+            ("spectra", Pipeline(spectra), make_column_selector(pattern=_spectra_columns(config)))
         )
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
@@ -1757,6 +1822,12 @@ def _branch_bands(branch: Pipeline) -> set[str]:
     return usable if mixes_bands else set().union(*sources.values())
 
 
+def _spectra_columns(config: PreprocessingConfig) -> str:
+    if config.use_acquisition_centering:
+        return f"{BAND_PATTERN}|^{AEZ_COL}$|^{MONTH_COL}$"
+    return BAND_PATTERN
+
+
 def _spectral_scaler(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:
     if config.use_spectral_standard_scale or config.scale:
         return [("standard_scale", StandardScaler())]
@@ -1774,6 +1845,7 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return f"Month {step}"
     known: dict[str, str] = {
         "drop_empty": "Drop empty bands",
+        "acquisition_centering": "Subtract the mean spectrum of the AEZ x month acquisition",
         "snv": "SNV scatter correction per spectrum",
         "indices": "Vegetation-index catalogue (from interpolated bands)",
         "standard_scale": "Standardize bands (per-band mean and std)",
@@ -1961,6 +2033,12 @@ _ALBEDO_SCALER_NODES: tuple[_OptionNode, ...] = (
 )
 
 _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
+    _OptionNode(
+        "spectra",
+        "acquisition_centering",
+        f"Pro Aufnahme zentrieren [{_config_fields('use_acquisition_centering')}]",
+        True,
+    ),
     _OptionNode(
         "spectra",
         "drop_empty",
@@ -2176,7 +2254,7 @@ def pipeline_options_diagram() -> str:
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select, impute = _INDICES_NODES
     pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
-    s_drop, s_inter, sensor, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
+    acquisition, s_drop, s_inter, sensor, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
     diagram: list[str] = ["```mermaid", "flowchart TD"]
@@ -2232,7 +2310,8 @@ def pipeline_options_diagram() -> str:
     link(_node_id(month_diamond), numeric, "False")
     link("X", a_drop)
     link("X", i_drop)
-    link("X", s_drop)
+    link("X", acquisition)
+    link(_node_id(acquisition), s_drop)
     link("X", aez_month)
     link(_node_id(a_drop), a_inter)
     link(_node_id(a_inter), albedo)
