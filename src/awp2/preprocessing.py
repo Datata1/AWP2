@@ -584,7 +584,7 @@ class SelectBands(_BandTransformer):
         self.k = k
         self.score = score
 
-    def fit(self, X: pd.DataFrame, y: pd.DataFrame | pd.Series) -> Self:
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame | pd.Series | np.ndarray) -> Self:
         """Score the bands and remember the ``k`` best.
 
         Args:
