@@ -396,7 +396,8 @@ LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMC
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
-VAL_SIZE = 0.3
+# 80/20 gives the models more training rows; CV rose from 0.848 to 0.859 (combined_svm_split_80_20)
+VAL_SIZE = 0.2
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
 RECALL_COL = "recall"
