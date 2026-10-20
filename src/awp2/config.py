@@ -399,6 +399,24 @@ SEED = 42
 VAL_SIZE = 0.3
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+
+# Regions for grouped permutation importance: neighbouring bands are nearly collinear, so
+# permuting one band alone lets its neighbours stand in and hides what the region carries.
+SPECTRAL_REGIONS_NM: dict[str, tuple[int, int]] = {
+    "VIS": (400, 680),  # pigments: chlorophyll and carotenoid absorption
+    "Red Edge": (680, 750),  # steep chlorophyll slope, shifts with stage and stress
+    "NIR": (750, 1300),  # leaf structure and biomass
+    "SWIR1": (1300, 1900),  # leaf water
+    "SWIR2": (1900, 2500),  # water, lignin, cellulose: drying and senescence
+}
+META_GROUP = "Meta"
+IMPORTANCE_GROUP_COL = "group"
+IMPORTANCE_METRIC_COL = "metric"
+IMPORTANCE_MEAN_COL = "mean"
+IMPORTANCE_STD_COL = "std"
+IMPORTANCE_REPEAT_COL = "repeat"
+IMPORTANCE_DROP_COL = "drop"
+IMPORTANCE_BASELINE_COL = "baseline"
 RECALL_COL = "recall"
 SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
