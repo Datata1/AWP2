@@ -121,6 +121,7 @@ flowchart TD
         n_principal_components_pca["PC_1 + PC_2 [use_principal_components]"]
     end
     subgraph spektren
+        n_spectra_acquisition_centering["Pro Aufnahme zentrieren [use_acquisition_centering]"]
         n_spectra_drop_empty["Leere Bänder entfernen [use_spectra, Standard]"]
         n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
         n_spectra_sensor["Sentinel-2 simulieren [spectral_sensor = sentinel2]"]
@@ -154,7 +155,8 @@ flowchart TD
     d_month -->|"False"| n_month_month
     X --> n_albedo_drop_empty
     X --> n_indices_drop_empty
-    X -.-> n_spectra_drop_empty
+    X -.-> n_spectra_acquisition_centering
+    n_spectra_acquisition_centering -.-> n_spectra_drop_empty
     X -.-> n_aez_month_aez_month
     n_albedo_drop_empty --> n_albedo_interpolate
     n_albedo_interpolate -.-> n_albedo_albedo
