@@ -393,6 +393,8 @@ Routing = Literal["hard", "soft"]
 HARD_ROUTING, SOFT_ROUTING = get_args(Routing)
 LSTMContextMode = Literal["none", "standard", "embeddings"]
 LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMContextMode)
+SequenceCell = Literal["lstm", "gru"]
+LSTM_CELL, GRU_CELL = get_args(SequenceCell)
 BandScore = Literal["f_classif", "mutual_info"]
 F_CLASSIF_SCORE, MUTUAL_INFO_SCORE = get_args(BandScore)
 Sensor = Literal["hyperion", "sentinel2"]
@@ -459,7 +461,8 @@ RANDOM_FOLDS, AEZ_MONTH_FOLDS, MONTH_FOLDS, AEZ_FOLDS = get_args(FoldGrouping)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
-VAL_SIZE = 0.3
+# 80/20 gives the models more training rows; CV rose from 0.848 to 0.859 (combined_svm_split_80_20)
+VAL_SIZE = 0.2
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
 
@@ -507,6 +510,8 @@ LSTM_DEFAULT_MAX_EPOCHS = 50
 LSTM_DEFAULT_BATCH_SIZE = 64
 LSTM_EARLY_STOPPING_PATIENCE = 8
 LSTM_INNER_VALIDATION_FRACTION = 0.1
+LSTM_DEFAULT_BANDS_PER_STEP = 1
+LSTM_DEFAULT_HEAD_HIDDEN_SIZE = 0  # 0 keeps the single linear layer after the fusion
 MLP_DEFAULT_HIDDEN_UNITS = 64
 MLP_DEFAULT_HIDDEN_LAYERS = 2
 MLP_DEFAULT_DROPOUT = 0.2
