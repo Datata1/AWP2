@@ -118,6 +118,24 @@ Diese Befunde beschreiben nur die vorliegende Stichprobe. Sie sind kein Leistung
 - Nach Ausschluss exakter Duplikate liegen die ähnlichsten Spektralpaare bei standardisierten Distanzen von etwa 0,54 bis 0,64. Die Verteilung ist kontinuierlich und liefert keinen natürlichen Schwellenwert für dieselbe Fläche.
 - Ohne Koordinaten, Feld-IDs oder Bild-IDs belegen ähnliche Spektren weder eine Feldwiederholung noch eine räumliche Nähe.
 
+### Datenqualität: Regelprüfung (#196)
+
+`awp2.quality.quality_flags()` markiert verdächtige Zeilen nach festen Regeln, ohne sie zu
+entfernen (Notebook `39_jd_datenqualitaet`):
+
+- **Reflektanz-Skala:** Blau liegt im Median bei rund 16 %, weit über den 3–6 % von Vegetation
+  an der Oberfläche. Die Daten enthalten offenbar einen Atmosphären- oder Kalibrieranteil.
+  Absolute Literaturschwellen (z. B. Fmask) passen deshalb nicht; alle Regeln markieren nur
+  Tukeys „far out“-Werte.
+- **Keine** extremen Dunst- oder Schatten-Zeilen, **keine** unplausiblen Kombinationen aus
+  Monat × Kultur × Stadium.
+- 5,5 % der Trainingszeilen sind spektrale Ausreißer ihrer Klasse. Sie bündeln sich in ganzen
+  kleinen Aufnahmen (AEZ 2 im Mai/Juni/Oktober, AEZ 6 im Mai) mit flachem, hellem, bodenartigem
+  Spektrum – echte Aufnahmen, keine Messfehler.
+- Markierte Zeilen sind 2,5-mal so oft falsch klassifiziert, erklären aber nur gut 13 % der
+  Fehler. Die Label-Verdachtsfälle (Konsens zweier Modelle) sind überwiegend physikalisch
+  mehrdeutig: reifer Mais ↔ keimender Weizen, „Emerge“-Stadien mit viel Boden, Nachbarstadien.
+
 ![Spektren und fehlende Werte in der Region um 900 nm](img/spektren_900nm.png)
 
 ## Cleaning-Empfehlungen
@@ -127,7 +145,7 @@ Diese Befunde beschreiben nur die vorliegende Stichprobe. Sie sind kein Leistung
 | Leere Bänder | 67 Bänder sind in Train und Test vollständig leer. | Im jeweiligen Trainingsanteil entfernen. | Vollständig leere Bänder enthalten keine Messinformation. |
 | Einzelne NaNs | Sechs verfügbare Bänder in Train und drei in Test haben einzelne Lücken. Das betrifft 44 Trainingszeilen vor und 43 nach dem Entfernen eines Duplikats sowie 11 Testzeilen. | Nach Entfernen leerer Bänder je Spektrum entlang der Wellenlänge interpolieren; vollständig leere Spektren nur mit einem im Training gelernten Median behandeln. | Benachbarte Bänder sind stark korreliert; der Verlauf desselben Spektrums nutzt lokale Information. |
 | Duplikate | Zwei Paare von Trainingszeilen sind exakt gleich; zwischen Train und Test gibt es keine exakten vollständigen Eingaben oder Spektren. | Vor dem gemeinsamen Split entfernen. | Exakte Wiederholungen können einen zufälligen Split optimistisch machen. |
-| Ausreißer | Sprung-Screening und Near-Duplicates liefern Kandidaten, aber keinen belegten Messfehler. | Keine automatische Zeilenentfernung. Eine spätere Regel nur im Trainingsanteil festlegen und gegen die Variante ohne Entfernung validieren. | Die EDA liefert keinen fachlich begründeten Schwellenwert. |
+| Ausreißer | Sprung-Screening, Near-Duplicates und die Regelprüfung (#196) liefern Kandidaten, aber keinen belegten Messfehler. | Keine automatische Zeilenentfernung; ob Entfernen nur im Trainingsfold hilft, prüft #197. | Auffällige Aufnahmen kommen auch im Test vor; Label-Verdachtsfälle sind die schweren, mehrdeutigen Fälle. |
 | Glättung / Rauschen | Es gibt keinen EDA-Beleg für eine pauschale Glättung. | Keine Standardglättung; Savitzky-Golay nur als vorab festgelegte Pipeline-Variante vergleichen. | Glättung kann Rauschen reduzieren, aber schmale relevante Strukturen verwischen. |
 | Split-Strategie | Labels und Crop-Stage-Paare sind unausgewogen; alle beobachteten Paare sind rechnerisch für 70/30 und 80/20 mit fünf inneren Folds ausreichend vertreten. Räumliche Gruppen sind nicht verfügbar. | Nach `Crop|Stage` stratifizieren; Balanced Accuracy und Macro-F1 für Crop und Stage berichten. | Seltene Paare bleiben trotz formaler Fold-Fähigkeit unsicher. Eine räumliche Gruppenvalidierung ist ohne Feld- oder Bild-IDs nicht ableitbar. |
 
