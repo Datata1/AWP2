@@ -14,8 +14,9 @@ Trainingsteil, Validierung nur einmal pro Empfehlung.
   identische Bänder wählt. Sentinel-2 deckt VIS, Red Edge, NIR und beide SWIR-Bereiche ab.
 - **PCA spart Merkmale, aber keine Messungen.** PCA-20 hält die Qualität, braucht aber alle
   131 Bänder als Eingabe.
-- **AEZ und Monat sind unverzichtbar**, Vegetationsindizes, Albedo und PC_1/PC_2 bringen
-  nichts zusätzlich.
+- **AEZ und Monat sind unverzichtbar.** Albedo und PC_1/PC_2 bringen nichts zusätzlich.
+- **Der Nutzen der Vegetationsindizes hängt vom Modell ab:** Der SVM bringen sie nichts, Bäumen
+  und der logistischen Regression +0,015 bis +0,029 (siehe [Modellfamilien](#merkmalsnutzen-je-modellfamilie)).
 - **Sequenzmodelle profitieren aktiv:** Ein GRU ist mit Sentinel-2 besser als mit allen
   Bändern (kürzere Sequenz).
 - **Grenze:** Alle Werte gelten für bekannte Aufnahmen. Für neue Aufnahmen, Monate oder Regionen
@@ -106,6 +107,24 @@ Die Netze sind mit 10 Sensorbändern besser als mit 131 Bändern: Kürzere Seque
 4.500 Trainingszeilen leichter zu lernen. Hierarchisch leiden die Stage-Netze zusätzlich unter
 wenigen Zeilen je Kultur. Die SVM bleibt in beiden Ansätzen vorn. Details:
 `notebooks/35_jd_sequenzmodelle.ipynb`, `notebooks/38_jd_hierarchisch_sequenzmodelle.ipynb`.
+
+## Merkmalsnutzen je Modellfamilie
+
+Ein Vegetationsindex ist meist ein Verhältnis zweier Bänder. Bäume prüfen pro Split nur ein
+Merkmal, lineare Modelle können kein Verhältnis bilden – ihnen liefern Indizes genau das.
+
+| Modell | alle Bänder | + Indizes | nur Indizes + Meta (28 Bänder) | Sentinel-2 (10 Bänder) |
+| --- | --- | --- | --- | --- |
+| Extra Trees | 0,811 | **0,827** | 0,808 | 0,814 |
+| HistGradientBoosting | 0,792 | **0,820** | 0,791 | 0,780 |
+| logistische Regression | 0,808 | **0,823** | 0,807 | 0,797 |
+| RBF-SVM | **0,859** | 0,848 | 0,840 | **0,860** |
+
+- Die verlustfreie Reduktion hängt vom Modell ab: Für die SVM reicht Sentinel-2, für Bäume und
+  lineare Modelle reichen die Indizes.
+- Die SVM bleibt mit Abstand das beste Modell.
+
+Details: `notebooks/41_jd_indizes_modellfamilien.ipynb`.
 
 ## Grenzen: unbekannte Aufnahmen
 
