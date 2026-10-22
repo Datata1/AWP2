@@ -467,6 +467,33 @@ MLP_EARLY_STOPPING_PATIENCE = 8
 MLP_INNER_VALIDATION_FRACTION = 0.1
 PERMUTATION_REPEATS = 3
 PERMUTATION_N_JOBS = -1
+REGION_PERMUTATION_REPEATS = 5  # regions are few and cheap, so they get more shuffles than bands
+RANDOM_BAND_GROUP_COUNT = 40  # windows per region; fewer exist where a region fills most bands
+NULL_QUANTILE = 0.95
+COMBINED_METRIC = "bacc_combined"
+GroupVariantKind = Literal["all", "only", "only_no_meta", "without", "meta_only"]
+(
+    ALL_GROUPS_KIND,
+    ONLY_GROUP_KIND,
+    ONLY_GROUP_NO_META_KIND,
+    WITHOUT_GROUP_KIND,
+    META_ONLY_KIND,
+) = get_args(GroupVariantKind)
+ALL_BANDS_VARIANT = "all-bands"
+ALL_BANDS_NO_META_VARIANT = "all-bands-no-meta"
+META_ONLY_VARIANT = "meta-only"
+ONLY_VARIANT_PREFIX = "only"
+WITHOUT_VARIANT_PREFIX = "without"
+NO_META_VARIANT_SUFFIX = "no-meta"
+GROUP_STUDY_RUN_PREFIX = "spectral_groups"
+GROUP_STUDY_EXPERIMENT = "spectral-groups"  # own MLflow experiment: a question besides the ranking
+GROUP_STUDY_APPROACH = "spectral-groups"
+GROUP_STUDY_C_GRID = (10.0, 100.0, 1000.0)
+GROUP_STUDY_GAMMA_GRID = (0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0)  # few bands need a wide kernel
+GROUP_STUDY_C_PARAM = "estimator__C"
+GROUP_STUDY_GAMMA_PARAM = "estimator__gamma"
+GROUP_STUDY_N_JOBS = -1
+GROUP_STUDY_CACHE_DIR = INTERIM_DATA_DIR / "spectral_groups_cache"  # resume after an interruption
 ImportanceGrouping = Literal["band", "region"]
 ImportanceKind = Literal["metric", "crop", "stage", "pair"]
 BAND_GROUPING, REGION_GROUPING = get_args(ImportanceGrouping)
