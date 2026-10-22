@@ -10,7 +10,7 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 | [Klassifikatoren](klassifikatoren.md) | Kandidaten nach Modellfamilie, Voraussetzungen und Priorität |
 | [Experimente](experimente.md) | Log aller Läufe mit Scores |
 | [Fehleranalyse](fehleranalyse.md) | Wo und warum die Ansätze falsch liegen – Vergleich Baseline, kombiniert, hierarchisch |
-| [Feature Importance](feature-importance.md) | Welche Wellenlängen und Metadaten die Referenz-SVM nutzt – Permutation Importance und SHAP |
+| [Feature Importance](feature-importance.md) | Welche Wellenlängen und Metadaten die Referenz-SVM nutzt – Permutation Importance, SHAP und einzeln betrachtete Spektralgruppen |
 
 ## Aktueller Stand
 
