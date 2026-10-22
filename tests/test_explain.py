@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 
 from awp2.config import BAND_GROUPING, CROP_KIND, METRIC_KIND, REGION_GROUPING
-from awp2.explain import _aggregate, _permutation_drops, feature_groups
+from awp2.explain import (
+    _aggregate,
+    _permutation_drops,
+    feature_groups,
+    random_band_groups,
+    size_matched_windows,
+)
 
 COLUMNS = ["AEZ_2", "AEZ_5", "Month_sin", "Month_cos", "X437", "X700", "X720", "X1000", "X1356"]
 
@@ -13,6 +19,66 @@ def test_band_groups_keep_metadata_together() -> None:
     assert groups["AEZ"] == ["AEZ_2", "AEZ_5"]
     assert groups["Month"] == ["Month_sin", "Month_cos"]
     assert groups["X700"] == ["X700"]
+
+
+def test_random_windows_are_neighbouring_bands_of_the_requested_size() -> None:
+    columns = [f"X{nm}" for nm in range(400, 500, 10)] + ["AEZ_1", "Month_sin"]
+    groups = random_band_groups(columns, size=4, n_groups=15, contiguous=True)
+    bands = [c for c in columns if c.startswith("X")]
+
+    assert len(groups) == len(bands) - 4 + 1
+    for members in groups.values():
+        start = bands.index(members[0])
+        assert members == bands[start : start + 4]
+    assert groups == random_band_groups(columns, size=4, n_groups=15, contiguous=True)
+
+
+def test_scattered_groups_have_distinct_bands_and_ignore_metadata() -> None:
+    columns = [f"X{nm}" for nm in range(400, 500, 10)] + ["AEZ_1", "Month_sin"]
+    groups = random_band_groups(columns, size=4, n_groups=15, contiguous=False)
+
+    for members in groups.values():
+        assert len(set(members)) == 4
+        assert all(member.startswith("X") for member in members)
+
+
+def test_windows_avoid_excluded_bands_and_are_distinct() -> None:
+    columns = [f"X{nm}" for nm in range(400, 500, 10)]
+    excluded = ["X430", "X440", "X450"]
+
+    groups = random_band_groups(columns, size=3, n_groups=50, exclude=excluded)
+
+    assert 0 < len(groups) < 50
+    assert len({tuple(members) for members in groups.values()}) == len(groups)
+    assert all(set(members).isdisjoint(excluded) for members in groups.values())
+
+
+def test_regions_of_equal_size_get_different_windows() -> None:
+    columns = [f"X{nm}" for nm in range(400, 700, 10)]
+
+    first = random_band_groups(columns, size=3, n_groups=5, exclude=["X400", "X410", "X420"])
+    second = random_band_groups(columns, size=3, n_groups=5, exclude=["X500", "X510", "X520"])
+
+    assert first != second
+
+
+def test_size_matched_windows_match_the_region_size_and_miss_it() -> None:
+    columns = [f"X{nm}" for nm in range(400, 1300, 10)]
+    red_edge = feature_groups(columns, REGION_GROUPING)["Red Edge"]
+
+    groups = size_matched_windows(columns, "Red Edge", n_groups=10)
+
+    assert all(len(members) == len(red_edge) for members in groups.values())
+    assert all(set(members).isdisjoint(red_edge) for members in groups.values())
+
+
+def test_no_window_fitting_outside_the_excluded_bands_is_an_error() -> None:
+    columns = [f"X{nm}" for nm in range(400, 440, 10)]
+    try:
+        random_band_groups(columns, size=3, n_groups=5, exclude=["X410"])
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError")
 
 
 def test_region_groups_collect_bands_by_wavelength() -> None:
