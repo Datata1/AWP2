@@ -9,13 +9,18 @@ import pandas as pd
 from matplotlib.container import BarContainer
 
 from awp2.config import (
+    ALL_GROUPS_KIND,
     BAND_GAP_NM,
     DOCS_FIGURES_DIR,
     FIGURE_DPI,
+    META_ONLY_KIND,
+    ONLY_GROUP_KIND,
+    ONLY_GROUP_NO_META_KIND,
     RECALL_COL,
     SPECTRAL_REGIONS,
     SUPPORT_COL,
     TARGET_COLS,
+    WITHOUT_GROUP_KIND,
     SpectralRegion,
 )
 from awp2.data import band_columns, wavelength, wavelengths
@@ -351,6 +356,93 @@ def plot_error_rate_by(
     ax.set_ylabel("Fehlerrate")
     ax.legend(fontsize="small")
     ax.grid(axis="y", alpha=0.3)
+    return ax
+
+
+def plot_group_study(
+    table: pd.DataFrame,
+    metric: str = "bacc_combined",
+    regions: Sequence[SpectralRegion] = SPECTRAL_REGIONS,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Compare retrained models that see only one region, or all but one, per region.
+
+    Args:
+        table: Output of :func:`awp2.group_study.results_table`.
+        metric: Cross-validated metric to plot; its ``<metric>_std`` column gives the error bars.
+        regions: Regions in plotting order.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with three bars per region and reference lines for the full model, the model
+            without metadata and the metadata alone.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4.8))
+    names = [region.name for region in regions]
+    series = (
+        (ONLY_GROUP_NO_META_KIND, "nur diese Region (ohne Metadaten)"),
+        (ONLY_GROUP_KIND, "nur diese Region + Metadaten"),
+        (WITHOUT_GROUP_KIND, "alle anderen Regionen + Metadaten"),
+    )
+    width = 0.8 / len(series)
+    positions = np.arange(len(names))
+    for number, (kind, label) in enumerate(series):
+        rows = table[table["kind"] == kind].set_index("group").loc[names]
+        ax.bar(
+            positions + (number - 1) * width,
+            rows[metric],
+            width,
+            yerr=rows[f"{metric}_std"],
+            capsize=2,
+            label=label,
+        )
+    references = (
+        (table[(table["kind"] == ALL_GROUPS_KIND) & table["use_meta"]], "alle Bänder + Metadaten"),
+        (
+            table[(table["kind"] == ALL_GROUPS_KIND) & ~table["use_meta"]],
+            "alle Bänder, keine Metadaten",
+        ),
+        (table[table["kind"] == META_ONLY_KIND], "nur Metadaten"),
+    )
+    for number, (rows, label) in enumerate(references):
+        ax.axhline(
+            rows[metric].iloc[0],
+            color=f"C{3 + number}",
+            linestyle=("-", "--", ":")[number],
+            linewidth=1.2,
+            label=label,
+        )
+    ax.set_xticks(positions, names)
+    ax.set_ylabel(f"CV-{METRIC_LABELS[metric]}")
+    ax.set_ylim(0, 1.2)
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(fontsize="x-small", ncols=3, loc="upper center")
+    return ax
+
+
+def plot_group_against_null(
+    observed: pd.Series, null: pd.DataFrame, ax: plt.Axes | None = None
+) -> plt.Axes:
+    """Compare the importance of each region with random band groups of the same size.
+
+    Args:
+        observed: Importance per region (index = region name).
+        null: Importance of random groups of the region's size, one column per region, one row
+            per random group.
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes with the null distribution as box plot and the region as red dot.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4.5))
+    names = list(observed.index)
+    ax.boxplot([null[name].dropna() for name in names], tick_labels=names, showfliers=False)
+    ax.scatter(range(1, len(names) + 1), observed[names], color="C3", zorder=3, label="Region")
+    ax.set_ylabel("Abfall der BAcc beim Mischen")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(fontsize="small")
     return ax
 
 

@@ -1,7 +1,8 @@
 """Permutation importance of single bands, spectral regions and metadata for a fitted pipeline."""
 
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
+from functools import partial
 from typing import NamedTuple
 
 import numpy as np
@@ -23,6 +24,7 @@ from awp2.config import (
     PAIR_KIND,
     PERMUTATION_N_JOBS,
     PERMUTATION_REPEATS,
+    REGION_GROUPING,
     SEED,
     SPECTRAL_REGIONS,
     STAGE_COL,
@@ -44,6 +46,9 @@ from awp2.experiment import (
 
 Predictor = Callable[[pd.DataFrame], pd.DataFrame]
 """Maps model-ready features to predictions with the columns ``Crop`` and ``Stage``."""
+
+GroupBuilder = Callable[[Sequence[str]], dict[str, list[str]]]
+"""Maps the model-ready feature columns to the feature groups that are shuffled."""
 
 
 class PermutationImportance(NamedTuple):
@@ -109,6 +114,83 @@ def _band_group(
     return next((r.name for r in regions if r.start_nm <= center < r.end_nm), None)
 
 
+def random_band_groups(
+    columns: Sequence[str],
+    size: int,
+    n_groups: int,
+    contiguous: bool = True,
+    exclude: Collection[str] = (),
+) -> dict[str, list[str]]:
+    """Draw random band groups of one size as a null for the importance of a spectral region.
+
+    A region of ``size`` bands is only important if shuffling it costs more than shuffling other
+    groups of the same size. Contiguous groups are the fair comparison for a region (neighbouring
+    bands carry similar information); scattered groups show how much a group loses when its
+    bands do not substitute each other. "Contiguous" means neighbours among the remaining bands,
+    exactly as the regions are defined, so a window can span a block of removed bands.
+
+    Args:
+        columns: Column names of the preprocessed features; only bands are drawn.
+        size: Number of bands per group.
+        n_groups: Maximum number of distinct groups to draw; fewer if fewer exist.
+        contiguous: Draw ``size`` neighbouring bands (in wavelength order) instead of a random
+            subset.
+        exclude: Bands no group may contain, e.g. the region under test. The draw also depends
+            on them, so regions of the same size get different groups.
+
+    Returns:
+        Group name to its band columns, named ``random_<nr>``.
+
+    Raises:
+        ValueError: If no group of ``size`` bands avoids ``exclude``.
+    """
+    bands = sorted((c for c in columns if re.fullmatch(BAND_PATTERN, c)), key=wavelength)
+    excluded = set(exclude)
+    rng = np.random.default_rng(
+        [SEED, size, n_groups, int(contiguous), *(wavelength(band) for band in sorted(excluded))]
+    )
+    if contiguous:
+        candidates = [
+            bands[start : start + size]
+            for start in range(len(bands) - size + 1)
+            if excluded.isdisjoint(bands[start : start + size])
+        ]
+    else:
+        allowed = [band for band in bands if band not in excluded]
+        if len(allowed) < size:
+            candidates = []
+        else:
+            candidates = [
+                [allowed[i] for i in sorted(rng.choice(len(allowed), size, replace=False))]
+                for _ in range(n_groups)
+            ]
+    if not candidates:
+        raise ValueError(f"No group of {size} bands avoids the {len(excluded)} excluded bands.")
+    chosen = rng.choice(len(candidates), min(n_groups, len(candidates)), replace=False)
+    return {f"random_{number:02d}": candidates[index] for number, index in enumerate(chosen)}
+
+
+def size_matched_windows(
+    columns: Sequence[str],
+    region: str,
+    n_groups: int,
+    regions: Sequence[SpectralRegion] = SPECTRAL_REGIONS,
+) -> dict[str, list[str]]:
+    """Draw contiguous band windows as large as a region that do not touch it.
+
+    Args:
+        columns: Column names of the preprocessed features.
+        region: Name of the region to match.
+        n_groups: Maximum number of distinct windows to draw.
+        regions: Wavelength intervals that define the regions.
+
+    Returns:
+        Group name to its band columns, see :func:`random_band_groups`.
+    """
+    members = feature_groups(columns, REGION_GROUPING, regions)[region]
+    return random_band_groups(columns, len(members), n_groups, exclude=members)
+
+
 def _scores(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> dict[tuple[str, str], float]:
     """Score recall per class and balanced accuracy for crop, stage and their combination.
 
@@ -159,7 +241,7 @@ def _fold_drops(
     config: TuneConfig | RunConfig,
     fold: Fold,
     fold_number: int,
-    grouping: ImportanceGrouping,
+    build_groups: GroupBuilder,
     n_repeats: int,
 ) -> tuple[dict[tuple[str, str], float], list[tuple[str, int, int, dict[tuple[str, str], float]]]]:
     split = load_split()
@@ -177,7 +259,7 @@ def _fold_drops(
         predict,
         X_val,
         y_val,
-        feature_groups(list(X_val.columns), grouping),
+        build_groups(list(X_val.columns)),
         n_repeats,
         np.random.default_rng([SEED, fold_number]),
     )
@@ -189,6 +271,7 @@ def permutation_importance(
     config: TuneConfig | RunConfig,
     grouping: ImportanceGrouping = BAND_GROUPING,
     n_repeats: int = PERMUTATION_REPEATS,
+    build_groups: GroupBuilder | None = None,
 ) -> PermutationImportance:
     """Shuffle feature groups of the preprocessed validation folds and measure the score drop.
 
@@ -204,12 +287,15 @@ def permutation_importance(
         grouping: ``band`` shuffles every band alone, ``region`` shuffles whole spectral regions
             (adjacent bands are strongly correlated, so single bands understate their region).
         n_repeats: Shuffles per group and fold.
+        build_groups: Builds the groups to shuffle from the model-ready columns, e.g. random
+            bands of one size; replaces ``grouping`` if given.
 
     Returns:
         Baseline scores and the drop per feature group, aggregated over folds and repeats.
     """
+    builder = build_groups or partial(feature_groups, grouping=grouping)
     results = Parallel(n_jobs=PERMUTATION_N_JOBS)(
-        delayed(_fold_drops)(model, config, fold, number, grouping, n_repeats)
+        delayed(_fold_drops)(model, config, fold, number, builder, n_repeats)
         for number, fold in enumerate(load_folds())
     )
     baseline = pd.DataFrame([fold_baseline for fold_baseline, _ in results]).mean()
