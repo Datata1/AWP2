@@ -40,6 +40,8 @@ MONTH_SIN_COL = f"{MONTH_COL}_sin"
 MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
 BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
+NDVI_RED_BAND = "X671"
+NDVI_NIR_BAND = "X854"
 INDEX_WAVELENGTH_TOLERANCE_NM = 5
 # Hyperion samples every ~10 nm; a larger step marks a block of deleted bands.
 BAND_GAP_NM = 20

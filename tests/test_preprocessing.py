@@ -25,11 +25,13 @@ from awp2.preprocessing import (
     describe_preprocessor,
     nearest_band,
 )
+from awp2.preprocessing.indices import _polynomial_reip
 
 
 class PreprocessingApiTest(unittest.TestCase):
     def test_public_api_keeps_existing_imports(self) -> None:
         expected = {
+            "ndvi",
             "nearest_band",
             "DropEmptyBands",
             "InterpolateBands",
@@ -194,6 +196,23 @@ class PreprocessingContractTest(unittest.TestCase):
             ],
         )
 
+    def test_description_includes_principal_component_branch(self) -> None:
+        preprocessor = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_principal_components=True)
+        )
+
+        self.assertEqual(
+            describe_preprocessor(preprocessor),
+            [
+                "G1. Drop empty bands",
+                "G2. Interpolate band gaps (max 15 nm)",
+                "G3. Standardize bands (per-band mean and std)",
+                "G4. PCA to PC_1 and PC_2",
+                "E1. Drop empty bands",
+                "E2. Interpolate band gaps (max 15 nm)",
+            ],
+        )
+
     def test_region_selected_pipeline_survives_pickle_round_trip(self) -> None:
         preprocessor = build_preprocessor(
             PreprocessingConfig(spectral_regions=("Red Edge",), use_mean_albedo=True)
@@ -212,6 +231,36 @@ class PreprocessingContractTest(unittest.TestCase):
         transformed = preprocessor.transform(training.assign(X712=100.0))
 
         self.assertEqual(list(transformed.columns), ["X681", "X691", "X702"])
+
+
+class NdviTest(unittest.TestCase):
+    def test_uses_historical_bands_and_preserves_index(self) -> None:
+        bands = pd.DataFrame(
+            {
+                "X854": [80.0, 60.0],
+                "X671": [20.0, 40.0],
+                "X803": [40.0, 40.0],
+                "X681": [40.0, 40.0],
+            },
+            index=[4, 8],
+        )
+
+        result = preprocessing.ndvi(bands)
+
+        pd.testing.assert_series_equal(result, pd.Series([0.6, 0.2], index=bands.index))
+
+    def test_preserves_missing_values_and_zero_denominator_behavior(self) -> None:
+        bands = pd.DataFrame({"X854": [np.nan, 0.0, 10.0], "X671": [2.0, 0.0, -10.0]})
+
+        result = preprocessing.ndvi(bands)
+
+        pd.testing.assert_series_equal(result, pd.Series([np.nan, np.nan, np.inf]))
+
+    def test_requires_the_historical_bands(self) -> None:
+        bands = pd.DataFrame({"X803": [40.0], "X681": [20.0]})
+
+        with self.assertRaises(KeyError):
+            preprocessing.ndvi(bands)
 
 
 class NearestBandTest(unittest.TestCase):
@@ -267,6 +316,33 @@ class SpectralRegionSelectionTest(unittest.TestCase):
             PreprocessingConfig(spectral_regions=(), use_meta=False)
         with self.assertRaisesRegex(ValueError, "nonempty spectral_regions"):
             PreprocessingConfig(spectral_regions=(), use_mean_albedo=True)
+
+
+class PolynomialReipTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.wavelengths = np.arange(670.0, 751.0, 10.0)
+        self.centered = self.wavelengths - 710.0
+
+    def test_selects_the_slope_maximum_not_the_minimum(self) -> None:
+        spectrum = 50 + 0.5 * self.centered - 0.005 * self.centered**2 + self.centered**4 / 120000
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertAlmostEqual(positions[0], 700.0)
+
+    def test_rejects_a_slope_minimum(self) -> None:
+        spectrum = 50 + self.centered + self.centered**3 / 10000
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertTrue(np.isnan(positions[0]))
+
+    def test_returns_nan_without_an_inflection_point(self) -> None:
+        spectrum = 50 + self.centered + 0.01 * self.centered**2
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertTrue(np.isnan(positions[0]))
 
 
 class VegetationIndexCatalogueTest(unittest.TestCase):

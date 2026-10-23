@@ -10,6 +10,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from awp2.config import (
     INDEX_WAVELENGTH_TOLERANCE_NM,
     MCARI_GREEN_WEIGHT,
+    NDVI_NIR_BAND,
+    NDVI_RED_BAND,
     OSAVI_SOIL_ADJUSTMENT,
     PCA_FEATURE_NAMES,
     REFLECTANCE_PERCENT_SCALE,
@@ -23,6 +25,25 @@ from awp2.config import (
 )
 from awp2.data import wavelength
 from awp2.preprocessing.bands import _BandTransformer
+
+
+def ndvi(bands: pd.DataFrame) -> pd.Series:
+    """Return diagnostic NDVI from the fixed 854 nm and 671 nm bands.
+
+    This diagnostic is separate from the wavelength-mapped vegetation-index catalogue.
+
+    Args:
+        bands: Reflectance containing ``NDVI_NIR_BAND`` and ``NDVI_RED_BAND``.
+
+    Returns:
+        NDVI with the input index, without imputation or clipping. Missing inputs and
+            zero denominators retain pandas' NaN and infinity behavior.
+
+    Raises:
+        KeyError: If a required band column is missing.
+    """
+    nir, red = bands[NDVI_NIR_BAND], bands[NDVI_RED_BAND]
+    return (nir - red) / (nir + red)
 
 
 def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
@@ -136,13 +157,14 @@ def _polynomial_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.n
         second_derivative = np.array(
             [2 * coefficients[2], 6 * coefficients[3], 12 * coefficients[4]]
         )
+        third_derivative = np.polynomial.polynomial.polyder(second_derivative)
         roots = np.polynomial.polynomial.polyroots(second_derivative)
         candidates = [
             float(root.real)
             for root in roots
             if np.isclose(root.imag, 0.0)
             and centered_wavelengths[0] <= root.real <= centered_wavelengths[-1]
-            and np.polynomial.polynomial.polyval(root.real, second_derivative) < 0
+            and np.polynomial.polynomial.polyval(root.real, third_derivative) < 0
         ]
         if candidates:
             first_derivative = np.array(
