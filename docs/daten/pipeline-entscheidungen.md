@@ -50,6 +50,18 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | Spektralregionen vorab auswählen (`spectral_regions`) | Nur für Analysen: Das Modell sieht nur die genannten Regionen (Grenzen wie [Domänen-Doku](../domaene/vegetation.md)), `()` ergibt ein reines Metadatenmodell. Die Auswahl erfolgt **vor** Interpolation, Skalierung und allen Spektralzweigen, damit ausgeschlossene Bänder weder Nachbarwerte noch Skalierung beeinflussen. Feste Wellenlängenintervalle statt datengetriebener Auswahl, daher kein Leakage. Standard ist `None` (alle Bänder); Ergebnisse siehe [Feature Importance](../modelle/feature-importance.md), Abschnitt 6 |
 | Pipeline-Optionen als Tabelle dokumentieren | Schritte, Konfigurationsfelder und Einschränkungen bleiben auch bei vielen optionalen Zweigen überschaubar. Die konkreten Schritte eines Experiments liefert `describe_preprocessor()` als Text. |
 
+### Polynomiale REIP-Schätzung
+
+`REIP_POLYNOMIAL` sucht das Maximum der spektralen Steigung: An einer Nullstelle der
+zweiten Ableitung muss die dritte Ableitung negativ sein. Ein Minimum der Steigung wird
+verworfen; ohne gültiges Maximum liefert der Index `NaN`, das im Indexzweig mit dem
+Trainingsmedian aufgefüllt wird.
+
+Die Korrektur vom 23.10.2026 verändert mögliche Featurewerte bei
+`use_vegetation_indices=True`. Frühere Experimentergebnisse werden nicht überschrieben;
+für ihre Reproduktion ist der damalige Code-Stand erforderlich. Auch gespeicherte
+Pipelines verwenden beim Laden die installierte Implementierung des Transformers.
+
 ## Klassenungleichgewicht
 
 Reis hat 93 Zeilen, Mais 2097. Modelle mit `class_weight` bekommen `class_weight="balanced"`,

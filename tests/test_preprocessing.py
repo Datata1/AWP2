@@ -25,6 +25,7 @@ from awp2.preprocessing import (
     describe_preprocessor,
     nearest_band,
 )
+from awp2.preprocessing.indices import _polynomial_reip
 
 
 class PreprocessingApiTest(unittest.TestCase):
@@ -284,6 +285,33 @@ class SpectralRegionSelectionTest(unittest.TestCase):
             PreprocessingConfig(spectral_regions=(), use_meta=False)
         with self.assertRaisesRegex(ValueError, "nonempty spectral_regions"):
             PreprocessingConfig(spectral_regions=(), use_mean_albedo=True)
+
+
+class PolynomialReipTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.wavelengths = np.arange(670.0, 751.0, 10.0)
+        self.centered = self.wavelengths - 710.0
+
+    def test_selects_the_slope_maximum_not_the_minimum(self) -> None:
+        spectrum = 50 + 0.5 * self.centered - 0.005 * self.centered**2 + self.centered**4 / 120000
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertAlmostEqual(positions[0], 700.0)
+
+    def test_rejects_a_slope_minimum(self) -> None:
+        spectrum = 50 + self.centered + self.centered**3 / 10000
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertTrue(np.isnan(positions[0]))
+
+    def test_returns_nan_without_an_inflection_point(self) -> None:
+        spectrum = 50 + self.centered + 0.01 * self.centered**2
+
+        positions = _polynomial_reip(spectrum[np.newaxis, :], self.wavelengths)
+
+        self.assertTrue(np.isnan(positions[0]))
 
 
 class VegetationIndexCatalogueTest(unittest.TestCase):

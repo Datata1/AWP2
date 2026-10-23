@@ -136,13 +136,14 @@ def _polynomial_reip(reflectance: np.ndarray, wavelength_nm: np.ndarray) -> np.n
         second_derivative = np.array(
             [2 * coefficients[2], 6 * coefficients[3], 12 * coefficients[4]]
         )
+        third_derivative = np.polynomial.polynomial.polyder(second_derivative)
         roots = np.polynomial.polynomial.polyroots(second_derivative)
         candidates = [
             float(root.real)
             for root in roots
             if np.isclose(root.imag, 0.0)
             and centered_wavelengths[0] <= root.real <= centered_wavelengths[-1]
-            and np.polynomial.polynomial.polyval(root.real, second_derivative) < 0
+            and np.polynomial.polynomial.polyval(root.real, third_derivative) < 0
         ]
         if candidates:
             first_derivative = np.array(
