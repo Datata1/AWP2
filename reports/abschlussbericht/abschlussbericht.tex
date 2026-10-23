@@ -1,0 +1,263 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+
+\setlist{nosep,leftmargin=*}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlength{\emergencystretch}{2em}
+\graphicspath{{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
+
+\title{Abschlussbericht\\Kulturpflanzen- und Entwicklungsstadiumsklassifikation}
+\author{Dom\"anenprojekt 2\\Team: AE-ROOT}
+\date{Stand: \today}
+
+\begin{document}
+\maketitle
+% Teammitglieder, Abgabedatum und den ausgewerteten Code-Stand erg\"anzen.
+% Ergebnisse mit MLflow-Run-IDs und reproduzierbaren Artefakten belegen.
+% Haupttext knapp halten; Detailtabellen und zus\"atzliche Plots in den Anhang.
+
+\tableofcontents
+\clearpage
+
+\section{Ziel und Dom\"ane}
+
+\subsection{Aufgabe und Motivation}
+
+Ziel des Projekts ist die gemeinsame Vorhersage der Kulturart (\texttt{Crop}) und ihres
+Entwicklungsstadiums (\texttt{Stage}) aus hyperspektralen Satellitenmessungen.
+Die Aufgabe wird als Challenge bearbeitet, in der alle Teams dieselbe
+Klassifikationsaufgabe untersuchen. Neben der Vorhersageleistung verlangt die
+Aufgabenstellung einen begr\"undeten Vergleich verschiedener Modellierungsstrategien
+und eine Untersuchung des Zielkonflikts zwischen Datenreduktion und
+Klassifikationsleistung~\cite{projekt2026}.
+
+Die Kulturart beschreibt, was auf einer Fl\"ache w\"achst; das Entwicklungsstadium
+ordnet die Beobachtung in den saisonalen Verlauf ein. Solche Informationen k\"onnen
+landwirtschaftliches Monitoring, Agrarstatistik und die Planung von
+Bewirtschaftungsma\ss nahmen unterst\"utzen. Fernerkundung erm\"oglicht dabei die
+wiederholte Beobachtung gro\ss er oder schwer zug\"anglicher Gebiete und kann
+Feldbegehungen erg\"anzen~\cite{mulla2013}. Das vorliegende Projekt untersucht
+jedoch die Klassifikationsleistung auf den bereitgestellten Daten. Ob daraus
+ein praktischer Nutzen etwa f\"ur Bew\"asserung, D\"ungung oder Ernteplanung
+entsteht, wird nicht nachgewiesen.
+
+\subsection{Hyperspektrale Messungen und Kulturentwicklung}
+
+Ein Spektrum beschreibt die Reflexion einer Oberfl\"ache \"uber verschiedene
+Wellenl\"angen. Hyperspektrale Sensoren erfassen viele schmale Spektralb\"ander
+und k\"onnen dadurch feine Unterschiede im Reflexionsverhalten abbilden.
+Grundlage der Aufgabe sind Messungen des Sensors Hyperion an Bord des
+Satelliten Earth Observing-1 (EO-1). Hyperion erfasste 220 B\"ander im Bereich
+von etwa 400 bis 2.500\,nm bei einer nominellen r\"aumlichen Aufl\"osung von
+30\,m~\cite{nasa2025}. Davon zu unterscheiden sind die 198 bereitgestellten
+Bandspalten zwischen 427 und 2.395\,nm. Ihre Reihenfolge beschreibt die
+Wellenl\"angenachse einer Beobachtung, keine Zeitreihe.
+
+Bei gr\"uner Vegetation absorbieren Blattpigmente vor allem blaues und rotes
+Licht. Der starke Anstieg zum nahen Infrarot wird als Red Edge bezeichnet;
+die hohe Reflexion im nahen Infrarot h\"angt wesentlich mit der inneren
+Blattstruktur zusammen. Im kurzwelligen Infrarot
+beeinflussen unter anderem der Wassergehalt und trockene Pflanzenbestandteile
+das Signal. Mit der Kulturentwicklung ver\"andern sich au\ss erdem Blattfl\"ache,
+Bodenbedeckung und Pflanzenh\"ohe. Diese Zusammenh\"ange
+motivieren die Klassifikation anhand spektraler Signaturen, garantieren aber
+keine eindeutige Trennung: Bodenanteile, Aufnahmebedingungen und Unterschiede
+innerhalb einer Kultur k\"onnen ebenfalls zum gemessenen Spektrum beitragen.
+
+Unterschieden werden Mais, Sojabohne, Winterweizen, Baumwolle und Reis sowie
+sechs Stadienkategorien: \texttt{Emerge\_VEarly}, \texttt{Early\_Mid},
+\texttt{Critical}, \texttt{Late}, \texttt{Mature\_Senesc} und \texttt{Harvest}.
+Diese Labels werden als vorgegebene Kategorien behandelt, nicht als
+best\"atigte Zuordnung zu standardisierten ph\"anologischen Skalen.
+Zus\"atzlich stehen die agro\"okologische Zone (\texttt{AEZ}) und der
+Aufnahmemonat (\texttt{Month}) als Kontextmerkmale zur Verf\"ugung.
+Agro\"okologische Zonen gruppieren Gebiete nach nat\"urlichen Anbaubedingungen
+wie Klima, B\"oden und Vegetationsperiode~\cite{projekt2026}.
+
+\subsection{Untersuchungsziele und Abgrenzung}
+
+Die Modellierung muss ungleiche Klassenh\"aufigkeiten, seltene
+Crop-Stage-Paare und m\"ogliche spektrale \"Uberlappungen ber\"ucksichtigen.
+Kulturart und Stadium sind dabei keine unabh\"angigen Zielgr\"o\ss en:
+Stadien k\"onnen sich je nach Kultur unterschiedlich im Spektrum ausdr\"ucken.
+Nicht beobachtete Kombinationen belegen allerdings nicht, dass diese
+fachlich unm\"oglich sind. Vor diesem Hintergrund leiten drei Fragen die Untersuchung:
+
+\begin{enumerate}
+	\item Welche Modellierungsstrategie sagt Kulturart und Entwicklungsstadium
+		unter vergleichbaren Evaluationsbedingungen am zuverl\"assigsten vorher?
+	\item Welchen zus\"atzlichen Nutzen liefern AEZ, Aufnahmemonat und
+		abgeleitete Merkmale gegen\"uber den Spektralb\"andern allein?
+	\item Wie weit l\"asst sich der Eingabeumfang reduzieren, und welcher
+		Verlust an Klassifikationsleistung entsteht dabei?
+\end{enumerate}
+
+Die prim\"are Bewertungsmetrik ist die Balanced Accuracy, die den Recall
+gleichgewichtet \"uber die Klassen mittelt. Erg\"anzend werden Macro-F1 und
+Samples-F1 betrachtet. Kulturart und Stadium werden jeweils separat
+ausgewertet; die gemeinsame Vorhersage wird zus\"atzlich untersucht~\cite{projekt2026}.
+Die Ergebnisse gelten zun\"achst f\"ur die untersuchte Datenbasis.
+Eine \"Ubertragbarkeit auf andere Regionen, Jahre oder Sensoren und die
+Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
+
+\section{Daten und explorative Analyse}
+
+\subsection{Datengrundlage und Zielgr\"o\ss en}
+% Herkunft, Umfang, Spektralbereich und Bandanzahl anhand der Daten belegen.
+% AEZ, Month, Crop und Stage erkl\"aren; bekannte Herkunftsl\"ucken offenlegen.
+% Gelabelte Entwicklungsdaten und ungelabelte Abgabedaten klar unterscheiden.
+% Beobachtete Kombinationen nicht mit fachlich m\"oglichen gleichsetzen.
+
+\subsection{Zentrale Befunde und Konsequenzen}
+% Klassenverteilung und seltene Crop-Stage-Paare mit Fallzahlen zeigen.
+% Fehlende Werte, leere B\"ander, Duplikate und auff\"allige Spektren beschreiben.
+% Spektrale \"Uberlappungen, Bandkorrelationen sowie Zusammenh\"ange mit AEZ und
+% Month auf die Befunde beschr\"anken, die Modellentscheidungen begr\"unden.
+% Wenige aussagekr\"aftige Abbildungen ausw\"ahlen und im Text interpretieren.
+
+\section{Methodik und Validierung}
+
+\subsection{Datenaufbereitung und Merkmalsbildung}
+% Gew\"ahlte Bereinigung, Imputation und Skalierung fachlich begr\"unden.
+% Verwendete Bandselektion, Vegetationsindizes, PCA oder weitere Merkmale
+% beschreiben; genutzte Metadaten und deren Kodierung nennen.
+% Dokumentieren, welche Transformationen ausschlie\ss lich auf den jeweiligen
+% Trainingsanteilen innerhalb der gemeinsamen Pipeline angepasst werden.
+
+\subsection{Evaluationsprotokoll und Reproduzierbarkeit}
+% Gemeinsame Split- und Fold-Artefakte, Anteile, Stratifizierung und Seed nennen.
+% Cross-Validation f\"ur die Hyperparametersuche von der anschlie\ss enden
+% Holdout-Auswertung trennen; tats\"achliches Auswahlverfahren offenlegen.
+% Falls wiederholt Holdout-Ergebnisse verglichen wurden, die dadurch begrenzte
+% Unabh\"angigkeit der finalen Bewertung diskutieren.
+% Balanced Accuracy als Hauptmetrik sowie Macro-F1 f\"ur Crop und Stage angeben.
+% Samples-F1 f\"ur die gemeinsame Crop-/Stage-Vorhersage pr\"azise definieren.
+% Umgang mit Klassenungleichgewicht und ung\"ultigen Vorhersagepaaren erl\"autern.
+% Code-Commit, Umgebung (uv.lock), Konfigurationen, MLflow-Run-IDs und Schritte
+% zur Reproduktion bzw. Vorhersage auf den Abgabedaten referenzieren.
+
+\section{Modellvergleich und Auswahl}
+
+\subsection{Baseline und untersuchte Strategien}
+% Baseline und tats\"achlich untersuchte Strategien beschreiben, beispielsweise
+% gemeinsame Klassen, hierarchische Klassifikation und Multi-Task-Learning.
+% Relevante Modellfamilien mit ihren Vor- und Nachteilen begr\"unden.
+% Suchr\"aume, Suchbudget und wichtigste gew\"ahlte Hyperparameter zusammenfassen.
+% Nur entscheidungsrelevante Experimente aufnehmen; vollst\"andige Laufhistorie
+% \"uber Experimentdokumentation und MLflow referenzieren.
+
+\subsection{Vergleich und finales Modell}
+% Modelle unter vergleichbaren Splits, Metriken und Eingaben gegen\"uberstellen.
+% Unterschiede in Suchbudget oder Evaluationsbedingungen kenntlich machen.
+% Eine kompakte Ergebnistabelle mit Baseline und wichtigsten Kandidaten zeigen.
+% CV-Ergebnisse und Holdout-Ergebnisse getrennt kennzeichnen; vorhandene
+% Streuungen berichten, keine Unsicherheiten ohne entsprechende Messung angeben.
+% Modellwahl anhand der vorab benannten Kriterien begr\"unden; Leistung,
+% Komplexit\"at, Rechenaufwand und Robustheit gegeneinander abw\"agen.
+
+\section{Datenreduktion}
+% Vollst\"andigen Input und ausgew\"ahlte reduzierte Varianten vergleichen.
+% Anzahl der Eingabeb\"ander, abgeleiteten Features und PCA-Komponenten klar
+% unterscheiden: weniger Komponenten bedeuten nicht weniger ben\"otigte B\"ander.
+% Auswahlverfahren und Einbettung in die Trainingspipeline dokumentieren.
+% Leistung gegen Eingabeumfang als Tabelle oder Plot zeigen, mit gleicher
+% Evaluationsgrundlage; gegebenenfalls Laufzeit und Speicherbedarf erg\"anzen.
+% Den Trade-off bewerten: Welche Reduktion ist bei welchem Leistungsverlust
+% vertretbar? Schlussfolgerungen auf die tats\"achlich gepr\"uften Varianten begrenzen.
+
+\section{Ergebnisse und Interpretation}
+
+\subsection{Vorhersageleistung und Fehleranalyse}
+% Finale Kennzahlen f\"ur Crop und Stage sowie gemeinsame Samples-F1 berichten.
+% Verbesserungen zur Baseline quantifizieren; Datenbasis jeder Kennzahl nennen.
+% Confusion Matrices sowie Precision, Recall und Fallzahlen je Klasse zeigen.
+% H\"aufige Verwechslungen und Schw\"achen bei seltenen Klassen diskutieren.
+% Bei hierarchischen Modellen m\"ogliche Fehlerfortpflanzung betrachten.
+% F\"ur ungelabelte Abgabedaten keine selbst berechneten G\"utema\ss e behaupten;
+% externe Bewertung nur bei tats\"achlich vorliegender R\"uckmeldung aufnehmen.
+
+\subsection{Fachliche Einordnung und Erkl\"arbarkeit}
+% Ergebnisse mit spektralen Mustern und Dom\"anenwissen in Beziehung setzen.
+% Gemessene Befunde von plausiblen, aber ungepr\"uften Erkl\"arungen trennen.
+% Falls untersucht: Feature Importance, relevante Wellenl\"angen und Nutzen
+% von AEZ/Month erl\"autern; Verfahren und Grenzen der Erkl\"arung nennen.
+% Korrelation nicht als Kausalit\"at auslegen; bei korrelierten B\"andern die
+% eingeschr\"ankte Interpretierbarkeit einzelner Wichtigkeiten diskutieren.
+
+\section{Modellkarte}
+% Als kompakten Steckbrief des tats\"achlich finalen Modells ausarbeiten.
+% Falls eine separate Modellkarte verlangt wird, diesen Inhalt auslagern.
+
+\subsection{Identit\"at und vorgesehene Nutzung}
+% Modellname, Version, Code-Commit, MLflow-Run-ID und Modellartefakt nennen.
+% Zielgruppe, Verwendungszweck und nicht abgedeckte Anwendungen festhalten.
+
+\subsection{Ein- und Ausgaben, Daten und Leistung}
+% Ben\"otigte Spektralb\"ander, Einheiten, Metadaten und Vorverarbeitung angeben.
+% Ausgabelabels und den Umgang mit Crop-Stage-Kombinationen beschreiben.
+% Trainingsbasis, Evaluationsverfahren und zentrale Kennzahlen zusammenfassen
+% oder eindeutig auf die entsprechenden Tabellen im Bericht verweisen.
+
+\subsection{Annahmen, Grenzen und Risiken}
+% Annahmen zu Sensor, Bandbelegung, Messbedingungen und Datenverteilung nennen.
+% Grenzen f\"ur seltene Klassen, unbekannte Kombinationen, fehlende Eingaben und
+% abweichende Regionen, Aufnahmezeitpunkte oder Sensoren dokumentieren.
+% M\"ogliche r\"aumliche/zeitliche Abh\"angigkeiten und deren Pr\"ufbarkeit benennen;
+% ein zuf\"alliger Split belegt keine \"Ubertragbarkeit auf neue Regionen.
+% Abh\"angigkeit von AEZ/Month und m\"ogliche Verteilungsverschiebungen diskutieren.
+% Nicht vorhandene Absicherungen wie Kalibrierung, Ablehnung unbekannter Daten
+% oder Praxistests ausdr\"ucklich als nicht gepr\"uft kennzeichnen.
+
+\section{Fazit und Ausblick}
+% Untersuchungsfragen beantworten: bestes begr\"undet gew\"ahltes Modell,
+% Zielerreichung und Ergebnis der Datenreduktionsstudie knapp zusammenfassen.
+% St\"arkste Erkenntnisse und wichtigste verbleibende Grenzen nennen.
+% Wenige konkrete n\"achste Schritte aus den beobachteten Schw\"achen ableiten.
+
+\begin{thebibliography}{9}
+% Verwendete Fachliteratur, Datensatz- und Methodenquellen mit \bibitem aufnehmen
+% und an den passenden Stellen mit \cite referenzieren.
+% Beispielstruktur: \bibitem{schluessel} Autor. Titel. Jahr. DOI oder URL.
+
+\bibitem{projekt2026}
+Dom\"anenprojekt 2 (2026).
+\emph{Beschreibung Dom\"anenprojekt 2, Vorabversion 2026/27;
+Kickoff-Folien zur Aufgabenbeschreibung.}
+Bereitgestellte Projektunterlagen.
+
+\bibitem{mulla2013}
+Mulla, D. J. (2013).
+Twenty five years of remote sensing in precision agriculture:
+Key advances and remaining knowledge gaps.
+\emph{Biosystems Engineering}, 114(4), 358--371.
+\url{https://doi.org/10.1016/j.biosystemseng.2012.08.009}.
+
+\bibitem{nasa2025}
+NASA (2025).
+\emph{Earth Observing-1.} NASA Earth Observatory.
+\url{https://science.nasa.gov/earth/earth-observatory/earth-observing-1}.
+
+\end{thebibliography}
+
+\appendix
+\section{Erg\"anzende Ergebnisse und Reproduktion}
+% Nur bei Bedarf: vollst\"andige Klassentabellen, weitere Confusion Matrices,
+% Suchr\"aume, Bandlisten und ausf\"uhrliche Reproduktionsbefehle aufnehmen.
+% Jede zus\"atzliche Tabelle oder Abbildung aus dem Haupttext referenzieren.
+% Separate Abgabebestandteile nicht vergessen: Vorhersage-CSV,
+% Arbeitszeitnachweise und je Teammitglied 0,5--1 Seite eigener Beitrag.
+
+\end{document}
