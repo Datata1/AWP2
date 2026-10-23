@@ -62,6 +62,17 @@ Die Korrektur vom 23.10.2026 verändert mögliche Featurewerte bei
 für ihre Reproduktion ist der damalige Code-Stand erforderlich. Auch gespeicherte
 Pipelines verwenden beim Laden die installierte Implementierung des Transformers.
 
+### Diagnostischer NDVI in den Fehleranalysen
+
+`ndvi()` berechnet den diagnostischen NDVI aus den festen Bändern `X854` und `X671`.
+Damit bleiben die Aufrufe der beiden Fehleranalyse-Notebooks und deren Banddefinition
+erhalten. Der Helfer imputiert und begrenzt keine Werte; fehlende Werte und Nenner von
+null behalten das Verhalten der direkten pandas-Berechnung.
+
+Dieser diagnostische NDVI ist nicht mit dem Katalogindex `ND_800_680` gleichzusetzen:
+Eine andere Bandwahl verändert die Werte. Der Helfer ergänzt keine Features in
+`build_preprocessor()` und benötigt keine zusätzliche Pipeline-Option.
+
 ## Klassenungleichgewicht
 
 Reis hat 93 Zeilen, Mais 2097. Modelle mit `class_weight` bekommen `class_weight="balanced"`,

@@ -31,6 +31,7 @@ from awp2.preprocessing.indices import _polynomial_reip
 class PreprocessingApiTest(unittest.TestCase):
     def test_public_api_keeps_existing_imports(self) -> None:
         expected = {
+            "ndvi",
             "nearest_band",
             "DropEmptyBands",
             "InterpolateBands",
@@ -230,6 +231,36 @@ class PreprocessingContractTest(unittest.TestCase):
         transformed = preprocessor.transform(training.assign(X712=100.0))
 
         self.assertEqual(list(transformed.columns), ["X681", "X691", "X702"])
+
+
+class NdviTest(unittest.TestCase):
+    def test_uses_historical_bands_and_preserves_index(self) -> None:
+        bands = pd.DataFrame(
+            {
+                "X854": [80.0, 60.0],
+                "X671": [20.0, 40.0],
+                "X803": [40.0, 40.0],
+                "X681": [40.0, 40.0],
+            },
+            index=[4, 8],
+        )
+
+        result = preprocessing.ndvi(bands)
+
+        pd.testing.assert_series_equal(result, pd.Series([0.6, 0.2], index=bands.index))
+
+    def test_preserves_missing_values_and_zero_denominator_behavior(self) -> None:
+        bands = pd.DataFrame({"X854": [np.nan, 0.0, 10.0], "X671": [2.0, 0.0, -10.0]})
+
+        result = preprocessing.ndvi(bands)
+
+        pd.testing.assert_series_equal(result, pd.Series([np.nan, np.nan, np.inf]))
+
+    def test_requires_the_historical_bands(self) -> None:
+        bands = pd.DataFrame({"X803": [40.0], "X681": [20.0]})
+
+        with self.assertRaises(KeyError):
+            preprocessing.ndvi(bands)
 
 
 class NearestBandTest(unittest.TestCase):

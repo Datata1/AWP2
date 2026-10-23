@@ -21,6 +21,7 @@ from awp2.preprocessing.decomposition import (
 )
 from awp2.preprocessing.indices import AddVegetationIndices as AddVegetationIndices
 from awp2.preprocessing.indices import SelectVegetationIndices as SelectVegetationIndices
+from awp2.preprocessing.indices import ndvi as ndvi
 from awp2.preprocessing.indices import nearest_band as nearest_band
 from awp2.preprocessing.metadata import AezMonthEncoder as AezMonthEncoder
 from awp2.preprocessing.metadata import CyclicMonthEncoder as CyclicMonthEncoder
@@ -30,6 +31,7 @@ from awp2.preprocessing.pipeline import build_preprocessor as build_preprocessor
 from awp2.preprocessing.reporting import describe_preprocessor as describe_preprocessor
 
 __all__ = [
+    "ndvi",
     "nearest_band",
     "DropEmptyBands",
     "InterpolateBands",
