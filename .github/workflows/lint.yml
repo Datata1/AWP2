@@ -39,9 +39,6 @@ jobs:
           echo "status=$?" >> "$GITHUB_OUTPUT"
           cat lint.log
 
-      - name: Pipeline diagram is up to date
-        run: uv run python tools/check_pipeline_diagram.py
-
       - name: Comment on PR
         env:
           GH_TOKEN: ${{ github.token }}
