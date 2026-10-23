@@ -3,6 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[ngerman]{babel}
+\usepackage{lmodern}
 \usepackage[a4paper,margin=2.5cm]{geometry}
 \usepackage{microtype}
 \usepackage{graphicx}
@@ -32,12 +33,85 @@
 \clearpage
 
 \section{Ziel und Dom\"ane}
-% Die Aufgabe erl\"autern: Crop und Stage aus EO-1-Hyperion-Spektren vorhersagen.
-% Fachliche Motivation und vorgesehenen Einsatz beschreiben und abgrenzen.
-% Zentrale Herausforderungen nennen: ungleiche Klassen, \"ahnliche Spektren,
-% wenige Beispiele f\"ur manche Crop-Stage-Kombinationen.
-% Untersuchungsfragen formulieren: Modellstrategie, Nutzen der Metadaten und
-% Trade-off zwischen Datenreduktion und Klassifikationsleistung.
+
+\subsection{Aufgabe und Motivation}
+
+Ziel des Projekts ist die gemeinsame Vorhersage der Kulturart (\texttt{Crop}) und ihres
+Entwicklungsstadiums (\texttt{Stage}) aus hyperspektralen Satellitenmessungen.
+Die Aufgabe wird als Challenge bearbeitet, in der alle Teams dieselbe
+Klassifikationsaufgabe untersuchen. Neben der Vorhersageleistung verlangt die
+Aufgabenstellung einen begr\"undeten Vergleich verschiedener Modellierungsstrategien
+und eine Untersuchung des Zielkonflikts zwischen Datenreduktion und
+Klassifikationsleistung~\cite{projekt2026}.
+
+Die Kulturart beschreibt, was auf einer Fl\"ache w\"achst; das Entwicklungsstadium
+ordnet die Beobachtung in den saisonalen Verlauf ein. Solche Informationen k\"onnen
+landwirtschaftliches Monitoring, Agrarstatistik und die Planung von
+Bewirtschaftungsma\ss nahmen unterst\"utzen. Fernerkundung erm\"oglicht dabei die
+wiederholte Beobachtung gro\ss er oder schwer zug\"anglicher Gebiete und kann
+Feldbegehungen erg\"anzen~\cite{mulla2013}. Das vorliegende Projekt untersucht
+jedoch die Klassifikationsleistung auf den bereitgestellten Daten. Ob daraus
+ein praktischer Nutzen etwa f\"ur Bew\"asserung, D\"ungung oder Ernteplanung
+entsteht, wird nicht nachgewiesen.
+
+\subsection{Hyperspektrale Messungen und Kulturentwicklung}
+
+Ein Spektrum beschreibt die Reflexion einer Oberfl\"ache \"uber verschiedene
+Wellenl\"angen. Hyperspektrale Sensoren erfassen viele schmale Spektralb\"ander
+und k\"onnen dadurch feine Unterschiede im Reflexionsverhalten abbilden.
+Grundlage der Aufgabe sind Messungen des Sensors Hyperion an Bord des
+Satelliten Earth Observing-1 (EO-1). Hyperion erfasste 220 B\"ander im Bereich
+von etwa 400 bis 2.500\,nm bei einer nominellen r\"aumlichen Aufl\"osung von
+30\,m~\cite{nasa2025}. Davon zu unterscheiden sind die 198 bereitgestellten
+Bandspalten zwischen 427 und 2.395\,nm. Ihre Reihenfolge beschreibt die
+Wellenl\"angenachse einer Beobachtung, keine Zeitreihe.
+
+Bei gr\"uner Vegetation absorbieren Blattpigmente vor allem blaues und rotes
+Licht. Der starke Anstieg zum nahen Infrarot wird als Red Edge bezeichnet;
+die hohe Reflexion im nahen Infrarot h\"angt wesentlich mit der inneren
+Blattstruktur zusammen. Im kurzwelligen Infrarot
+beeinflussen unter anderem der Wassergehalt und trockene Pflanzenbestandteile
+das Signal. Mit der Kulturentwicklung ver\"andern sich au\ss erdem Blattfl\"ache,
+Bodenbedeckung und Pflanzenh\"ohe. Diese Zusammenh\"ange
+motivieren die Klassifikation anhand spektraler Signaturen, garantieren aber
+keine eindeutige Trennung: Bodenanteile, Aufnahmebedingungen und Unterschiede
+innerhalb einer Kultur k\"onnen ebenfalls zum gemessenen Spektrum beitragen.
+
+Unterschieden werden Mais, Sojabohne, Winterweizen, Baumwolle und Reis sowie
+sechs Stadienkategorien: \texttt{Emerge\_VEarly}, \texttt{Early\_Mid},
+\texttt{Critical}, \texttt{Late}, \texttt{Mature\_Senesc} und \texttt{Harvest}.
+Diese Labels werden als vorgegebene Kategorien behandelt, nicht als
+best\"atigte Zuordnung zu standardisierten ph\"anologischen Skalen.
+Zus\"atzlich stehen die agro\"okologische Zone (\texttt{AEZ}) und der
+Aufnahmemonat (\texttt{Month}) als Kontextmerkmale zur Verf\"ugung.
+Agro\"okologische Zonen gruppieren Gebiete nach nat\"urlichen Anbaubedingungen
+wie Klima, B\"oden und Vegetationsperiode~\cite{projekt2026}.
+
+\subsection{Untersuchungsziele und Abgrenzung}
+
+Die Modellierung muss ungleiche Klassenh\"aufigkeiten, seltene
+Crop-Stage-Paare und m\"ogliche spektrale \"Uberlappungen ber\"ucksichtigen.
+Kulturart und Stadium sind dabei keine unabh\"angigen Zielgr\"o\ss en:
+Stadien k\"onnen sich je nach Kultur unterschiedlich im Spektrum ausdr\"ucken.
+Nicht beobachtete Kombinationen belegen allerdings nicht, dass diese
+fachlich unm\"oglich sind. Vor diesem Hintergrund leiten drei Fragen die Untersuchung:
+
+\begin{enumerate}
+	\item Welche Modellierungsstrategie sagt Kulturart und Entwicklungsstadium
+		unter vergleichbaren Evaluationsbedingungen am zuverl\"assigsten vorher?
+	\item Welchen zus\"atzlichen Nutzen liefern AEZ, Aufnahmemonat und
+		abgeleitete Merkmale gegen\"uber den Spektralb\"andern allein?
+	\item Wie weit l\"asst sich der Eingabeumfang reduzieren, und welcher
+		Verlust an Klassifikationsleistung entsteht dabei?
+\end{enumerate}
+
+Die prim\"are Bewertungsmetrik ist die Balanced Accuracy, die den Recall
+gleichgewichtet \"uber die Klassen mittelt. Erg\"anzend werden Macro-F1 und
+Samples-F1 betrachtet. Kulturart und Stadium werden jeweils separat
+ausgewertet; die gemeinsame Vorhersage wird zus\"atzlich untersucht~\cite{projekt2026}.
+Die Ergebnisse gelten zun\"achst f\"ur die untersuchte Datenbasis.
+Eine \"Ubertragbarkeit auf andere Regionen, Jahre oder Sensoren und die
+Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
 
 \section{Daten und explorative Analyse}
 
@@ -157,6 +231,25 @@
 % Verwendete Fachliteratur, Datensatz- und Methodenquellen mit \bibitem aufnehmen
 % und an den passenden Stellen mit \cite referenzieren.
 % Beispielstruktur: \bibitem{schluessel} Autor. Titel. Jahr. DOI oder URL.
+
+\bibitem{projekt2026}
+Dom\"anenprojekt 2 (2026).
+\emph{Beschreibung Dom\"anenprojekt 2, Vorabversion 2026/27;
+Kickoff-Folien zur Aufgabenbeschreibung.}
+Bereitgestellte Projektunterlagen.
+
+\bibitem{mulla2013}
+Mulla, D. J. (2013).
+Twenty five years of remote sensing in precision agriculture:
+Key advances and remaining knowledge gaps.
+\emph{Biosystems Engineering}, 114(4), 358--371.
+\url{https://doi.org/10.1016/j.biosystemseng.2012.08.009}.
+
+\bibitem{nasa2025}
+NASA (2025).
+\emph{Earth Observing-1.} NASA Earth Observatory.
+\url{https://science.nasa.gov/earth/earth-observatory/earth-observing-1}.
+
 \end{thebibliography}
 
 \appendix
