@@ -82,6 +82,7 @@ _BRANCH_LETTERS: dict[str, str] = {
     "indices": "D",
     "spectra": "E",
     "aez_month": "F",
+    "principal_components": "G",
 }
 
 
@@ -90,7 +91,7 @@ def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
 
     Reads the built transformer, so optional steps appear only when enabled. Each
     branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra,
-    F: AEZ x month)
+    F: AEZ x month, G: PC_1 and PC_2)
     and steps are numbered per branch from 1, so the labels stay comparable across
     runs. Print the lines in the notebook to log which preprocessing a run used.
 

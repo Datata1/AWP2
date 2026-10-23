@@ -194,6 +194,23 @@ class PreprocessingContractTest(unittest.TestCase):
             ],
         )
 
+    def test_description_includes_principal_component_branch(self) -> None:
+        preprocessor = build_preprocessor(
+            PreprocessingConfig(use_meta=False, use_principal_components=True)
+        )
+
+        self.assertEqual(
+            describe_preprocessor(preprocessor),
+            [
+                "G1. Drop empty bands",
+                "G2. Interpolate band gaps (max 15 nm)",
+                "G3. Standardize bands (per-band mean and std)",
+                "G4. PCA to PC_1 and PC_2",
+                "E1. Drop empty bands",
+                "E2. Interpolate band gaps (max 15 nm)",
+            ],
+        )
+
     def test_region_selected_pipeline_survives_pickle_round_trip(self) -> None:
         preprocessor = build_preprocessor(
             PreprocessingConfig(spectral_regions=("Red Edge",), use_mean_albedo=True)
