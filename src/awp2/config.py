@@ -15,6 +15,153 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"  # scratch figures, not in git
+AUTOML_DIR = REPORTS_DIR / "automl"
+AUTOML_VALIDATION_SIZE = 0.2
+AUTOML_COMPONENTS = (10, 20, 40, 80)
+AUTOML_SAVGOL = ((None, None), (5, 2), (7, 2), (11, 2), (11, 3))
+AUTOML_LPP_NEIGHBORS = (5, 10, 20)
+AUTOML_DBN_LAYERS = ((64, 20), (128, 40), (128, 64, 20))
+AUTOML_EXPERIMENT = "automl-exhaustive"
+AUTOML_INTERPOLATION_GAPS = (10, 15, 20)
+AUTOML_SAMPLE_WEIGHT_FAMILIES = ("mlp", "gnb")
+AUTOML_NO_SAMPLE_WEIGHT_FAMILIES = ("knn", "lda", "plsda")
+AUTOML_FOCUSED_DIR = REPORTS_DIR / "automl-focused-80-20"
+AUTOML_FOCUSED_PREPROCESSING = (
+    {"use_spectral_standard_scale": True},
+    {"use_spectral_standard_scale": True, "spectral_pca_components": 20},
+    {
+        "use_spectral_standard_scale": True,
+        "use_savgol": True,
+        "savgol_window_length": 11,
+        "savgol_polyorder": 3,
+        "spectral_lpp_components": 40,
+        "spectral_lpp_neighbors": 20,
+        "use_principal_components": True,
+    },
+    {
+        "use_spectral_standard_scale": True,
+        "use_savgol": True,
+        "savgol_window_length": 11,
+        "savgol_polyorder": 3,
+        "use_principal_components": True,
+    },
+    {
+        "max_interpolation_gap_nm": 10,
+        "use_spectral_minmax_scale": True,
+        "use_savgol": True,
+        "savgol_window_length": 11,
+        "savgol_polyorder": 3,
+        "use_mean_albedo": True,
+        "use_aez_month": True,
+        "use_vegetation_indices": True,
+    },
+    {
+        "max_interpolation_gap_nm": 10,
+        "use_spectral_minmax_scale": True,
+        "use_savgol": True,
+        "savgol_window_length": 11,
+        "savgol_polyorder": 3,
+        "use_mean_albedo": True,
+        "use_aez_month": True,
+    },
+)
+AUTOML_FOCUSED_MODEL_GRIDS = {
+    "combined_et": {
+        "estimator__n_estimators": [600],
+        "estimator__max_depth": [None],
+        "estimator__max_features": [0.5, 1.0],
+        "estimator__min_samples_leaf": [1, 2, 5, 10],
+    },
+    "combined_rf": {
+        "estimator__n_estimators": [600],
+        "estimator__max_depth": [None],
+        "estimator__max_features": ["sqrt", 0.5],
+        "estimator__min_samples_leaf": [1, 2, 5, 10],
+    },
+    "combined_svm": {
+        "estimator__kernel": ["rbf"],
+        "estimator__C": [30.0, 100.0, 300.0, 1000.0],
+        "estimator__gamma": ["scale", 0.001],
+    },
+    "combined_hgb": {
+        "estimator__max_iter": [300],
+        "estimator__learning_rate": [0.03, 0.1],
+        "estimator__max_leaf_nodes": [31, 63],
+        "estimator__l2_regularization": [1.0, 10.0],
+    },
+    "hierarchical_svm_lda": {
+        "crop_estimator__kernel": ["rbf"],
+        "crop_estimator__C": [30.0, 100.0, 300.0, 1000.0],
+        "crop_estimator__gamma": [0.1],
+        "stage_estimator__shrinkage": [0.01, "auto"],
+    },
+    "hierarchical_svm_et": {
+        "crop_estimator__kernel": ["rbf"],
+        "crop_estimator__C": [100.0, 1000.0],
+        "crop_estimator__gamma": [0.1],
+        "stage_estimator__n_estimators": [300],
+        "stage_estimator__max_depth": [10, None],
+        "stage_estimator__max_features": [1.0],
+        "stage_estimator__min_samples_leaf": [1, 2],
+    },
+    "hierarchical_et_hgb": {
+        "crop_estimator__n_estimators": [600],
+        "crop_estimator__max_depth": [30],
+        "crop_estimator__max_features": [0.5, 1.0],
+        "crop_estimator__min_samples_leaf": [2],
+        "stage_estimator__learning_rate": [0.03],
+        "stage_estimator__max_iter": [100, 300],
+        "stage_estimator__max_leaf_nodes": [63],
+        "stage_estimator__l2_regularization": [1.0, 10.0],
+    },
+    "hierarchical_svm_svm": {
+        "crop_estimator__kernel": ["rbf"],
+        "crop_estimator__C": [30.0, 100.0],
+        "crop_estimator__gamma": [0.01],
+        "stage_estimator__kernel": ["rbf"],
+        "stage_estimator__C": [100.0, 300.0],
+        "stage_estimator__gamma": [0.003, 0.01],
+    },
+}
+AUTOML_MODEL_GRIDS = {
+    "svm": {
+        "C": [0.1, 1.0, 10.0, 30.0, 100.0, 300.0, 1000.0],
+        "gamma": ["scale", 0.0001, 0.001, 0.003, 0.01, 0.1],
+        "kernel": ["rbf", "sigmoid"],
+    },
+    "rf": {
+        "n_estimators": [300, 600],
+        "max_depth": [None, 10, 30],
+        "min_samples_leaf": [1, 2, 5],
+        "max_features": ["sqrt", 0.5, 1.0],
+    },
+    "et": {
+        "n_estimators": [300, 600],
+        "max_depth": [None, 10, 30],
+        "min_samples_leaf": [1, 2, 5],
+        "max_features": ["sqrt", 0.5, 1.0],
+    },
+    "hgb": {
+        "learning_rate": [0.03, 0.05, 0.1],
+        "max_iter": [100, 300],
+        "max_leaf_nodes": [15, 31, 63],
+        "l2_regularization": [0.0, 1.0, 10.0],
+    },
+    "logreg": {"C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]},
+    "knn": {
+        "n_neighbors": [1, 3, 5, 9, 15],
+        "weights": ["uniform", "distance"],
+        "metric": ["euclidean", "manhattan", "cosine"],
+    },
+    "mlp": {
+        "hidden_layer_sizes": [(64,), (128,), (128, 64), (256, 128)],
+        "alpha": [0.0001, 0.001, 0.01, 0.1],
+        "learning_rate_init": [0.0003, 0.001],
+    },
+    "lda": {"shrinkage": ["auto", 0.01, 0.1, 0.5, 1.0]},
+    "plsda": {"n_components": [10, 20, 40, 80, 120]},
+    "gnb": {"var_smoothing": [1e-11, 1e-9, 1e-7, 1e-5]},
+}
 DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "daten" / "img"  # figures shown in the docs, in git
 MODEL_DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "modelle" / "img"  # model results, in git
 FIGURE_DPI = 150
