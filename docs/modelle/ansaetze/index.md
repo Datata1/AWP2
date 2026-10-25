@@ -18,7 +18,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | [Baseline](baseline.md) | verglichen | Dummy, Random Forest | `rf_baseline` (BAcc kombiniert 0.743) | Referenz für alle weiteren Ansätze |
 | [Getrennte Modelle](getrennt.md) | offen | – | | |
 | [Multi-Task](multi-task.md) | verglichen | Tabellarisches MLP, LSTM | `multi_task_mlp_pca20` (BAcc kombiniert 0.765) | LSTM mit Embeddings erreicht 0.417 und wird nicht weiter verfolgt; die anderen Kontextvarianten bleiben unbewertet |
-| [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM, LSTM | `combined_svm_expanded` (BAcc kombiniert 0.866) | LSTM-Embeddings erreichen 0.700; Kontext ist entscheidend, die SVM bleibt klar führend |
+| [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM, LSTM | `automl_final` (BAcc kombiniert 0.8832, 80/20) | Fokussierte CV-Suche wählt RBF-SVM mit Glättung, MinMax, Albedo, Indizes und AEZ×Monat; einmal validiert |
 | [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM (bester), Extra Trees, HistGradientBoosting, MLP, logistische Regression, kNN, PLS-DA, LSTM | `hierarchical_svm` (BAcc kombiniert 0.844) | LSTM-Embeddings erreichen 0.568; gegenüber Standardkontext besser, aber deutlich hinter der SVM |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.
@@ -35,7 +35,7 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 | RBF-SVM | | | [**0.845**](kombiniert.md#rbf-svm) | | |
 | Multi-Task-MLP | | | | | [0.765](multi-task.md#tabellarisches-multi-task-mlp) |
 | LSTM | | | [0.700](kombiniert.md#lstm-mit-spat-fusioniertem-kontext) | [0.568](hierarchisch.md#lstm-lstm-mit-hartem-routing) | [0.417](multi-task.md#multi-task-lstm-mit-spat-fusioniertem-kontext) |
-| RBF-SVM | | | [**0.866**](kombiniert.md#rbf-svm-erweiterte-suche) | [0.844](hierarchisch.md#rbf-svm-rbf-svm) | |
+| RBF-SVM | | | [**0.8832 (80/20)**](kombiniert.md#rbf-svm-aus-dem-fokussierten-automl-lauf) | [0.844](hierarchisch.md#rbf-svm-rbf-svm) | |
 | Extra Trees | | | [0.804](kombiniert.md#extra-trees) | [0.785](hierarchisch.md#extra-trees-extra-trees) | |
 | Extra Trees → RBF-SVM | | | | [0.801](hierarchisch.md#extra-trees-rbf-svm) | |
 | LDA (gleiche Priors) | | | | [0.676](hierarchisch.md#lda-lda) | |
@@ -47,8 +47,14 @@ Unterkapitel. Eine neue Zeile, sobald ein Klassifikator in irgendeinem Ansatz ge
 
 So sieht man auf einen Blick, ob ein Klassifikator in allen Ansätzen gut ist oder ob ein Ansatz
 mit jedem Klassifikator besser abschneidet.
+Die Tabelle enthält unterschiedliche Split-Protokolle; insbesondere dürfen die markierten
+80/20-Ergebnisse nicht unmittelbar gegen ältere 70/30-Zahlen verglichen werden.
 Quer zu allen Ansätzen: [Datenrepräsentation](datenrepraesentation.md) (tabellarisch oder
 sequenziell).
+
+Abgeschlossene systematische Suche über kombinierte und hierarchische Modelle:
+[AutoML auf 80/20](automl.md). 384 erfolgreiche Kandidaten im fokussierten Raster;
+die kombinierte SVM wurde als CV-Gewinner einmal validiert.
 
 ## Aufbau einer Ansatz-Seite
 

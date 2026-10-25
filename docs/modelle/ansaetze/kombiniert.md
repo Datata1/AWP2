@@ -6,6 +6,11 @@ Kultur und Stadium werden zu *einer* Klasse `Crop|Stage` verbunden – 23 Klasse
 Ein beliebiger Klassifikator lernt damit direkt die gemeinsame Verteilung P(Crop, Stage).
 Baustein und Recherche: #54, Entwurf #55.
 
+**Aktuelle 80/20-Referenz:** Die [RBF-SVM aus dem fokussierten AutoML-Lauf](#rbf-svm-aus-dem-fokussierten-automl-lauf)
+erreicht BAcc kombiniert **0,8832** bei CV 0,86682. Die älteren Arbeitspläne und Vergleiche
+unten beschreiben ihren jeweiligen damaligen Stand; insbesondere sind 70/30- und
+80/20-Ergebnisse nicht direkt vergleichbar.
+
 ## Vor- und Nachteile
 
 | Vorteil | Nachteil |
@@ -227,6 +232,55 @@ Split-Protokoll, nicht eine neue Modellvariante.
 - Die Zahl ist nicht direkt gegen die 70/30-Referenz vergleichbar, weil Training und Holdout
     andere Zeilen enthalten. Sie zeigt, dass die bewaehrte SVM-Repraesentation auch mit dem
     neuen Protokoll stabil bleibt.
+
+### RBF-SVM aus dem fokussierten AutoML-Lauf
+
+Datum: 25.10.2026. Ausführung über `awp2.automl`, Profil `focused`, auf den gemeinsamen
+80/20-Artefakten. Das [AutoML-Protokoll](automl.md) beschreibt Screening, Vorauswahl,
+Suchraster und Grenzen. Es wurde kein zusätzliches Notebook erstellt.
+
+- **Auswahl:** Nach einem breiten CV-Screening folgte ein begrenztes Raster mit acht
+    Modellkonfigurationen, sechs gemeinsamen Vorverarbeitungen und je acht Parametereinstellungen:
+    384 erfolgreiche Kandidaten, 48 je Modellkonfiguration, fünf Trainingsfolds. Der globale
+    CV-Gewinner wurde genau einmal auf dem Holdout bewertet.
+- **Modell:** `CombinedLabelClassifier` mit RBF-SVM, `C=100.0`, `gamma="scale"`,
+    `class_weight="balanced"`. Kein PCA/LPP, keine andere Dimensionsreduktion und kein SNV.
+- **Vorverarbeitung:** Alle Bänder; Interpolationsgrenze 10 nm, Savitzky-Golay mit Fenster 11
+    und Grad 3, MinMax-Skalierung der Spektren; Albedo und Vegetationsindex-Katalog als
+    parallele Featurezweige. AEZ one-hot, zyklischer Monat und AEZ×Monat-Indikatoren.
+    Sämtliche gelernten Transformationen werden innerhalb des jeweiligen Trainingsfolds angepasst.
+- **CV:** BAcc kombiniert 0,86682 ± 0,01744; MLflow-Tuning
+    `a08557a27a84465eb1a0667b312ef39e`. Extra Trees erreicht im selben fokussierten Raster
+    maximal 0,86066, SVM → Extra Trees 0,85978. Der Abstand allein ist kein Nachweis
+    statistisch gesicherter Überlegenheit.
+- **Einmalige Validierung:** `automl_final`, MLflow
+    `c99e3915704a4131bf6da0a795fb50ee`; keine ungültigen Kultur-/Stadium-Paare.
+
+| Metrik | Crop | Stage | Kombiniert |
+| --- | --- | --- | --- |
+| Balanced Accuracy | 0,9325 | 0,9204 | **0,8832** |
+| Macro-F1 | 0,9170 | 0,9107 | 0,8576 |
+
+Samples-F1: **0,9217**. Der Holdout-Score liegt rund 1,64 Prozentpunkte über dem CV-Mittel.
+Das ist kein Beleg für Leakage oder für statistisch gesicherten Zugewinn; die Fold-Streuung
+ist keine Konfidenzgrenze für den Holdout.
+
+Die gleiche SVM mit derselben Vorverarbeitung, aber ohne Vegetationsindizes, erreicht in
+der CV 0,86104 statt 0,86682 (Differenz 0,00578). Das ist eine kontrollierte Beobachtung
+innerhalb des Suchrasters, kein isolierter Holdout-Nachweis für den Beitrag der Indizes.
+Die frühere 80/20-SVM liegt dokumentiert bei rund 0,866 kombinierter Holdout-BAcc.
+Identische Splitgröße allein garantiert jedoch nicht dieselben Zeilen und Datenstände;
+ein kausaler Gewinn durch die zusätzlichen Merkmale ist daraus nicht abzuleiten.
+
+**Grenzen und Abschluss:** Das Raster wurde adaptiv anhand vorheriger CV-Ergebnisse festgelegt;
+seine CV-Spitze kann daher optimistisch sein. Das gemeinsame Holdout wurde auch in früheren
+Experimenten betrachtet und ist kein unabhängiger Abschlusstest. Multi-Task und getrennte
+Modelle waren nicht Teil dieses Vergleichs. Die Auswahl ist eingefroren; keine weitere
+Parameteranpassung anhand dieses Holdout-Ergebnisses. Die [Fehleranalyse des gespeicherten
+Modells](../fehleranalyse.md#finales-automl-modell-8020) reproduziert alle Metriken ohne erneutes
+Training: 998/1.118 Paare stimmen, 77 Zeilen haben die falsche Kultur und 43 nur das falsche
+Stadium. Schwächste Paarklasse ist `soybean|Emerge_VEarly` (Recall 0.5714, n=21);
+100-%-Recalls der kleinsten Klassen (n=2 bis 8) sind nicht belastbar abgesichert.
 
 ### RBF-SVM mit Standard Normal Variate
 

@@ -43,6 +43,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | 2026-10-16 | hierarchical_lstm_standard | QMoWo | Hierarchisch | 0.810 | 0.657 | 0.486 | 0.448 | 0.695 | – | Harter LSTM → LSTM mit Standardkontext, 64 → 64 Einheiten; CV 0.497, keine ungültigen Paare. MLflow-Tracking fehlgeschlagen (`/C:`). |
 | 2026-10-16 | hierarchical_lstm_embeddings | QMoWo | Hierarchisch | 0.812 | 0.778 | 0.568 | 0.529 | 0.748 | – | Harter LSTM → LSTM mit Embeddings, 32 → 64 Einheiten; CV 0.546, keine ungültigen Paare. MLflow-Tracking fehlgeschlagen (`/C:`). |
 | 2026-10-16 | multi_task_lstm_embeddings | QMoWo | Multi-Task | 0.796 | 0.744 | 0.417 | 0.388 | 0.717 | – | Multi-Task-LSTM mit AEZ-/Monatsembeddings, 64 Einheiten; CV 0.458, keine ungültigen Paare. MLflow-Tracking fehlgeschlagen (`/C:`). |
+| 2026-10-25 | automl_final | Achim Duong | Kombinierte Klasse | 0.9325 | 0.9204 | 0.8832 | 0.8576 | 0.9217 | c99e3915 | 80/20; CV-Gewinner aus 384 Kandidaten: RBF-SVM `C=100`, `gamma=scale`, CV 0.86682 ± 0.01744 (Tuning `a08557a2`); MinMax, Glättung 11/3, Albedo, Indizes, AEZ×Monat; keine ungültigen Paare. [Details](ansaetze/kombiniert.md#rbf-svm-aus-dem-fokussierten-automl-lauf). |
 
 ## Abweichende Split-Protokolle
 

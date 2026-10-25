@@ -1,5 +1,111 @@
 # Fehleranalyse
 
+Die aktuelle Analyse beschreibt die eingefrorene 80/20-Referenz. Der darunterstehende
+[historische Vergleich](#historische-analyse-7030) betrifft andere Modelle und einen 70/30-Split;
+seine Zahlen sind nicht direkt mit dem finalen AutoML-Lauf vergleichbar.
+
+## Finales AutoML-Modell (80/20)
+
+### Grundlage und Reproduzierbarkeit
+
+Stand: 25.10.2026. Analysiert wird die [kombinierte RBF-SVM](ansaetze/kombiniert.md#rbf-svm-aus-dem-fokussierten-automl-lauf)
+aus MLflow-Run `c99e3915704a4131bf6da0a795fb50ee`, gespeichertes Modell
+`m-fd1d4454d4d642b6a38d2aa5823abf80`. Das Modell wurde geladen, **nicht erneut trainiert**.
+Da der Lauf keine zeilenweisen Vorhersagen speichert, wurden diese durch reine Inferenz auf
+dem identischen Holdout rekonstruiert. Es wurde kein neuer MLflow-Lauf angelegt.
+
+- Datei-Hashes von Quellcode, Datenartefakten und `uv.lock` stimmen mit dem Suchmanifest überein.
+- MLflow-Datensatz-Digests stimmen überein: Training `896bd14b`, Validierung `377358a0`.
+- Alle acht protokollierten Metriken werden exakt reproduziert: BAcc Crop **0.9325**, Stage
+  **0.9204**, kombiniert **0.8832**; Macro-F1 **0.9170 / 0.9107 / 0.8576**;
+  Samples-F1 **0.9217**; **0 %** ungültige Paare.
+
+Reproduktion ohne Training: `uv run python tools/analyze_automl_final.py`.
+Tabellen, Zeilenvorhersagen und Provenienz liegen unter
+`reports/automl-focused-80-20/analysis/`; die Abbildungen stehen auf dieser Seite.
+Das Skript bricht bei abweichenden Hashes, Datensatz-Digests oder Metriken ab.
+
+### Fehlerzerlegung
+
+| Ergebnis auf dem Holdout | Zeilen | Anteil |
+| --- | --- | --- |
+| Kultur und Stadium richtig | 998 | 89,27 % |
+| Kultur falsch, Stadium beliebig | 77 | 6,89 % |
+| Kultur richtig, nur Stadium falsch | 43 | 3,85 % |
+| Gesamt | 1.118 | 100 % |
+
+Von den 77 Kulturfehlern haben 55 auch ein falsches Stadium und 22 ein richtiges Stadium.
+Damit betreffen **77 von 120 Paarfehlern (64,2 %) die Kultur**. Die reine Stadiumverwechslung
+erklärt die übrigen 35,8 %. Die kombinierte Trefferquote von 89,27 % ist **nicht** die
+Balanced Accuracy von 88,32 %: Letztere gewichtet alle 23 Paarklassen gleich.
+Bei richtiger Kultur beträgt die Stadium-BAcc 0.9610; dieser bedingte Wert gilt nur für die
+entsprechende Teilmenge und ist kein unabhängiger Leistungsnachweis.
+
+### Klassenrecall
+
+![Recall je Kultur und Stadium mit Stichprobengröße](img/automl_final_recall.png)
+
+Winterweizen hat den niedrigsten Kultur-Recall: **0.8791 bei 215 Zeilen**. Bei den Stadien
+ist **Mature_Senesc mit 0.8535 bei 198 Zeilen** am schwächsten. Die insgesamt hohe
+Kulturleistung für Baumwolle (0.9618) verdeckt hingegen Schwächen einzelner Baumwollstadien.
+
+![Recall aller 23 Kultur-Stadium-Paare mit Stichprobengröße](img/automl_final_combined_recall.png)
+
+| Schwächste Paarklassen | Holdout-Zeilen | Richtig | Recall |
+| --- | --- | --- | --- |
+| soybean\|Emerge_VEarly | 21 | 12 | 0.5714 |
+| corn\|Emerge_VEarly | 30 | 23 | 0.7667 |
+| cotton\|Mature_Senesc | 13 | 10 | 0.7692 |
+| winter_wheat\|Mature_Senesc | 76 | 60 | 0.7895 |
+| cotton\|Emerge_VEarly | 34 | 28 | 0.8235 |
+
+Die kleinsten Klassen benötigen besondere Vorsicht: `cotton|Harvest` erreicht 2/2,
+`winter_wheat|Late` 6/6 und `rice|Late` 8/8 Treffer. Das belegt keine stabile 100-%-Erkennung.
+Ein einziger Fehler bei `cotton|Harvest` würde dessen Recall auf 0.5 und die gesamte kombinierte
+BAcc um etwa **2,17 Prozentpunkte** senken. `rice|Early_Mid` erreicht 9/10 Treffer; Reis ist
+auch insgesamt mit nur 18 Holdout-Zeilen schwach abgesichert.
+
+### Konkrete Verwechslungen
+
+![Zeilennormierte Konfusionsmatrizen für Kultur und Stadium](img/automl_final_confusion.png)
+
+Zeilen sind die wahren Klassen; jede Zeile summiert sich vor Rundung zu eins. Die Diagonale
+entspricht dem Klassenrecall. Die folgenden absoluten Häufigkeiten ergänzen diese Sicht,
+gewichten aber große Klassen stärker.
+
+![Häufigste Verwechslungen je Zielgröße](img/automl_final_confusions.png)
+
+- **Winterweizen → Baumwolle: 18 Zeilen**, die häufigste Kulturverwechslung. Darunter sind
+  8-mal `winter_wheat|Mature_Senesc` → `cotton|Early_Mid` und 4-mal dasselbe wahre Paar
+  → `cotton|Emerge_VEarly`. Kultur- und Stadiumfehler treten hier gemeinsam auf.
+- **Sojabohne → Mais: 15 Zeilen.** Darunter sind 7 der 21 Zeilen von
+  `soybean|Emerge_VEarly`, die als `corn|Emerge_VEarly` erkannt werden. Bei diesen Fehlern
+  stimmt das Stadium, aber nicht die Kultur.
+- Der häufigste reine Paar-Stadiumfehler ist `soybean|Critical` →
+  `soybean|Mature_Senesc` mit **8 Zeilen**. Zielübergreifend tritt
+  `Critical` → `Mature_Senesc` 11-mal auf.
+- Alle 3 Fehler von `cotton|Mature_Senesc` gehen nach `cotton|Critical`:
+  Hier liegt die Schwäche ausschließlich im Stadium, nicht in der Kultur.
+
+### Kontext und Grenzen
+
+Die Paarfehlerrate ist im Mai 24,4 % (86 Zeilen), im Juni 22,5 % (120), im August dagegen
+2,3 % (172). Für AEZ 5 beträgt sie 19,9 % (151), für AEZ 9 15,4 % (285) und für AEZ 6
+4,3 % (184). Das sind **deskriptive Gruppenunterschiede**, keine kausalen Monats- oder
+Regionseffekte: Kultur- und Stadiumzusammensetzung können sich unterscheiden. Diese aktuelle
+Analyse enthält keine erneute Out-of-fold-Gegenprüfung; dafür wären neue Fits nötig.
+
+Beobachtet sind die konkreten Verwechslungen, nicht ihre Ursache. Spektrale Überlappung,
+Wachstumsübergänge oder Kontextabhängigkeit sind mögliche, hier **nicht nachgewiesene**
+Erklärungen. Kleine Klassen begrenzen die Präzision der Recalls. Das wiederholt betrachtete
+Holdout ist außerdem kein unabhängiger Abschlusstest; die adaptive CV-Suche kann optimistisch
+sein. Aus diesen Befunden werden **keine weiteren Parameter- oder Modellentscheidungen**
+abgeleitet. Das finale Modell bleibt unverändert.
+
+## Historische Analyse (70/30)
+
+Alle folgenden Abschnitte betreffen den früheren Modellvergleich, nicht `automl_final`.
+
 Welche Klassen verwechselt werden, warum, und weshalb Baseline, kombinierter und hierarchischer
 Ansatz unterschiedlich abschneiden (#32). Notebook: `notebooks/10_jd_fehleranalyse.ipynb`,
 Bausteine: `error_breakdown()`, `recall_by_class()`, `compare_predictions()`
