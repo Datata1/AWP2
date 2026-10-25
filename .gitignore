@@ -17,6 +17,7 @@ models/*
 !models/.gitkeep
 reports/figures/*
 !reports/figures/.gitkeep
+automl-*/
 
 # Persönliche Stundendoku (Repo ist öffentlich)
 stundendoku/*
