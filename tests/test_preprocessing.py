@@ -5,7 +5,9 @@ import unittest
 
 import numpy as np
 import pandas as pd
+from scipy.linalg import eigh
 from sklearn.base import clone
+from sklearn.neighbors import kneighbors_graph
 
 from awp2 import preprocessing
 from awp2.config import (
@@ -19,6 +21,7 @@ from awp2.preprocessing import (
     AddVegetationIndices,
     AezMonthEncoder,
     InterpolateBands,
+    LocalityPreservingProjection,
     PreprocessingConfig,
     StandardNormalVariate,
     build_preprocessor,
@@ -94,6 +97,54 @@ class SpectralReductionContractTest(unittest.TestCase):
                     len(describe_preprocessor(preprocessor)),
                     len(preprocessor.named_transformers_["spectra"].steps),
                 )
+
+
+class LocalityPreservingProjectionTest(unittest.TestCase):
+    def setUp(self) -> None:
+        generator = np.random.default_rng(SEED)
+        independent = generator.normal(size=(32, 3))
+        self.features = pd.DataFrame(
+            np.column_stack([independent, independent[:, 0], independent[:, 0], np.zeros(32)]),
+            columns=["X681", "X691", "X702", "X712", "X722", "X732"],
+        )
+
+    def test_dependent_bands_produce_finite_nonconstant_components(self) -> None:
+        for scale in (1e-8, 1.0, 1e8):
+            with self.subTest(scale=scale):
+                features = self.features * scale
+                transformer = LocalityPreservingProjection(n_components=2, n_neighbors=3)
+                transformed = transformer.fit_transform(features)
+                self.assertEqual(transformed.shape, (32, 2))
+                self.assertTrue(np.isfinite(transformed.to_numpy()).all())
+                self.assertTrue((transformed.var() > 0).all())
+                pd.testing.assert_frame_equal(
+                    transformed, clone(transformer).fit_transform(features)
+                )
+
+    def test_full_rank_projection_matches_generalized_eigensolver(self) -> None:
+        features = self.features.iloc[:, :3]
+        values = features.to_numpy()
+        graph = kneighbors_graph(values, 3, include_self=False)
+        adjacency = graph.maximum(graph.T)
+        degrees = np.asarray(adjacency.sum(axis=1)).ravel()
+        left = (values * degrees[:, None] - adjacency @ values).T @ values
+        right = (values * degrees[:, None]).T @ values
+        _, expected = eigh(left, right, subset_by_index=[0, 1])
+        transformer = LocalityPreservingProjection(n_components=2, n_neighbors=3).fit(features)
+        np.testing.assert_allclose(
+            transformer.projection_ @ transformer.projection_.T,
+            expected @ expected.T,
+            rtol=1e-7,
+            atol=1e-12,
+        )
+
+    def test_component_count_cannot_exceed_effective_rank(self) -> None:
+        with self.assertRaisesRegex(ValueError, "rank"):
+            LocalityPreservingProjection(n_components=4, n_neighbors=3).fit(self.features)
+
+    def test_zero_spectra_fail_with_a_clear_error(self) -> None:
+        with self.assertRaisesRegex(ValueError, "rank"):
+            LocalityPreservingProjection(n_components=2, n_neighbors=3).fit(self.features * 0)
 
 
 class PreprocessingContractTest(unittest.TestCase):

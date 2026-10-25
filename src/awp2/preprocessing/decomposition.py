@@ -10,6 +10,7 @@ from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
 
 from awp2.config import (
+    LPP_RANK_RELATIVE_TOLERANCE,
     PCA_FEATURE_NAMES,
     SEED,
 )
@@ -143,7 +144,8 @@ class LocalityPreservingProjection(_BandTransformer):
     Builds a symmetric binary k-nearest-neighbour graph over the training spectra and keeps
     the projection that best preserves neighbour relations (smallest eigenvectors of the
     generalized problem ``XLX'a = lXDX'a``). New spectra transform linearly, so validation
-    data needs no graph of its own.
+    data needs no graph of its own. Numerically null directions of the degree-weighted
+    spectral covariance are excluded before solving the eigenproblem.
     """
 
     def __init__(self, n_components: int, n_neighbors: int) -> None:
@@ -167,7 +169,8 @@ class LocalityPreservingProjection(_BandTransformer):
             The fitted transformer.
 
         Raises:
-            ValueError: If the component or neighbour counts are not positive.
+            ValueError: If the component or neighbour counts are not positive, or if the
+                component count exceeds the numerical rank of the weighted training spectra.
         """
         X = self._check(X)
         if self.n_components < 1 or self.n_neighbors < 1:
@@ -180,8 +183,20 @@ class LocalityPreservingProjection(_BandTransformer):
         spread = values * degrees[:, None] - adjacency @ values
         left = spread.T @ values
         right = (values * degrees[:, None]).T @ values
-        _, eigenvectors = eigh(left, right, subset_by_index=[0, self.n_components - 1])
-        self.projection_ = eigenvectors
+        eigenvalues, basis = eigh((right + right.T) / 2)
+        retained = eigenvalues > eigenvalues.max() * LPP_RANK_RELATIVE_TOLERANCE
+        self.effective_rank_ = int(np.count_nonzero(retained))
+        if self.n_components > self.effective_rank_:
+            raise ValueError(
+                f"n_components={self.n_components} exceeds the numerical rank "
+                f"of the weighted training spectra ({self.effective_rank_})"
+            )
+        whitening = basis[:, retained] / np.sqrt(eigenvalues[retained])
+        reduced = whitening.T @ left @ whitening
+        _, eigenvectors = eigh(
+            (reduced + reduced.T) / 2, subset_by_index=[0, self.n_components - 1]
+        )
+        self.projection_ = whitening @ eigenvectors
         self.feature_names_out_ = [f"lpp{position}" for position in range(self.n_components)]
         return self
 
