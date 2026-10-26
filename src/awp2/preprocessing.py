@@ -4,6 +4,7 @@ import re
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Self
 
 import numpy as np
@@ -14,6 +15,7 @@ from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.decomposition import NMF, PCA, FastICA
+from sklearn.feature_selection import f_classif, mutual_info_classif
 from sklearn.impute import SimpleImputer
 from sklearn.neighbors import kneighbors_graph
 from sklearn.neural_network import BernoulliRBM
@@ -27,6 +29,8 @@ from awp2.config import (
     AEZ_MONTH_SEP,
     BAND_PATTERN,
     BAND_PREFIX,
+    F_CLASSIF_SCORE,
+    HYPERION_SENSOR,
     INDEX_WAVELENGTH_TOLERANCE_NM,
     MCARI_GREEN_WEIGHT,
     MEAN_ALBEDO_COL,
@@ -42,11 +46,17 @@ from awp2.config import (
     REIP_POLYNOMIAL_WINDOW_NM,
     SAVGOL_SPLIT_GAP_NM,
     SEED,
+    SENTINEL2_BANDS,
+    SENTINEL2_SENSOR,
+    SPECTRAL_REGIONS,
     TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
     VEGETATION_INDEX_SPECS,
+    BandScore,
+    Sensor,
+    SensorBand,
 )
-from awp2.data import wavelength, wavelengths
+from awp2.data import combined_label, wavelength, wavelengths
 
 
 def nearest_band(target_wavelength_nm: int, band_names: Sequence[str]) -> str:
@@ -98,9 +108,7 @@ def _band_window(
     Raises:
         ValueError: If the resolved window contains too few available bands.
     """
-    start_band, end_band = (
-        nearest_band(target_nm, band_names) for target_nm in target_window_nm
-    )
+    start_band, end_band = (nearest_band(target_nm, band_names) for target_nm in target_window_nm)
     start_nm, end_nm = sorted((wavelength(start_band), wavelength(end_band)))
     window_bands = tuple(
         sorted(
@@ -455,6 +463,170 @@ class StandardNormalVariate(_BandTransformer):
         return pd.DataFrame(corrected, index=X.index, columns=X.columns)
 
 
+class KeepEveryNthBand(_BandTransformer):
+    """Keep every ``step``-th band, starting with the first, to coarsen the spectral sampling.
+
+    Counts the bands it receives, so after ``DropEmptyBands`` the step runs over the usable
+    bands and does not land in the empty water-absorption gaps.
+    """
+
+    def __init__(self, step: int) -> None:
+        """Set the distance between kept bands.
+
+        Args:
+            step: Distance between kept bands, in bands; 1 keeps all.
+        """
+        self.step = step
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Choose the kept bands from the column order.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``step`` is smaller than 1.
+        """
+        if self.step < 1:
+            raise ValueError(f"step must be at least 1, got {self.step}")
+        X = self._check(X)
+        self._set_input(X)
+        self.feature_names_out_ = list(X.columns[:: self.step])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to every ``step``-th band.
+        """
+        return self._check(X)[self.feature_names_out_]
+
+
+class SimulateSensor(_BandTransformer):
+    """Resample the hyperspectral bands to the bands of a multispectral sensor.
+
+    Each sensor band is the plain mean of the bands inside its bandwidth, a box-shaped
+    approximation of the real spectral response. Outputs keep the band-column format
+    (``X<center nm>``), so all later spectral steps and wavelength plots still apply.
+    """
+
+    def __init__(self, bands: tuple[SensorBand, ...] = SENTINEL2_BANDS) -> None:
+        """Set the sensor bands to simulate.
+
+        Args:
+            bands: Central wavelength and bandwidth of every sensor band.
+        """
+        self.bands = bands
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Assign the input bands to the sensor bands.
+
+        Args:
+            X: Gap-free band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a sensor band contains no input band.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        input_wavelengths = np.asarray(wavelengths(X))
+        self.members_: dict[str, list[str]] = {}
+        for band in self.bands:
+            inside = np.abs(input_wavelengths - band.center_nm) <= band.width_nm / 2
+            if not inside.any():
+                raise ValueError(f"no input band inside sensor band {band.name}")
+            self.members_[f"{BAND_PREFIX}{band.center_nm}"] = list(X.columns[inside])
+        self.feature_names_out_ = list(self.members_)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Average the input bands per sensor band.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column per sensor band, named by its central wavelength.
+        """
+        X = self._check(X)
+        return pd.DataFrame(
+            {name: X[members].mean(axis=1) for name, members in self.members_.items()},
+            index=X.index,
+        )
+
+
+class SelectBands(_BandTransformer):
+    """Keep the ``k`` bands that separate the crop/stage pairs best on their own.
+
+    Scores every band univariately against the combined crop/stage label, so a band that
+    helps for either target counts. Belongs inside the model pipeline: fitted on a training
+    fold, the choice never sees validation labels.
+    """
+
+    def __init__(self, k: int, score: BandScore = F_CLASSIF_SCORE) -> None:
+        """Set the number of bands and the scoring function.
+
+        Args:
+            k: Number of bands to keep.
+            score: ``"f_classif"`` (ANOVA F, linear separability) or ``"mutual_info"``
+                (also non-linear dependence, slower).
+        """
+        self.k = k
+        self.score = score
+
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame | pd.Series) -> Self:
+        """Score the bands and remember the ``k`` best.
+
+        Args:
+            X: Band columns of the training part.
+            y: Targets with ``Crop`` and ``Stage``, or one label per row.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``k`` exceeds the number of bands.
+        """
+        X = self._check(X)
+        if not 1 <= self.k <= X.shape[1]:
+            raise ValueError(f"k must be between 1 and {X.shape[1]} bands, got {self.k}")
+        self._set_input(X)
+        labels = combined_label(y) if isinstance(y, pd.DataFrame) else y
+        if self.score == F_CLASSIF_SCORE:
+            scores, _p_values = f_classif(X, labels)
+        else:
+            scores = mutual_info_classif(X, labels, random_state=SEED)
+        self.scores_ = pd.Series(np.nan_to_num(scores), index=X.columns)
+        best = set(self.scores_.nlargest(self.k).index)
+        self.feature_names_out_ = [band for band in X.columns if band in best]
+        self.selected_wavelengths_ = [wavelength(band) for band in self.feature_names_out_]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to the selected bands, in wavelength order.
+        """
+        check_is_fitted(self, "feature_names_out_")
+        return self._check(X)[self.feature_names_out_]
+
+
 class OrthogonalSubspaceProjection(_BandTransformer):
     """Unsupervised OSP by automatic target generation: iterative endmember signatures.
 
@@ -751,9 +923,7 @@ class AddVegetationIndices(_BandTransformer):
         r800, r550 = (reflectance[band] for band in index_bands["SR_800_550"])
         _, r660 = (reflectance[band] for band in index_bands["ND_750_660"])
         _, r680 = (reflectance[band] for band in index_bands["ND_800_680"])
-        r750_msr, r705_msr, r445 = (
-            reflectance[band] for band in index_bands["MSR_750_445"]
-        )
+        r750_msr, r705_msr, r445 = (reflectance[band] for band in index_bands["MSR_750_445"])
         r700, r670, _ = (reflectance[band] for band in index_bands["MCARI"])
         _, r500, _ = (reflectance[band] for band in index_bands["PSRI"])
         r531, r570 = (reflectance[band] for band in index_bands["PRI"])
@@ -1087,8 +1257,29 @@ class PreprocessingConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
+    spectral_regions: tuple[str, ...] | None = Field(
+        default=None,
+        description="Restrict every spectral branch to these SPECTRAL_REGIONS before "
+        "interpolation. None keeps all bands; () gives a metadata-only baseline.",
+    )
     use_meta: bool = Field(
         default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
+    )
+    use_spectra: bool = Field(
+        default=True,
+        description="Use the spectral bands as features; False keeps only the other enabled "
+        "groups (meta, indices, albedo, PC_1/PC_2), e.g. for an indices-only model.",
+    )
+    spectral_sensor: Sensor = Field(
+        default=HYPERION_SENSOR,
+        description="Spectral sampling of the input: hyperion keeps all bands, sentinel2 "
+        "averages them into the 10 Sentinel-2 surface bands (after interpolation).",
+    )
+    spectral_band_step: int | None = Field(
+        default=None,
+        ge=2,
+        description="Keep only every n-th usable band (after interpolation, smoothing and SNV) "
+        "to simulate a coarser spectral resolution; None keeps all bands.",
     )
     use_categorical_context: bool = Field(
         default=False,
@@ -1146,6 +1337,16 @@ class PreprocessingConfig(BaseModel):
         gt=0,
         description="Reduce the spectral bands to this many principal components; "
         "None keeps all bands. Requires use_spectral_standard_scale or use_spectral_centering.",
+    )
+    spectral_select_k: int | None = Field(
+        default=None,
+        gt=0,
+        description="Keep the k bands with the highest univariate score against the crop/stage "
+        "label, fitted per training fold; None keeps all bands.",
+    )
+    spectral_select_score: BandScore = Field(
+        default=F_CLASSIF_SCORE,
+        description="Band score for spectral_select_k: f_classif (ANOVA F) or mutual_info.",
     )
     spectral_ica_components: int | None = Field(
         default=None,
@@ -1226,12 +1427,37 @@ class PreprocessingConfig(BaseModel):
 
         Raises:
             ValueError: If ``use_aez_month`` is set without ``use_meta`` or with
-                ``use_categorical_context``; if more than one reduction method is selected; if
-                centering,
+                ``use_categorical_context``; if ``spectral_regions`` repeats or does not know a
+                region, is empty without ``use_meta`` or with a spectral feature branch; if more
+                than one reduction method is selected; if centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
-                if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
-                arguments are set without their method or missing with it.
+                if NMF, OSP or DBN get unsuitable input; if Savitzky-Golay or LPP
+                arguments are set without their method or missing with it; or if
+                ``use_spectra=False`` keeps spectral steps or leaves no features.
         """
+        if not self.use_spectra:
+            self._check_without_spectra()
+        if self.spectral_sensor == SENTINEL2_SENSOR and (
+            self.use_savgol or self.spectral_band_step is not None
+        ):
+            raise ValueError(
+                "spectral_sensor='sentinel2' must not combine with savgol or spectral_band_step"
+            )
+        if self.spectral_regions is not None:
+            unknown = set(self.spectral_regions) - {region.name for region in SPECTRAL_REGIONS}
+            if unknown:
+                raise ValueError(f"spectral_regions requires known names; unknown: {unknown}")
+            if len(set(self.spectral_regions)) != len(self.spectral_regions):
+                raise ValueError("spectral_regions requires unique names")
+            if not self.spectral_regions:
+                if not self.use_meta:
+                    raise ValueError("Empty spectral_regions requires use_meta=True")
+                if (
+                    self.use_mean_albedo
+                    or self.use_vegetation_indices
+                    or self.use_principal_components
+                ):
+                    raise ValueError("Spectral feature branches require nonempty spectral_regions")
         if self.use_aez_month and (not self.use_meta or self.use_categorical_context):
             raise ValueError("use_aez_month requires use_meta without use_categorical_context")
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
@@ -1244,6 +1470,7 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
         reductions = [
             self.spectral_pca_components,
+            self.spectral_select_k,
             self.spectral_ica_components,
             self.spectral_nmf_components,
             self.spectral_osp_components,
@@ -1317,6 +1544,42 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("savgol_window_length/polyorder require use_savgol=True")
         return self
 
+    def _check_without_spectra(self) -> None:
+        spectral_steps = {
+            "use_savgol": self.use_savgol,
+            "use_spectral_snv": self.use_spectral_snv,
+            "spectral_sensor": self.spectral_sensor != HYPERION_SENSOR,
+            "spectral_band_step": self.spectral_band_step is not None,
+            "spectral_pca_components": self.spectral_pca_components is not None,
+            "spectral_select_k": self.spectral_select_k is not None,
+            "spectral_ica_components": self.spectral_ica_components is not None,
+            "spectral_nmf_components": self.spectral_nmf_components is not None,
+            "spectral_osp_components": self.spectral_osp_components is not None,
+            "spectral_lpp_components": self.spectral_lpp_components is not None,
+            "spectral_vsrp_components": self.spectral_vsrp_components is not None,
+            "spectral_dbn_layers": self.spectral_dbn_layers is not None,
+        }
+        enabled = [name for name, active in spectral_steps.items() if active]
+        if enabled:
+            raise ValueError(f"use_spectra=False must not combine with spectral steps: {enabled}")
+        if not (
+            self.use_meta
+            or self.use_vegetation_indices
+            or self.use_mean_albedo
+            or self.use_principal_components
+        ):
+            raise ValueError("use_spectra=False needs another feature group")
+
+
+def _region_columns(frame: pd.DataFrame, regions: tuple[str, ...]) -> list[str]:
+    intervals = [region for region in SPECTRAL_REGIONS if region.name in regions]
+    return [
+        column
+        for column in frame.columns
+        if re.fullmatch(BAND_PATTERN, column)
+        and any(region.start_nm <= wavelength(column) < region.end_nm for region in intervals)
+    ]
+
 
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
     """Build the standard preprocessing as one sklearn transformer.
@@ -1341,6 +1604,11 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ```
     """
     config = config or PreprocessingConfig()
+    band_selector = (
+        make_column_selector(pattern=BAND_PATTERN)
+        if config.spectral_regions is None
+        else partial(_region_columns, regions=config.spectral_regions)
+    )
     if config.scale:
         warnings.warn(
             "PreprocessingConfig(scale=...) is deprecated and will be removed soon; "
@@ -1352,6 +1620,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ("drop_empty", DropEmptyBands()),
         ("interpolate", InterpolateBands(config.max_interpolation_gap_nm)),
     ]
+    if config.spectral_sensor == SENTINEL2_SENSOR:
+        spectra.append(("sensor", SimulateSensor(SENTINEL2_BANDS)))
     if config.use_savgol:
         assert config.savgol_window_length is not None and config.savgol_polyorder is not None
         spectra.append(
@@ -1359,6 +1629,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
+    if config.spectral_band_step is not None:
+        spectra.append(("band_step", KeepEveryNthBand(config.spectral_band_step)))
     spectra.extend(_spectral_scaler(config))
     pca_components = config.spectral_pca_components
     ica_components = config.spectral_ica_components
@@ -1369,6 +1641,10 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     dbn_layers = config.spectral_dbn_layers
     if pca_components is not None:
         spectra.append(("pca", PCA(n_components=pca_components, random_state=SEED)))
+    elif config.spectral_select_k is not None:
+        spectra.append(
+            ("select_k", SelectBands(config.spectral_select_k, config.spectral_select_score))
+        )
     elif ica_components is not None:
         spectra.append(("ica", FastICA(n_components=ica_components, random_state=SEED)))
     elif nmf_components is not None:
@@ -1417,7 +1693,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                         *_spectral_scaler(config),
                     ]
                 ),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_vegetation_indices:
@@ -1438,7 +1714,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             (
                 "indices",
                 Pipeline(index_steps),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_principal_components:
@@ -1453,12 +1729,13 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                         ("pca", PrincipalComponentFeatures()),
                     ]
                 ),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_aez_month:
         transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
-    transformers.append(("spectra", Pipeline(spectra), make_column_selector(pattern=BAND_PATTERN)))
+    if config.use_spectra:
+        transformers.append(("spectra", Pipeline(spectra), band_selector))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
 
@@ -1496,6 +1773,10 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return known[name]
     if name == "interpolate" and isinstance(step, InterpolateBands):
         return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "sensor" and isinstance(step, SimulateSensor):
+        return f"Simulate {len(step.bands)} multispectral sensor bands"
+    if name == "band_step" and isinstance(step, KeepEveryNthBand):
+        return f"Keep every {step.step}. band"
     if name == "select" and isinstance(step, SelectVegetationIndices):
         return "Keep only the vegetation indices"
     if name == "savgol" and isinstance(step, SavitzkyGolaySmoothing):
@@ -1505,6 +1786,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         )
     if name == "pca" and isinstance(step, PCA):
         return f"PCA to {step.n_components} components"
+    if name == "select_k" and isinstance(step, SelectBands):
+        return f"Select {step.k} bands ({step.score})"
     if name == "pca" and isinstance(step, PrincipalComponentFeatures):
         return "PCA to PC_1 and PC_2"
     if name == "ica" and isinstance(step, FastICA):
@@ -1660,12 +1943,23 @@ _ALBEDO_SCALER_NODES: tuple[_OptionNode, ...] = (
 )
 
 _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
-    _OptionNode("spectra", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "spectra",
+        "drop_empty",
+        f"Leere Bänder entfernen [{_config_fields('use_spectra')}, Standard]",
+        True,
+    ),
     _OptionNode(
         "spectra",
         "interpolate",
         f"Lücken interpolieren (immer, {_config_fields('max_interpolation_gap_nm')})",
         False,
+    ),
+    _OptionNode(
+        "spectra",
+        "sensor",
+        f"Sentinel-2 simulieren [{_config_fields('spectral_sensor')} = sentinel2]",
+        True,
     ),
     _OptionNode(
         "spectra",
@@ -1676,6 +1970,12 @@ _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
         True,
     ),
     _OptionNode("spectra", "snv", f"SNV [{_config_fields('use_spectral_snv')}]", True),
+    _OptionNode(
+        "spectra",
+        "band_step",
+        f"Jedes n-te Band [{_config_fields('spectral_band_step')}]",
+        True,
+    ),
 )
 
 _INDICES_NODES: tuple[_OptionNode, ...] = (
@@ -1756,6 +2056,14 @@ _REDUCTION_NODES: tuple[_OptionNode, ...] = (
         "spectra",
         "pca",
         f"PCA [{_config_fields('spectral_pca_components')} | braucht Standard/Center]",
+        False,
+    ),
+    _OptionNode(
+        "spectra",
+        "select_k",
+        "Bandauswahl ["
+        + _config_fields("spectral_select_k", "spectral_select_score")
+        + " | überwacht, je Fold]",
         False,
     ),
     _OptionNode(
@@ -1850,7 +2158,7 @@ def pipeline_options_diagram() -> str:
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select, impute = _INDICES_NODES
     pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
-    s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
+    s_drop, s_inter, sensor, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
     diagram: list[str] = ["```mermaid", "flowchart TD"]
@@ -1926,16 +2234,18 @@ def pipeline_options_diagram() -> str:
     link(_node_id(pc_scale), pc_pca)
     link(_node_id(pc_pca), concat)
     link(_node_id(s_drop), s_inter)
-    link(_node_id(s_inter), savgol)
+    link(_node_id(s_inter), sensor)
+    link(_node_id(sensor), savgol)
     link(_node_id(savgol), snv)
-    link(_node_id(snv), scaler_diamond)
+    link(_node_id(snv), band_step)
+    link(_node_id(band_step), scaler_diamond)
     for node in _SCALER_NODES:
         link(_node_id(scaler_diamond), node)
         link(_node_id(node), reduction_diamond)
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, albedo,aez_month, select):
+    for node in (aez, cyclic, numeric, albedo, aez_month, select):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")
