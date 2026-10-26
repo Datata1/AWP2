@@ -41,6 +41,8 @@ MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
 BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
 INDEX_WAVELENGTH_TOLERANCE_NM = 5
+# Hyperion samples every ~10 nm; a larger step marks a block of deleted bands.
+BAND_GAP_NM = 20
 REFLECTANCE_PERCENT_SCALE = 100.0
 MCARI_GREEN_WEIGHT = 0.2
 TCARI_MULTIPLIER = 3.0
@@ -380,6 +382,33 @@ SAVGOL_SPLIT_GAP_NM = 20
 AEZ_RANGE = (1, 20)
 MONTH_RANGE = (1, 12)
 
+
+@dataclass(frozen=True)
+class SpectralRegion:
+    """A named wavelength interval of the vegetation spectrum.
+
+    Args:
+        name: Display name.
+        start_nm: Lower bound in nanometres (inclusive).
+        end_nm: Upper bound in nanometres (exclusive).
+    """
+
+    name: str
+    start_nm: int
+    end_nm: int
+
+
+# Boundaries follow docs/domaene/vegetation.md: red edge 680-750 nm, SWIR from about 1300 nm.
+SPECTRAL_REGIONS: tuple[SpectralRegion, ...] = (
+    SpectralRegion("Blau", 400, 500),
+    SpectralRegion("Grün", 500, 600),
+    SpectralRegion("Rot", 600, 680),
+    SpectralRegion("Red Edge", 680, 750),
+    SpectralRegion("NIR", 750, 1300),
+    SpectralRegion("SWIR 1", 1300, 1800),
+    SpectralRegion("SWIR 2", 1800, 2500),
+)
+
 Crop = Literal["corn", "cotton", "rice", "soybean", "winter_wheat"]
 Stage = Literal["Emerge_VEarly", "Early_Mid", "Critical", "Late", "Mature_Senesc", "Harvest"]
 CROPS: tuple[str, ...] = get_args(Crop)
@@ -521,6 +550,42 @@ MLP_DEFAULT_MAX_EPOCHS = 50
 MLP_DEFAULT_BATCH_SIZE = 64
 MLP_EARLY_STOPPING_PATIENCE = 8
 MLP_INNER_VALIDATION_FRACTION = 0.1
+PERMUTATION_REPEATS = 3
+PERMUTATION_N_JOBS = -1
+REGION_PERMUTATION_REPEATS = 5  # regions are few and cheap, so they get more shuffles than bands
+RANDOM_BAND_GROUP_COUNT = 40  # windows per region; fewer exist where a region fills most bands
+NULL_QUANTILE = 0.95
+COMBINED_METRIC = "bacc_combined"
+GroupVariantKind = Literal["all", "only", "only_no_meta", "without", "meta_only"]
+(
+    ALL_GROUPS_KIND,
+    ONLY_GROUP_KIND,
+    ONLY_GROUP_NO_META_KIND,
+    WITHOUT_GROUP_KIND,
+    META_ONLY_KIND,
+) = get_args(GroupVariantKind)
+ALL_BANDS_VARIANT = "all-bands"
+ALL_BANDS_NO_META_VARIANT = "all-bands-no-meta"
+META_ONLY_VARIANT = "meta-only"
+ONLY_VARIANT_PREFIX = "only"
+WITHOUT_VARIANT_PREFIX = "without"
+NO_META_VARIANT_SUFFIX = "no-meta"
+GROUP_STUDY_RUN_PREFIX = "spectral_groups"
+GROUP_STUDY_EXPERIMENT = "spectral-groups"  # own MLflow experiment: a question besides the ranking
+GROUP_STUDY_APPROACH = "spectral-groups"
+GROUP_STUDY_C_GRID = (10.0, 100.0, 1000.0)
+GROUP_STUDY_GAMMA_GRID = (0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0)  # few bands need a wide kernel
+GROUP_STUDY_C_PARAM = "estimator__C"
+GROUP_STUDY_GAMMA_PARAM = "estimator__gamma"
+GROUP_STUDY_N_JOBS = -1
+GROUP_STUDY_CACHE_DIR = INTERIM_DATA_DIR / "spectral_groups_cache"  # resume after an interruption
+ImportanceGrouping = Literal["band", "region"]
+ImportanceKind = Literal["metric", "crop", "stage", "pair"]
+BAND_GROUPING, REGION_GROUPING = get_args(ImportanceGrouping)
+METRIC_KIND, CROP_KIND, STAGE_KIND, PAIR_KIND = get_args(ImportanceKind)
+IMPORTANCE_LEVELS = ("group", "fold", "repeat")
+IMPORTANCE_COLUMN_LEVELS = ("kind", "target")
+IMPORTANCE_METRICS = ("bacc_crop", "bacc_stage", "bacc_combined")
 SLUG_PATTERN = (
     r"^[a-z0-9][a-z0-9_-]*$"  # lowercase, no spaces: names of runs, approaches, experiments
 )
