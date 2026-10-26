@@ -4,6 +4,9 @@ Jedes Experiment bekommt eine Zeile (wird von `/experiment` automatisch ergänzt
 `run()` auf dem gemeinsamen Validierungs-Split; Details jedes Laufs lokal in MLflow unter der
 Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 
+**Split:** Seit 2026-10-20 ist der Standard 80/20. Ältere Zeilen beruhen auf 70/30 und sind nur
+über Läufe mit derselben `split.validation_size` vergleichbar.
+
 | Datum | ID | Autor | Ansatz | BAcc Crop | BAcc Stage | BAcc kombiniert | Macro-F1 kombiniert | Samples-F1 | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-09-30 | dummy_most_frequent | Datata1 | Baseline | 0.200 | 0.167 | 0.044 | 0.009 | 0.326 | f8cf4ecc | Untergrenze: immer die häufigste Klasse |
@@ -73,3 +76,4 @@ Diese Läufe verwenden ausschließlich die Trainingsfolds. Sie haben keine Valid
 | 2026-10-12 | hierarchical_ensemble_search | Datata1 | Hierarchisch | 0.844 | 9259062a | Gewichtete Abstimmung (#113, korrigierte Gleichstandsregel): RBF-SVM + jede Teilmenge aus kNN, logistischer Regression, Extra Trees × SVM-Gewicht 1/1.5/2 (21 Kandidaten, etwa 5 verschiedene Entscheidungsregeln); bestes Ensemble alle vier, Gewicht 1 (0.844) – Gewinn 0.0045 unter `MIN_CV_GAIN` 0.005, keine Validierung; SVM bleibt Referenz. |
 | 2026-10-20 | reduction_svm_* | Datata1 | Kombinierte Klasse | 0.860 (Sentinel-2) | 0ac067c3 | **80/20-Split.** Trade-off-Kurve über 17 Eingaben (#155), gleiches Raster `C` × `gamma`: alle Bänder 0.859; PCA 2/5/10/20/40 0.765/0.811/0.846/0.851/0.856 (immer 131 Bänder); Bandauswahl 5/10/20/40/80 0.711/0.739/0.755/0.788/0.841; jedes 2./4./8. Band 0.857/0.859/0.849; Sentinel-2 0.860; nur Indizes 0.840; nur Meta 0.537. Notebook `33_jd_datenreduktion`. |
 | 2026-10-20 | audit_svm_* | Datata1 | Kombinierte Klasse | 0.859 (Referenz, + Albedo) | 7571d2ea | **80/20-Split.** Feature-Audit der Referenz: ohne Meta 0.787 (a91b83fe), + Indizes 0.848 (fded1d9c), + Albedo 0.859 (79394678), + PC_1/PC_2 0.850 (5d454ca9), nur Indizes + Meta 0.840 (f283078a), nur Meta 0.537 (56eefe21) – keine Zusatzgruppe trägt. |
+| 2026-10-22 | spectral_groups_*_search (24 Läufe) | QMoWo | Spektralgruppen | 0.860 (Referenz) | ddb9bdeb | Feedback zur Permutation Importance (#34): Referenz-SVM je Spektralregion nur mit der Region (mit/ohne Metadaten) und ohne die Region neu trainiert, je Variante eigene Suche (`C` 10/100/1000 × `gamma` 0.001–1, 21 Kandidaten), MLflow-Experiment `spectral-groups`. Referenz alle Bänder 0.860 ± 0.027, ohne Metadaten 0.786 (`750c1d51`), nur Metadaten 0.536 (`f006e58e`). Nur Red Edge + Metadaten 0.792 (`d078dbdb`), nur NIR 0.811 (`912dfb99`), nur SWIR 1 0.787 (`c372a045`); ohne eine Region 0.853–0.864 (Differenz −0.007 bis +0.003) – keine Region allein unverzichtbar. Keine Validierung, ändert keine Referenz. Details: [Feature Importance](feature-importance.md), Abschnitt 6. |
