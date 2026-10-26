@@ -12,6 +12,7 @@ from sklearn.base import BaseEstimator
 
 from awp2.config import (
     REDUCTION_BAND_STEPS,
+    REDUCTION_BEST_PARAMS_COL,
     REDUCTION_FAMILY_COL,
     REDUCTION_PCA_COMPONENTS,
     REDUCTION_SELECT_K,
@@ -107,7 +108,8 @@ def reduction_curve(
 
     Returns:
         One row per variant: variant, family, ``n_input_features``, ``n_measured_bands``,
-            tuning run id, and per metric its mean and ``<metric>_std``.
+            tuning run id, best hyperparameters, and per metric its mean and
+            ``<metric>_std``.
     """
     split = load_split()
     folds = load_folds()
@@ -134,6 +136,7 @@ def reduction_curve(
                 REDUCTION_FAMILY_COL: variant.family,
                 **tuned.input_size._asdict(),
                 REDUCTION_TUNING_RUN_COL: tuned.run_id,
+                REDUCTION_BEST_PARAMS_COL: tuned.best_params,
                 **fold_scores.mean().to_dict(),
                 **fold_scores.std().add_suffix(STD_SUFFIX).to_dict(),
             }

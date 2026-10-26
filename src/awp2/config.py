@@ -478,6 +478,9 @@ REDUCTION_BAND_STEPS = (2, 4, 8)
 REDUCTION_FAMILY_COL = "family"
 REDUCTION_VARIANT_COL = "variant"
 REDUCTION_TUNING_RUN_COL = "tuning_run"
+REDUCTION_BEST_PARAMS_COL = "best_params"
+# a reduced input counts as equivalent if it loses at most this much CV-BAcc against all bands
+REDUCTION_MAX_CV_LOSS = 0.01
 N_INPUT_FEATURES_COL = "n_input_features"  # field names of preprocessing.InputSize
 N_MEASURED_BANDS_COL = "n_measured_bands"
 STD_SUFFIX = "_std"

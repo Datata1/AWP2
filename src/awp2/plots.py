@@ -406,9 +406,10 @@ def plot_tradeoff(
         ax.axhline(reference.iloc[0], color="grey", linestyle="--", linewidth=1)
     # metadata-only has zero bands, which a plain log axis cannot show
     ax.set_xscale("symlog", linthresh=1)
+    ax.set_xlim(-0.3, curve[x].max() * 1.5)
     ax.set_xlabel("Gemessene Bänder" if x == N_MEASURED_BANDS_COL else "Merkmale im Modell")
     ax.set_ylabel(f"{METRIC_LABELS.get(metric, metric)} (CV)")
-    ax.legend(fontsize="small")
+    ax.legend(fontsize="small", loc="lower right")
     ax.grid(alpha=0.3)
     return ax
 
