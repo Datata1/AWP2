@@ -14,6 +14,8 @@ Codes. Wie die Bausteine zusammenspielen, erklären die Seiten unter [Daten](../
 | [`awp2.importance`](importance.md) | Permutation-Importance auf Spaltengruppen (Spektralregionen, Bandfenster) |
 | [`awp2.reduction`](reduction.md) | Datenreduktionsstudie: Varianten und Trade-off-Kurve Qualität vs. Input |
 | [`awp2.plots`](plots.md) | Gemeinsame Plots, z. B. Spektren |
+| [`awp2.explain`](explain.md) | Permutation Importance für Merkmalsgruppen |
+| [`awp2.group_study`](group_study.md) | Referenzmodell auf einzelnen Spektralregionen neu trainieren und vergleichen |
 
 Neue öffentliche Funktionen brauchen einen Docstring im Google-Stil (`Args:`, `Returns:`,
 `Raises:`) – `make lint` prüft das.
