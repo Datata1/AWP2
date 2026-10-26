@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import Self
+from typing import NamedTuple, Self
 
 import numpy as np
 import pandas as pd
@@ -1738,6 +1738,59 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         transformers.append(("spectra", Pipeline(spectra), band_selector))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
+
+
+class InputSize(NamedTuple):
+    """How much input a fitted preprocessor uses.
+
+    Attributes:
+        n_input_features: Columns the model receives after preprocessing.
+        n_measured_bands: Spectral bands a sensor has to measure: Hyperion bands, or the bands
+            of a simulated sensor; PCA still needs all bands, band selection fewer.
+    """
+
+    n_input_features: int
+    n_measured_bands: int
+
+
+def input_size(preprocessor: ColumnTransformer) -> InputSize:
+    """Count the model features and the measured bands of a fitted preprocessor.
+
+    Assumes that every kept band is measured, so interpolation never has to fill it from
+    neighbours.
+
+    Args:
+        preprocessor: Built by ``build_preprocessor`` and fitted.
+
+    Returns:
+        Number of model features and of distinct measured bands over all branches.
+    """
+    check_is_fitted(preprocessor)
+    bands: set[str] = set()
+    for _name, branch, _columns in preprocessor.transformers_:
+        if isinstance(branch, Pipeline) and "drop_empty" in branch.named_steps:
+            bands |= _branch_bands(branch)
+    return InputSize(len(preprocessor.get_feature_names_out()), len(bands))
+
+
+def _branch_bands(branch: Pipeline) -> set[str]:
+    sources = {band: {band} for band in branch.named_steps["drop_empty"].feature_names_out_}
+    usable = set(sources)
+    mixes_bands = False
+    for step in branch.named_steps.values():
+        if isinstance(step, SavitzkyGolaySmoothing | StandardNormalVariate):
+            # every output band then depends on its neighbours or on the whole spectrum
+            mixes_bands = True
+        elif isinstance(step, SimulateSensor):
+            # the simulated sensor measures each of its broad bands once
+            sources = {name: {name} for name in step.members_}
+        elif isinstance(step, KeepEveryNthBand | SelectBands):
+            sources = {band: sources[band] for band in step.feature_names_out_}
+        elif isinstance(step, AddVegetationIndices):
+            index_bands = {band for bands in step.index_bands_.values() for band in bands}
+            reip_bands = {*step.reip_lagrangian_bands_, *step.reip_polynomial_bands_}
+            return index_bands | reip_bands
+    return usable if mixes_bands else set().union(*sources.values())
 
 
 def _spectral_scaler(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:

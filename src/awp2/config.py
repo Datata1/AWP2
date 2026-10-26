@@ -457,6 +457,28 @@ SENTINEL2_BANDS: tuple[SensorBand, ...] = (
     SensorBand("B11", 1614, 91),
     SensorBand("B12", 2202, 175),
 )
+
+ReductionFamily = Literal[
+    "all_bands", "pca", "band_selection", "band_step", "sentinel2", "indices_only", "meta_only"
+]
+REDUCTION_FAMILY_LABELS: dict[str, str] = {
+    "all_bands": "Alle Bänder",
+    "pca": "PCA",
+    "band_selection": "Bandauswahl",
+    "band_step": "Jedes n-te Band",
+    "sentinel2": "Sentinel-2",
+    "indices_only": "Nur Indizes",
+    "meta_only": "Nur Meta",
+}
+REDUCTION_PCA_COMPONENTS = (2, 5, 10, 20, 40)
+REDUCTION_SELECT_K = (5, 10, 20, 40, 80)
+REDUCTION_BAND_STEPS = (2, 4, 8)
+REDUCTION_FAMILY_COL = "family"
+REDUCTION_VARIANT_COL = "variant"
+REDUCTION_TUNING_RUN_COL = "tuning_run"
+N_INPUT_FEATURES_COL = "n_input_features"  # field names of preprocessing.InputSize
+N_MEASURED_BANDS_COL = "n_measured_bands"
+STD_SUFFIX = "_std"
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
@@ -566,6 +588,7 @@ MLFLOW_ARTIFACTS_DIR = Path(
     os.environ.get("MLFLOW_ARTIFACTS_DIR", PROJECT_ROOT / "mlruns")
 ).resolve()
 MLFLOW_EXPERIMENT = "crop-stage"  # main question: which approach predicts crop and stage best
+MLFLOW_REDUCTION_EXPERIMENT = "band-reduction"  # how much input does the quality need
 # Marks the experiment as classic ML so the MLflow UI opens the "Model training" view.
 MLFLOW_EXPERIMENT_KIND_TAG = ("mlflow.experimentKind", "custom_model_development")
 MLFLOW_SYSTEM_METRICS_INTERVAL_S = (

@@ -36,7 +36,13 @@ from awp2.importance import (
     permutation_drops,
     summarize_drops,
 )
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor, describe_preprocessor
+from awp2.preprocessing import (
+    InputSize,
+    PreprocessingConfig,
+    build_preprocessor,
+    describe_preprocessor,
+    input_size,
+)
 from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
 
 _MODEL_STEP = "model"
@@ -118,6 +124,7 @@ class RunResult:
         run_id: MLflow run id, ``None`` if the run was not tracked.
         model_uri: URI to load the stored model with ``mlflow.sklearn.load_model``, ``None`` if
             no model was stored.
+        input_size: Model features and measured bands of the fitted preprocessing.
     """
 
     config: RunConfig
@@ -127,6 +134,7 @@ class RunResult:
     y_pred: pd.DataFrame
     run_id: str | None
     model_uri: str | None
+    input_size: InputSize
 
 
 @dataclass(frozen=True)
@@ -140,6 +148,8 @@ class TuneResult:
         best_model: Unfitted copy of the model with ``best_params`` – pass it to :func:`run`.
         candidates: One row per candidate: ``params``, ``mean``, ``std``, ``rank``, ``fold_<i>``.
         run_id: MLflow run id of the tuning run, ``None`` if it was not tracked.
+        input_size: Model features and measured bands of the preprocessing, fitted on the
+            whole training part.
     """
 
     config: TuneConfig
@@ -148,6 +158,7 @@ class TuneResult:
     best_model: BaseEstimator
     candidates: pd.DataFrame
     run_id: str | None
+    input_size: InputSize
 
 
 def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
@@ -247,7 +258,8 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         }
     )
     best = candidates.loc[candidates["rank"].idxmin()]
-    run_id = _track_tuning(config, model, candidates, split) if config.track else None
+    size = input_size(build_preprocessor(config.preprocessing).fit(split.X_train, split.y_train))
+    run_id = _track_tuning(config, model, candidates, split, size) if config.track else None
     return TuneResult(
         config=config,
         best_params=best["params"],
@@ -255,6 +267,7 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         best_model=clone(model).set_params(**best["params"]),
         candidates=candidates,
         run_id=run_id,
+        input_size=size,
     )
 
 
@@ -295,7 +308,10 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
             stacklevel=2,
         )
 
-    tracked = _track_run(config, model, metrics, pipeline, split, y_pred) if config.track else None
+    size = input_size(pipeline.named_steps[_PREPROCESS_STEP])
+    tracked = (
+        _track_run(config, model, metrics, pipeline, split, y_pred, size) if config.track else None
+    )
     return RunResult(
         config,
         metrics,
@@ -304,6 +320,7 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
         y_pred,
         run_id=tracked.run_id if tracked else None,
         model_uri=tracked.model_uri if tracked else None,
+        input_size=size,
     )
 
 
@@ -381,8 +398,10 @@ def _track_run(
     pipeline: Pipeline,
     split: TrainValSplit,
     y_pred: pd.DataFrame,
+    size: InputSize,
 ) -> TrackedRun | None:
     scores = {name: value for name, value in metrics.model_dump().items() if value is not None}
+    scores.update(size._asdict())
     figure = plot_confusion_matrices(split.y_val, y_pred)
     try:
         return log_run(
@@ -407,7 +426,11 @@ def _track_run(
 
 
 def _track_tuning(
-    config: TuneConfig, model: BaseEstimator, candidates: pd.DataFrame, split: TrainValSplit
+    config: TuneConfig,
+    model: BaseEstimator,
+    candidates: pd.DataFrame,
+    split: TrainValSplit,
+    size: InputSize,
 ) -> str | None:
     try:
         return log_tuning(
@@ -419,6 +442,7 @@ def _track_tuning(
             metric=config.metric,
             candidates=candidates,
             train=pd.concat([split.X_train, split.y_train], axis=1),
+            extra_metrics=size._asdict(),
             system_metrics=config.system_metrics,
         )
     except Exception as error:  # noqa: BLE001 – a tracking problem must not discard the search

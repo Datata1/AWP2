@@ -19,12 +19,16 @@ from awp2.config import (
     IMPORTANCE_METRIC_COL,
     IMPORTANCE_STD_COL,
     META_ONLY_KIND,
+    N_MEASURED_BANDS_COL,
     ONLY_GROUP_KIND,
     ONLY_GROUP_NO_META_KIND,
     RECALL_COL,
+    REDUCTION_FAMILY_COL,
+    REDUCTION_FAMILY_LABELS,
     SAVGOL_SPLIT_GAP_NM,
     SPECTRAL_REGIONS,
     SPECTRAL_REGIONS_NM,
+    STD_SUFFIX,
     SUPPORT_COL,
     TARGET_COLS,
     WITHOUT_GROUP_KIND,
@@ -364,6 +368,48 @@ def plot_error_rate_by(
     ax.set_ylabel("Fehlerrate")
     ax.legend(fontsize="small")
     ax.grid(axis="y", alpha=0.3)
+    return ax
+
+
+def plot_tradeoff(
+    curve: pd.DataFrame,
+    metric: MetricName = "bacc_combined",
+    x: str = N_MEASURED_BANDS_COL,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    """Plot quality against input size, one line per reduction family.
+
+    Args:
+        curve: Output of ``awp2.reduction.reduction_curve``.
+        metric: Score on the y-axis, drawn as mean ± std over the folds.
+        x: ``"n_measured_bands"`` (what a sensor must measure) or ``"n_input_features"``
+            (what the model receives).
+        ax: Axes to draw on; a new figure is created if omitted.
+
+    Returns:
+        The axes; a dashed line marks the reference with all bands.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 5))
+    for family, rows in curve.groupby(REDUCTION_FAMILY_COL, sort=False):
+        rows = rows.sort_values(x)
+        ax.errorbar(
+            rows[x],
+            rows[metric],
+            yerr=rows[f"{metric}{STD_SUFFIX}"],
+            marker="o",
+            capsize=3,
+            label=REDUCTION_FAMILY_LABELS.get(str(family), str(family)),
+        )
+    reference = curve.loc[curve[REDUCTION_FAMILY_COL] == "all_bands", metric]
+    if not reference.empty:
+        ax.axhline(reference.iloc[0], color="grey", linestyle="--", linewidth=1)
+    # metadata-only has zero bands, which a plain log axis cannot show
+    ax.set_xscale("symlog", linthresh=1)
+    ax.set_xlabel("Gemessene Bänder" if x == N_MEASURED_BANDS_COL else "Merkmale im Modell")
+    ax.set_ylabel(f"{METRIC_LABELS.get(metric, metric)} (CV)")
+    ax.legend(fontsize="small")
+    ax.grid(alpha=0.3)
     return ax
 
 
