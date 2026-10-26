@@ -1,6 +1,7 @@
 """Tune and evaluate models on the shared split and track both steps in MLflow."""
 
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,10 +13,22 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-from awp2.config import MLFLOW_EXPERIMENT, SLUG_PATTERN
+from awp2.config import (
+    AEZ_COL,
+    AEZ_FOLDS,
+    AEZ_MONTH_FOLDS,
+    AEZ_MONTH_SEP,
+    MLFLOW_EXPERIMENT,
+    MONTH_COL,
+    RANDOM_FOLDS,
+    SLUG_PATTERN,
+    FoldGrouping,
+)
 from awp2.data import (
+    Fold,
     TrainValSplit,
     balanced_sample_weight,
+    cv_splits,
     load_folds,
     load_split,
     load_split_config,
@@ -29,8 +42,24 @@ from awp2.evaluation import (
     plot_confusion_matrices,
     scorer,
 )
-from awp2.preprocessing import PreprocessingConfig, build_preprocessor, describe_preprocessor
+from awp2.importance import (
+    Groups,
+    ImportanceConfig,
+    ImportanceResult,
+    permutation_drops,
+    summarize_drops,
+)
+from awp2.preprocessing import (
+    InputSize,
+    PreprocessingConfig,
+    build_preprocessor,
+    describe_preprocessor,
+    input_size,
+)
 from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
+
+TrainFilter = Callable[[pd.DataFrame, pd.DataFrame], pd.Series]
+"""Marks training rows (``True``) to leave out, given raw features and targets."""
 
 _MODEL_STEP = "model"
 _PREPROCESS_STEP = "preprocess"
@@ -54,6 +83,11 @@ class _ExperimentConfig(BaseModel):
         pattern=SLUG_PATTERN,
         description="MLflow experiment = the question the run answers; the default is the main "
         "task, other questions (e.g. the band-reduction study) get their own.",
+    )
+    folds: FoldGrouping = Field(
+        default=RANDOM_FOLDS,
+        description="Cross-validation folds: the shared random folds, or group folds that keep "
+        "each AEZ x month cell, month or AEZ in one fold to score unseen acquisitions.",
     )
     preprocessing: PreprocessingConfig = Field(
         default_factory=PreprocessingConfig,
@@ -111,6 +145,7 @@ class RunResult:
         run_id: MLflow run id, ``None`` if the run was not tracked.
         model_uri: URI to load the stored model with ``mlflow.sklearn.load_model``, ``None`` if
             no model was stored.
+        input_size: Model features and measured bands of the fitted preprocessing.
     """
 
     config: RunConfig
@@ -120,6 +155,7 @@ class RunResult:
     y_pred: pd.DataFrame
     run_id: str | None
     model_uri: str | None
+    input_size: InputSize
 
 
 @dataclass(frozen=True)
@@ -133,6 +169,8 @@ class TuneResult:
         best_model: Unfitted copy of the model with ``best_params`` – pass it to :func:`run`.
         candidates: One row per candidate: ``params``, ``mean``, ``std``, ``rank``, ``fold_<i>``.
         run_id: MLflow run id of the tuning run, ``None`` if it was not tracked.
+        input_size: Model features and measured bands of the preprocessing, fitted on the
+            whole training part.
     """
 
     config: TuneConfig
@@ -141,6 +179,34 @@ class TuneResult:
     best_model: BaseEstimator
     candidates: pd.DataFrame
     run_id: str | None
+    input_size: InputSize
+
+
+def cv_folds(grouping: FoldGrouping = RANDOM_FOLDS) -> list[Fold]:
+    """Cross-validation folds of the training part.
+
+    Rows of one AEZ x month cell probably come from the same acquisition (same atmosphere and
+    illumination); random folds then let a model recognise the acquisition. Group folds keep a
+    whole group in one fold and score how well the model carries over to unseen ones.
+
+    Args:
+        grouping: ``"random"`` for the shared folds of ``make data``, or ``"aez_month"``,
+            ``"month"`` or ``"aez"`` for stratified group folds.
+
+    Returns:
+        ``CV_FOLDS`` folds as row positions within ``load_split().X_train``.
+    """
+    if grouping == RANDOM_FOLDS:
+        return load_folds()
+    split = load_split()
+    X = split.X_train
+    if grouping == AEZ_MONTH_FOLDS:
+        groups = X[AEZ_COL].astype(str) + AEZ_MONTH_SEP + X[MONTH_COL].astype(str)
+    elif grouping == AEZ_FOLDS:
+        groups = X[AEZ_COL]
+    else:
+        groups = X[MONTH_COL]
+    return list(cv_splits(X, split.y_train, groups=groups))
 
 
 def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
@@ -175,13 +241,14 @@ def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool | float]:
         },
         "balance_samples": config.balance_samples,
         "split.validation_size": load_split_config().validation_size,
+        "cv.folds": config.folds,
     }
 
 
 def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
     """Search hyperparameters by cross-validation on the training part.
 
-    Uses the shared folds (``load_folds()``) and never touches the validation part, so the
+    Uses the folds of ``config.folds`` (``cv_folds``) and never touches the validation part, so the
     subsequent :func:`run` on the validation part stays an honest estimate. If
     ``config.track``, MLflow gets one tuning run with a nested run per candidate.
 
@@ -216,7 +283,7 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         _pipeline(model, config.preprocessing),
         {f"{_MODEL_STEP}__{key}": values for key, values in config.param_grid.items()},
         scoring=scorer(config.metric),
-        cv=load_folds(),
+        cv=cv_folds(config.folds),
         refit=False,
     )
     search.fit(split.X_train, split.y_train, **_fit_params(config, split.y_train))
@@ -240,7 +307,8 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         }
     )
     best = candidates.loc[candidates["rank"].idxmin()]
-    run_id = _track_tuning(config, model, candidates, split) if config.track else None
+    size = input_size(build_preprocessor(config.preprocessing).fit(split.X_train, split.y_train))
+    run_id = _track_tuning(config, model, candidates, split, size) if config.track else None
     return TuneResult(
         config=config,
         best_params=best["params"],
@@ -248,6 +316,7 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         best_model=clone(model).set_params(**best["params"]),
         candidates=candidates,
         run_id=run_id,
+        input_size=size,
     )
 
 
@@ -288,7 +357,10 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
             stacklevel=2,
         )
 
-    tracked = _track_run(config, model, metrics, pipeline, split, y_pred) if config.track else None
+    size = input_size(pipeline.named_steps[_PREPROCESS_STEP])
+    tracked = (
+        _track_run(config, model, metrics, pipeline, split, y_pred, size) if config.track else None
+    )
     return RunResult(
         config,
         metrics,
@@ -297,13 +369,18 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
         y_pred,
         run_id=tracked.run_id if tracked else None,
         model_uri=tracked.model_uri if tracked else None,
+        input_size=size,
     )
 
 
-def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig) -> pd.DataFrame:
+def out_of_fold_predictions(
+    model: BaseEstimator,
+    config: TuneConfig | RunConfig,
+    train_filter: TrainFilter | None = None,
+) -> pd.DataFrame:
     """Predict every training row with preprocessing + ``model`` fitted on the other folds.
 
-    Uses the shared folds of the training part (``load_folds()``) and never touches the
+    Uses the folds of the training part from ``cv_folds(config.folds)`` and never touches the
     validation part – for analysing errors before the single :func:`run`. Fits exactly like
     :func:`tune`/:func:`run` (``config.preprocessing``, ``config.balance_samples``); nothing is
     tracked.
@@ -311,6 +388,8 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
     Args:
         model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
         config: Configuration the model was tuned or evaluated with, e.g. ``TuneResult.config``.
+        train_filter: Optional rule that marks rows to leave out of training, e.g. outliers.
+            It sees only the training rows of each fold; every held-out row is still predicted.
 
     Returns:
         Out-of-fold predictions with the columns ``Crop`` and ``Stage``, in the row order of
@@ -318,15 +397,56 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
     """
     split = load_split()
     predictions = []
-    for fold in load_folds():
-        y_fold = split.y_train.iloc[fold.train]
+    for fold in cv_folds(config.folds):
+        X_fold, y_fold = split.X_train.iloc[fold.train], split.y_train.iloc[fold.train]
+        if train_filter is not None:
+            keep = ~train_filter(X_fold, y_fold)
+            X_fold, y_fold = X_fold[keep], y_fold[keep]
         pipeline = _pipeline(model, config.preprocessing)
-        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        pipeline.fit(X_fold, y_fold, **_fit_params(config, y_fold))
         fold_index = split.X_train.index[fold.val]
         predictions.append(
             as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)
         )
     return pd.concat(predictions).loc[split.y_train.index]
+
+
+def out_of_fold_importance(
+    model: BaseEstimator,
+    config: TuneConfig | RunConfig,
+    groups: Groups,
+    importance: ImportanceConfig | None = None,
+) -> ImportanceResult:
+    """Permutation importance of column groups, measured on every held-out training fold.
+
+    Fits like :func:`out_of_fold_predictions` and never touches the validation part, so the
+    result may guide a band or feature selection. Drops are averaged over folds and repeats.
+
+    Args:
+        model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
+        config: Configuration the model was tuned or evaluated with.
+        groups: Raw input columns to permute together, e.g. ``region_groups(split.X_train)``.
+        importance: Repeats and metrics; the defaults of ``ImportanceConfig`` if omitted.
+
+    Returns:
+        Mean and std of the score drop per group and metric over all folds.
+    """
+    split = load_split()
+    drops = []
+    for fold in cv_folds(config.folds):
+        y_fold = split.y_train.iloc[fold.train]
+        pipeline = _pipeline(model, config.preprocessing)
+        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        drops.append(
+            permutation_drops(
+                pipeline,
+                split.X_train.iloc[fold.val],
+                split.y_train.iloc[fold.val],
+                groups,
+                importance,
+            )
+        )
+    return summarize_drops(pd.concat(drops, ignore_index=True))
 
 
 def _track_run(
@@ -336,8 +456,10 @@ def _track_run(
     pipeline: Pipeline,
     split: TrainValSplit,
     y_pred: pd.DataFrame,
+    size: InputSize,
 ) -> TrackedRun | None:
     scores = {name: value for name, value in metrics.model_dump().items() if value is not None}
+    scores.update(size._asdict())
     figure = plot_confusion_matrices(split.y_val, y_pred)
     try:
         return log_run(
@@ -362,7 +484,11 @@ def _track_run(
 
 
 def _track_tuning(
-    config: TuneConfig, model: BaseEstimator, candidates: pd.DataFrame, split: TrainValSplit
+    config: TuneConfig,
+    model: BaseEstimator,
+    candidates: pd.DataFrame,
+    split: TrainValSplit,
+    size: InputSize,
 ) -> str | None:
     try:
         return log_tuning(
@@ -374,6 +500,7 @@ def _track_tuning(
             metric=config.metric,
             candidates=candidates,
             train=pd.concat([split.X_train, split.y_train], axis=1),
+            extra_metrics=size._asdict(),
             system_metrics=config.system_metrics,
         )
     except Exception as error:  # noqa: BLE001 – a tracking problem must not discard the search

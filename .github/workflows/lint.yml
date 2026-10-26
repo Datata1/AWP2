@@ -39,6 +39,9 @@ jobs:
           echo "status=$?" >> "$GITHUB_OUTPUT"
           cat lint.log
 
+      - name: Tests
+        run: make test
+
       - name: Comment on PR
         env:
           GH_TOKEN: ${{ github.token }}

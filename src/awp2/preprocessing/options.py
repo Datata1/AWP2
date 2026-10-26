@@ -5,7 +5,12 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from awp2.config import (
+    F_CLASSIF_SCORE,
+    HYPERION_SENSOR,
+    SENTINEL2_SENSOR,
     SPECTRAL_REGIONS,
+    BandScore,
+    Sensor,
 )
 
 
@@ -25,6 +30,22 @@ class PreprocessingConfig(BaseModel):
     )
     use_meta: bool = Field(
         default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
+    )
+    use_spectra: bool = Field(
+        default=True,
+        description="Use the spectral bands as features; False keeps only the other enabled "
+        "groups (meta, indices, albedo, PC_1/PC_2), e.g. for an indices-only model.",
+    )
+    spectral_sensor: Sensor = Field(
+        default=HYPERION_SENSOR,
+        description="Spectral sampling of the input: hyperion keeps all bands, sentinel2 "
+        "averages them into the 10 Sentinel-2 surface bands (after interpolation).",
+    )
+    spectral_band_step: int | None = Field(
+        default=None,
+        ge=2,
+        description="Keep only every n-th usable band (after interpolation, smoothing and SNV) "
+        "to simulate a coarser spectral resolution; None keeps all bands.",
     )
     use_categorical_context: bool = Field(
         default=False,
@@ -83,6 +104,16 @@ class PreprocessingConfig(BaseModel):
         description="Reduce the spectral bands to this many principal components; "
         "None keeps all bands. Requires use_spectral_standard_scale or use_spectral_centering.",
     )
+    spectral_select_k: int | None = Field(
+        default=None,
+        gt=0,
+        description="Keep the k bands with the highest univariate score against the crop/stage "
+        "label, fitted per training fold; None keeps all bands.",
+    )
+    spectral_select_score: BandScore = Field(
+        default=F_CLASSIF_SCORE,
+        description="Band score for spectral_select_k: f_classif (ANOVA F) or mutual_info.",
+    )
     spectral_ica_components: int | None = Field(
         default=None,
         gt=0,
@@ -140,6 +171,11 @@ class PreprocessingConfig(BaseModel):
         description="One-hot encode each AEZ × month combination seen in training next to the "
         "separate AEZ and month features; requires use_meta.",
     )
+    use_acquisition_centering: bool = Field(
+        default=False,
+        description="Subtract the mean training spectrum of each AEZ x month acquisition from "
+        "the spectra before all other spectral steps; unseen acquisitions use the overall mean.",
+    )
     use_cyclic_month: bool = Field(
         default=True,
         description="Replace numeric Month with sine/cosine annual-cycle features.",
@@ -166,9 +202,22 @@ class PreprocessingConfig(BaseModel):
                 region, is empty without ``use_meta`` or with a spectral feature branch; if more
                 than one reduction method is selected; if centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
-                if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
-                arguments are set without their method or missing with it.
+                if NMF, OSP or DBN get unsuitable input; if Savitzky-Golay or LPP
+                arguments are set without their method or missing with it; or if
+                ``use_spectra=False`` keeps spectral steps or leaves no features.
         """
+        if not self.use_spectra:
+            self._check_without_spectra()
+        if self.use_acquisition_centering and (
+            self.spectral_nmf_components is not None or self.spectral_osp_components is not None
+        ):
+            raise ValueError("acquisition centering must not combine with NMF or OSP (raw spectra)")
+        if self.spectral_sensor == SENTINEL2_SENSOR and (
+            self.use_savgol or self.spectral_band_step is not None
+        ):
+            raise ValueError(
+                "spectral_sensor='sentinel2' must not combine with savgol or spectral_band_step"
+            )
         if self.spectral_regions is not None:
             unknown = set(self.spectral_regions) - {region.name for region in SPECTRAL_REGIONS}
             if unknown:
@@ -196,6 +245,7 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("deprecated 'scale' must not be combined with the spectral scalers")
         reductions = [
             self.spectral_pca_components,
+            self.spectral_select_k,
             self.spectral_ica_components,
             self.spectral_nmf_components,
             self.spectral_osp_components,
@@ -268,3 +318,29 @@ class PreprocessingConfig(BaseModel):
         elif self.savgol_window_length is not None or self.savgol_polyorder is not None:
             raise ValueError("savgol_window_length/polyorder require use_savgol=True")
         return self
+
+    def _check_without_spectra(self) -> None:
+        spectral_steps = {
+            "use_savgol": self.use_savgol,
+            "use_spectral_snv": self.use_spectral_snv,
+            "spectral_sensor": self.spectral_sensor != HYPERION_SENSOR,
+            "spectral_band_step": self.spectral_band_step is not None,
+            "spectral_pca_components": self.spectral_pca_components is not None,
+            "spectral_select_k": self.spectral_select_k is not None,
+            "spectral_ica_components": self.spectral_ica_components is not None,
+            "spectral_nmf_components": self.spectral_nmf_components is not None,
+            "spectral_osp_components": self.spectral_osp_components is not None,
+            "spectral_lpp_components": self.spectral_lpp_components is not None,
+            "spectral_vsrp_components": self.spectral_vsrp_components is not None,
+            "spectral_dbn_layers": self.spectral_dbn_layers is not None,
+        }
+        enabled = [name for name, active in spectral_steps.items() if active]
+        if enabled:
+            raise ValueError(f"use_spectra=False must not combine with spectral steps: {enabled}")
+        if not (
+            self.use_meta
+            or self.use_vegetation_indices
+            or self.use_mean_albedo
+            or self.use_principal_components
+        ):
+            raise ValueError("use_spectra=False needs another feature group")

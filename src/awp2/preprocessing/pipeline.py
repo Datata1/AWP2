@@ -2,6 +2,7 @@
 
 import re
 import warnings
+from collections.abc import Callable
 from functools import partial
 
 import pandas as pd
@@ -17,14 +18,19 @@ from awp2.config import (
     BAND_PATTERN,
     MONTH_COL,
     SEED,
+    SENTINEL2_BANDS,
+    SENTINEL2_SENSOR,
     SPECTRAL_REGIONS,
 )
 from awp2.data import wavelength
 from awp2.preprocessing.bands import (
     DropEmptyBands,
     InterpolateBands,
+    KeepEveryNthBand,
     MeanAlbedo,
     SavitzkyGolaySmoothing,
+    SelectBands,
+    SimulateSensor,
     StandardNormalVariate,
 )
 from awp2.preprocessing.decomposition import (
@@ -35,7 +41,7 @@ from awp2.preprocessing.decomposition import (
     VerySparseRandomProjection,
 )
 from awp2.preprocessing.indices import AddVegetationIndices, SelectVegetationIndices
-from awp2.preprocessing.metadata import AezMonthEncoder, CyclicMonthEncoder
+from awp2.preprocessing.metadata import AcquisitionCentering, AezMonthEncoder, CyclicMonthEncoder
 from awp2.preprocessing.options import PreprocessingConfig
 
 
@@ -85,6 +91,10 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             stacklevel=2,
         )
     spectra = _clean_band_steps(config)
+    if config.use_acquisition_centering:
+        spectra.insert(0, ("acquisition_centering", AcquisitionCentering()))
+    if config.spectral_sensor == SENTINEL2_SENSOR:
+        spectra.append(("sensor", SimulateSensor(SENTINEL2_BANDS)))
     if config.use_savgol:
         assert config.savgol_window_length is not None and config.savgol_polyorder is not None
         spectra.append(
@@ -92,6 +102,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
+    if config.spectral_band_step is not None:
+        spectra.append(("band_step", KeepEveryNthBand(config.spectral_band_step)))
     spectra.extend(_spectral_scaler(config))
     pca_components = config.spectral_pca_components
     ica_components = config.spectral_ica_components
@@ -102,6 +114,10 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
     dbn_layers = config.spectral_dbn_layers
     if pca_components is not None:
         spectra.append(("pca", PCA(n_components=pca_components, random_state=SEED)))
+    elif config.spectral_select_k is not None:
+        spectra.append(
+            ("select_k", SelectBands(config.spectral_select_k, config.spectral_select_score))
+        )
     elif ica_components is not None:
         spectra.append(("ica", FastICA(n_components=ica_components, random_state=SEED)))
     elif nmf_components is not None:
@@ -183,9 +199,22 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_aez_month:
         transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
-    transformers.append(("spectra", Pipeline(spectra), band_selector))
+    if config.use_spectra:
+        spectra_columns = (
+            partial(_with_acquisition_context, band_selector=band_selector)
+            if config.use_acquisition_centering
+            else band_selector
+        )
+        transformers.append(("spectra", Pipeline(spectra), spectra_columns))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
+
+
+def _with_acquisition_context(
+    frame: pd.DataFrame, band_selector: Callable[[pd.DataFrame], list[str]]
+) -> list[str]:
+    # acquisition centering groups the spectra by AEZ and month, so it needs both columns
+    return [AEZ_COL, MONTH_COL, *band_selector(frame)]
 
 
 def _clean_band_steps(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:

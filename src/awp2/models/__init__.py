@@ -25,8 +25,11 @@ from awp2.models.linear import BalancedLinearDiscriminantAnalysis
 from awp2.models.lstm import SpectralLSTMClassifier
 from awp2.models.multi_task import MultiTaskLSTMClassifier, MultiTaskMLPClassifier
 from awp2.models.plsda import PLSDAClassifier
+from awp2.models.reduced import BandReducedClassifier, make_hierarchical_reduced_svm
 
 __all__ = [
+    "BandReducedClassifier",
+    "make_hierarchical_reduced_svm",
     "CropStageVotingClassifier",
     "HierarchicalSummary",
     "summarize_hierarchical",

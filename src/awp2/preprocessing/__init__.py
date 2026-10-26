@@ -2,8 +2,11 @@
 
 from awp2.preprocessing.bands import DropEmptyBands as DropEmptyBands
 from awp2.preprocessing.bands import InterpolateBands as InterpolateBands
+from awp2.preprocessing.bands import KeepEveryNthBand as KeepEveryNthBand
 from awp2.preprocessing.bands import MeanAlbedo as MeanAlbedo
 from awp2.preprocessing.bands import SavitzkyGolaySmoothing as SavitzkyGolaySmoothing
+from awp2.preprocessing.bands import SelectBands as SelectBands
+from awp2.preprocessing.bands import SimulateSensor as SimulateSensor
 from awp2.preprocessing.bands import StandardNormalVariate as StandardNormalVariate
 from awp2.preprocessing.bands import _BandTransformer as _BandTransformer
 from awp2.preprocessing.decomposition import DeepBeliefFeatures as DeepBeliefFeatures
@@ -23,12 +26,15 @@ from awp2.preprocessing.indices import AddVegetationIndices as AddVegetationIndi
 from awp2.preprocessing.indices import SelectVegetationIndices as SelectVegetationIndices
 from awp2.preprocessing.indices import ndvi as ndvi
 from awp2.preprocessing.indices import nearest_band as nearest_band
+from awp2.preprocessing.metadata import AcquisitionCentering as AcquisitionCentering
 from awp2.preprocessing.metadata import AezMonthEncoder as AezMonthEncoder
 from awp2.preprocessing.metadata import CyclicMonthEncoder as CyclicMonthEncoder
 from awp2.preprocessing.options import PreprocessingConfig as PreprocessingConfig
 from awp2.preprocessing.pipeline import _region_columns as _region_columns
 from awp2.preprocessing.pipeline import build_preprocessor as build_preprocessor
+from awp2.preprocessing.reporting import InputSize as InputSize
 from awp2.preprocessing.reporting import describe_preprocessor as describe_preprocessor
+from awp2.preprocessing.reporting import input_size as input_size
 
 __all__ = [
     "ndvi",
@@ -37,6 +43,9 @@ __all__ = [
     "InterpolateBands",
     "SavitzkyGolaySmoothing",
     "StandardNormalVariate",
+    "KeepEveryNthBand",
+    "SimulateSensor",
+    "SelectBands",
     "OrthogonalSubspaceProjection",
     "VerySparseRandomProjection",
     "LocalityPreservingProjection",
@@ -46,8 +55,11 @@ __all__ = [
     "PrincipalComponentFeatures",
     "CyclicMonthEncoder",
     "MeanAlbedo",
+    "AcquisitionCentering",
     "AezMonthEncoder",
     "PreprocessingConfig",
     "build_preprocessor",
     "describe_preprocessor",
+    "InputSize",
+    "input_size",
 ]

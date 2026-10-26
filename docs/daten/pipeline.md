@@ -86,9 +86,13 @@ zusammengeführt. Alle lernenden Schritte werden nur auf dem jeweiligen Training
 | Zweig | Schritt | Option und Einschränkung |
 | --- | --- | --- |
 | Spektren | Regionen auswählen | `spectral_regions`; vor Interpolation und allen Spektralzweigen; `()` ergibt ein Metadatenmodell |
+| Spektren | Pro Aufnahme zentrieren | `use_acquisition_centering`; zieht das mittlere Trainingsspektrum je AEZ × Monat ab, vor allen anderen Spektralschritten; unbekannte Aufnahmen nutzen den Gesamtmittelwert; nicht mit NMF oder OSP kombinierbar |
+| Spektren | Spektren abschalten | `use_spectra=False`; behält nur die übrigen Merkmalsgruppen, keine Spektralschritte erlaubt |
 | Alle Spektralzweige | Leere Bänder entfernen und Lücken auffüllen | Immer aktiv; `max_interpolation_gap_nm` begrenzt die lineare Interpolation |
+| Spektren | Sentinel-2 simulieren | `spectral_sensor="sentinel2"`; mittelt die Bänder in die 10 Sentinel-2-Oberflächenbänder; nicht mit Savitzky-Golay oder `spectral_band_step` kombinierbar |
 | Spektren | Savitzky-Golay-Glättung | `use_savgol` mit `savgol_window_length` und `savgol_polyorder`; getrennt nach Wellenlängensegment |
 | Spektren | SNV-Streukorrektur | `use_spectral_snv`; entfernt die Helligkeit pro Spektrum |
+| Spektren | Jedes n-te Band | `spectral_band_step`; simuliert eine gröbere spektrale Auflösung, nach SNV |
 | Spektren | Skalieren oder zentrieren | Höchstens eine der Optionen `use_spectral_standard_scale`, `use_spectral_minmax_scale`, `use_spectral_centering` |
 | Spektren | Dimension reduzieren | Höchstens ein Verfahren; Optionen und Voraussetzungen siehe Tabelle unten |
 | Metadaten | AEZ und Monat kodieren | `use_meta`; Monat standardmäßig zyklisch, mit `use_cyclic_month=False` numerisch |
@@ -111,6 +115,7 @@ Hyperspektraldaten ([Lupu et al.](https://www.researchgate.net/publication/39028
 | Methode | Feld | Skalierung | Hinweis |
 | --- | --- | --- | --- |
 | PCA | `spectral_pca_components` | Standard-Scaler oder Zentrierung (`use_spectral_centering`) | Varianz-maximierende Komponenten |
+| Bandauswahl | `spectral_select_k` + `spectral_select_score` | Beliebig | Überwacht: die k Bänder mit dem höchsten univariaten Score (`f_classif` oder `mutual_info`) gegen das kombinierte Crop-/Stage-Label, je Trainingsfold |
 | ICA | `spectral_ica_components` | Standard-Scaler oder Zentrierung | Statistisch unabhängige Komponenten (FastICA, whitened intern) |
 | NMF | `spectral_nmf_components` | Keine (rohe Reflektanzen) | Multiplikative Updates; sklearn kennt nur NNDSVD/Random-Init |
 | OSP | `spectral_osp_components` | Keine (rohe Spektren) | Automatische Zielgenerierung: iterative Endmember, Projektion darauf |

@@ -15,6 +15,7 @@ from awp2.config import (
     MONTH_COS_COL,
     MONTH_SIN_COL,
 )
+from awp2.data import band_columns
 
 
 class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
@@ -79,6 +80,61 @@ class CyclicMonthEncoder(TransformerMixin, BaseEstimator):
             Names of the sine and cosine features.
         """
         return np.asarray([MONTH_SIN_COL, MONTH_COS_COL], dtype=object)
+
+
+class AcquisitionCentering(TransformerMixin, BaseEstimator):
+    """Subtract the mean training spectrum of each AEZ x month acquisition.
+
+    Rows of one AEZ x month cell probably share an acquisition, i.e. its atmosphere and
+    illumination; removing the cell mean takes out that common offset. Cells unseen in training
+    fall back to the overall mean. Takes AEZ, Month and the bands, returns the bands only.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Learn the mean spectrum per acquisition and overall.
+
+        Args:
+            X: ``AEZ``, ``Month`` and band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        self.bands_ = band_columns(X)
+        self.cell_means_ = X[self.bands_].groupby(_acquisition(X)).mean()
+        self.overall_mean_ = X[self.bands_].mean()
+        self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Subtract the mean spectrum of each row's acquisition.
+
+        Args:
+            X: ``AEZ``, ``Month`` and band columns.
+
+        Returns:
+            The centered band columns; missing values stay missing.
+        """
+        check_is_fitted(self, "cell_means_")
+        means = self.cell_means_.reindex(_acquisition(X).to_numpy())
+        means = means.fillna(self.overall_mean_).set_axis(X.index)
+        return X[self.bands_] - means
+
+    def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
+        """Return output feature names following the sklearn transformer API.
+
+        Args:
+            input_features: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The band column names.
+        """
+        return np.asarray(self.bands_, dtype=object)
+
+
+def _acquisition(X: pd.DataFrame) -> pd.Series:
+    return X[AEZ_COL].astype(int).astype(str) + AEZ_MONTH_SEP + X[MONTH_COL].astype(int).astype(str)
 
 
 class AezMonthEncoder(TransformerMixin, BaseEstimator):

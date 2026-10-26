@@ -424,6 +424,71 @@ Routing = Literal["hard", "soft"]
 HARD_ROUTING, SOFT_ROUTING = get_args(Routing)
 LSTMContextMode = Literal["none", "standard", "embeddings"]
 LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMContextMode)
+SequenceCell = Literal["lstm", "gru"]
+LSTM_CELL, GRU_CELL = get_args(SequenceCell)
+BandScore = Literal["f_classif", "mutual_info"]
+F_CLASSIF_SCORE, MUTUAL_INFO_SCORE = get_args(BandScore)
+Sensor = Literal["hyperion", "sentinel2"]
+HYPERION_SENSOR, SENTINEL2_SENSOR = get_args(Sensor)
+
+
+@dataclass(frozen=True)
+class SensorBand:
+    """One band of a simulated multispectral sensor.
+
+    Args:
+        name: Band name in the sensor documentation.
+        center_nm: Central wavelength.
+        width_nm: Full bandwidth; the simulation averages all bands inside it.
+    """
+
+    name: str
+    center_nm: int
+    width_nm: int
+
+
+# Sentinel-2A MSI surface bands (ESA). B1, B9 and B10 are left out: they sense aerosols,
+# water vapour and cirrus for atmospheric correction, not the crop.
+SENTINEL2_BANDS: tuple[SensorBand, ...] = (
+    SensorBand("B2", 492, 66),
+    SensorBand("B3", 560, 36),
+    SensorBand("B4", 665, 31),
+    SensorBand("B5", 704, 15),
+    SensorBand("B6", 740, 15),
+    SensorBand("B7", 783, 20),
+    SensorBand("B8", 833, 106),
+    SensorBand("B8A", 865, 21),
+    SensorBand("B11", 1614, 91),
+    SensorBand("B12", 2202, 175),
+)
+
+ReductionFamily = Literal[
+    "all_bands", "pca", "band_selection", "band_step", "sentinel2", "indices_only", "meta_only"
+]
+REDUCTION_FAMILY_LABELS: dict[str, str] = {
+    "all_bands": "Alle Bänder",
+    "pca": "PCA",
+    "band_selection": "Bandauswahl",
+    "band_step": "Jedes n-te Band",
+    "sentinel2": "Sentinel-2",
+    "indices_only": "Nur Indizes",
+    "meta_only": "Nur Meta",
+}
+REDUCTION_PCA_COMPONENTS = (2, 5, 10, 20, 40)
+REDUCTION_SELECT_K = (5, 10, 20, 40, 80)
+REDUCTION_BAND_STEPS = (2, 4, 8)
+REDUCTION_FAMILY_COL = "family"
+REDUCTION_VARIANT_COL = "variant"
+REDUCTION_TUNING_RUN_COL = "tuning_run"
+REDUCTION_BEST_PARAMS_COL = "best_params"
+# a reduced input counts as equivalent if it loses at most this much CV-BAcc against all bands
+REDUCTION_MAX_CV_LOSS = 0.01
+N_INPUT_FEATURES_COL = "n_input_features"  # field names of preprocessing.InputSize
+N_MEASURED_BANDS_COL = "n_measured_bands"
+STD_SUFFIX = "_std"
+# group folds keep every group in one fold, so a model is scored on acquisitions it never saw
+FoldGrouping = Literal["random", "aez_month", "month", "aez"]
+RANDOM_FOLDS, AEZ_MONTH_FOLDS, MONTH_FOLDS, AEZ_FOLDS = get_args(FoldGrouping)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
@@ -431,6 +496,24 @@ SEED = 42
 VAL_SIZE = 0.2
 CV_FOLDS = 5
 SCORE_DECIMALS = 4
+
+# Regions for grouped permutation importance: neighbouring bands are nearly collinear, so
+# permuting one band alone lets its neighbours stand in and hides what the region carries.
+SPECTRAL_REGIONS_NM: dict[str, tuple[int, int]] = {
+    "VIS": (400, 680),  # pigments: chlorophyll and carotenoid absorption
+    "Red Edge": (680, 750),  # steep chlorophyll slope, shifts with stage and stress
+    "NIR": (750, 1300),  # leaf structure and biomass
+    "SWIR1": (1300, 1900),  # leaf water
+    "SWIR2": (1900, 2500),  # water, lignin, cellulose: drying and senescence
+}
+META_GROUP = "Meta"
+IMPORTANCE_GROUP_COL = "group"
+IMPORTANCE_METRIC_COL = "metric"
+IMPORTANCE_MEAN_COL = "mean"
+IMPORTANCE_STD_COL = "std"
+IMPORTANCE_REPEAT_COL = "repeat"
+IMPORTANCE_DROP_COL = "drop"
+IMPORTANCE_BASELINE_COL = "baseline"
 RECALL_COL = "recall"
 SUPPORT_COL = "support"
 RANDOM_FOREST_N_ESTIMATORS = 300
@@ -439,6 +522,32 @@ LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on 
 MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 # a CV gain below this is within the fold-to-fold noise of the reference (std about 0.010)
 MIN_CV_GAIN = 0.005
+
+# Data-quality flags (#196) only mark rows for review; nothing is removed by them.
+QualityFlag = Literal["haze", "dark", "ndvi_outlier", "rare_context", "class_outlier"]
+LABEL_SUSPECT_COL = "label_suspect"
+HAZE_FLAG, DARK_FLAG, NDVI_OUTLIER_FLAG, RARE_CONTEXT_FLAG, CLASS_OUTLIER_FLAG = get_args(
+    QualityFlag
+)
+ANY_FLAG_COL = "any_flag"
+# The blue reflectance (median 16 %) lies far above the 3-6 % of vegetation at the surface, so
+# absolute literature thresholds (e.g. Fmask) do not transfer. Every rule therefore flags only
+# Tukey's "far out" values: below Q1 - 3 IQR or above Q3 + 3 IQR (Tukey 1977).
+TUKEY_FAR_OUT_FACTOR = 3.0
+# Haze Optimized Transform as in Fmask (Zhu & Woodcock 2012): haze raises blue against red
+HAZE_BLUE_NM = 470
+HAZE_RED_NM = 660
+HAZE_RED_WEIGHT = 0.5
+# very low NIR points to shadow or open water instead of vegetation or soil
+DARK_NIR_NM = 860
+NDVI_INDEX = "ND_800_680"
+# month x crop x stage combinations this rare in training are phenologically suspicious
+RARE_CONTEXT_MAX_COUNT = 3
+# class-wise outliers: robust Mahalanobis distance on PCA scores of each crop/stage class
+OUTLIER_PCA_COMPONENTS = 5
+OUTLIER_MIN_CLASS_ROWS = 30
+# the consensus filter needs at least two independent opinions on a label
+MIN_CONSENSUS_MODELS = 2
 CNN_DEFAULT_FILTERS = 16
 CNN_DEFAULT_KERNEL_SIZE = 5
 CNN_DEFAULT_DROPOUT = 0.2
@@ -458,6 +567,8 @@ LSTM_DEFAULT_MAX_EPOCHS = 50
 LSTM_DEFAULT_BATCH_SIZE = 64
 LSTM_EARLY_STOPPING_PATIENCE = 8
 LSTM_INNER_VALIDATION_FRACTION = 0.1
+LSTM_DEFAULT_BANDS_PER_STEP = 1
+LSTM_DEFAULT_HEAD_HIDDEN_SIZE = 0  # 0 keeps the single linear layer after the fusion
 MLP_DEFAULT_HIDDEN_UNITS = 64
 MLP_DEFAULT_HIDDEN_LAYERS = 2
 MLP_DEFAULT_DROPOUT = 0.2
@@ -515,6 +626,8 @@ MLFLOW_ARTIFACTS_DIR = Path(
     os.environ.get("MLFLOW_ARTIFACTS_DIR", PROJECT_ROOT / "mlruns")
 ).resolve()
 MLFLOW_EXPERIMENT = "crop-stage"  # main question: which approach predicts crop and stage best
+MLFLOW_REDUCTION_EXPERIMENT = "band-reduction"  # how much input does the quality need
+MLFLOW_SPLIT_EXPERIMENT = "split-leakage"  # do the scores hold for unseen acquisitions
 # Marks the experiment as classic ML so the MLflow UI opens the "Model training" view.
 MLFLOW_EXPERIMENT_KIND_TAG = ("mlflow.experimentKind", "custom_model_development")
 MLFLOW_SYSTEM_METRICS_INTERVAL_S = (

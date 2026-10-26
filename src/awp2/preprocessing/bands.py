@@ -7,14 +7,21 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import f_classif, mutual_info_classif
+from sklearn.utils.validation import check_is_fitted
 
 from awp2.config import (
     BAND_PATTERN,
     BAND_PREFIX,
+    F_CLASSIF_SCORE,
     MEAN_ALBEDO_COL,
     SAVGOL_SPLIT_GAP_NM,
+    SEED,
+    SENTINEL2_BANDS,
+    BandScore,
+    SensorBand,
 )
-from awp2.data import wavelengths
+from awp2.data import combined_label, wavelength, wavelengths
 
 
 class _BandTransformer(TransformerMixin, BaseEstimator):
@@ -288,6 +295,170 @@ class StandardNormalVariate(_BandTransformer):
         stds[stds == 0.0] = 1.0
         corrected = (values - values.mean(axis=1, keepdims=True)) / stds[:, None]
         return pd.DataFrame(corrected, index=X.index, columns=X.columns)
+
+
+class KeepEveryNthBand(_BandTransformer):
+    """Keep every ``step``-th band, starting with the first, to coarsen the spectral sampling.
+
+    Counts the bands it receives, so after ``DropEmptyBands`` the step runs over the usable
+    bands and does not land in the empty water-absorption gaps.
+    """
+
+    def __init__(self, step: int) -> None:
+        """Set the distance between kept bands.
+
+        Args:
+            step: Distance between kept bands, in bands; 1 keeps all.
+        """
+        self.step = step
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Choose the kept bands from the column order.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``step`` is smaller than 1.
+        """
+        if self.step < 1:
+            raise ValueError(f"step must be at least 1, got {self.step}")
+        X = self._check(X)
+        self._set_input(X)
+        self.feature_names_out_ = list(X.columns[:: self.step])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to every ``step``-th band.
+        """
+        return self._check(X)[self.feature_names_out_]
+
+
+class SimulateSensor(_BandTransformer):
+    """Resample the hyperspectral bands to the bands of a multispectral sensor.
+
+    Each sensor band is the plain mean of the bands inside its bandwidth, a box-shaped
+    approximation of the real spectral response. Outputs keep the band-column format
+    (``X<center nm>``), so all later spectral steps and wavelength plots still apply.
+    """
+
+    def __init__(self, bands: tuple[SensorBand, ...] = SENTINEL2_BANDS) -> None:
+        """Set the sensor bands to simulate.
+
+        Args:
+            bands: Central wavelength and bandwidth of every sensor band.
+        """
+        self.bands = bands
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Assign the input bands to the sensor bands.
+
+        Args:
+            X: Gap-free band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a sensor band contains no input band.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        input_wavelengths = np.asarray(wavelengths(X))
+        self.members_: dict[str, list[str]] = {}
+        for band in self.bands:
+            inside = np.abs(input_wavelengths - band.center_nm) <= band.width_nm / 2
+            if not inside.any():
+                raise ValueError(f"no input band inside sensor band {band.name}")
+            self.members_[f"{BAND_PREFIX}{band.center_nm}"] = list(X.columns[inside])
+        self.feature_names_out_ = list(self.members_)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Average the input bands per sensor band.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column per sensor band, named by its central wavelength.
+        """
+        X = self._check(X)
+        return pd.DataFrame(
+            {name: X[members].mean(axis=1) for name, members in self.members_.items()},
+            index=X.index,
+        )
+
+
+class SelectBands(_BandTransformer):
+    """Keep the ``k`` bands that separate the crop/stage pairs best on their own.
+
+    Scores every band univariately against the combined crop/stage label, so a band that
+    helps for either target counts. Belongs inside the model pipeline: fitted on a training
+    fold, the choice never sees validation labels.
+    """
+
+    def __init__(self, k: int, score: BandScore = F_CLASSIF_SCORE) -> None:
+        """Set the number of bands and the scoring function.
+
+        Args:
+            k: Number of bands to keep.
+            score: ``"f_classif"`` (ANOVA F, linear separability) or ``"mutual_info"``
+                (also non-linear dependence, slower).
+        """
+        self.k = k
+        self.score = score
+
+    def fit(self, X: pd.DataFrame, y: pd.DataFrame | pd.Series | np.ndarray) -> Self:
+        """Score the bands and remember the ``k`` best.
+
+        Args:
+            X: Band columns of the training part.
+            y: Targets with ``Crop`` and ``Stage``, or one label per row.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``k`` exceeds the number of bands.
+        """
+        X = self._check(X)
+        if not 1 <= self.k <= X.shape[1]:
+            raise ValueError(f"k must be between 1 and {X.shape[1]} bands, got {self.k}")
+        self._set_input(X)
+        labels = combined_label(y) if isinstance(y, pd.DataFrame) else y
+        if self.score == F_CLASSIF_SCORE:
+            scores, _p_values = f_classif(X, labels)
+        else:
+            scores = mutual_info_classif(X, labels, random_state=SEED)
+        self.scores_ = pd.Series(np.nan_to_num(scores), index=X.columns)
+        best = set(self.scores_.nlargest(self.k).index)
+        self.feature_names_out_ = [band for band in X.columns if band in best]
+        self.selected_wavelengths_ = [wavelength(band) for band in self.feature_names_out_]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to the selected bands, in wavelength order.
+        """
+        check_is_fitted(self, "feature_names_out_")
+        return self._check(X)[self.feature_names_out_]
 
 
 class MeanAlbedo(TransformerMixin, BaseEstimator):

@@ -1,11 +1,21 @@
 """Reporting for the shared preprocessing pipeline."""
 
+from typing import NamedTuple
+
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import NMF, PCA, FastICA
 from sklearn.pipeline import Pipeline
+from sklearn.utils.validation import check_is_fitted
 
-from awp2.preprocessing.bands import InterpolateBands, SavitzkyGolaySmoothing
+from awp2.preprocessing.bands import (
+    InterpolateBands,
+    KeepEveryNthBand,
+    SavitzkyGolaySmoothing,
+    SelectBands,
+    SimulateSensor,
+    StandardNormalVariate,
+)
 from awp2.preprocessing.decomposition import (
     DeepBeliefFeatures,
     LocalityPreservingProjection,
@@ -13,7 +23,7 @@ from awp2.preprocessing.decomposition import (
     PrincipalComponentFeatures,
     VerySparseRandomProjection,
 )
-from awp2.preprocessing.indices import SelectVegetationIndices
+from awp2.preprocessing.indices import AddVegetationIndices, SelectVegetationIndices
 
 
 def _branch_steps(
@@ -31,6 +41,7 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return f"Month {step}"
     known: dict[str, str] = {
         "drop_empty": "Drop empty bands",
+        "acquisition_centering": "Subtract the mean spectrum of the AEZ x month acquisition",
         "snv": "SNV scatter correction per spectrum",
         "indices": "Vegetation-index catalogue (from interpolated bands)",
         "standard_scale": "Standardize bands (per-band mean and std)",
@@ -47,6 +58,10 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return known[name]
     if name == "interpolate" and isinstance(step, InterpolateBands):
         return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "sensor" and isinstance(step, SimulateSensor):
+        return f"Simulate {len(step.bands)} multispectral sensor bands"
+    if name == "band_step" and isinstance(step, KeepEveryNthBand):
+        return f"Keep every {step.step}. band"
     if name == "select" and isinstance(step, SelectVegetationIndices):
         return "Keep only the vegetation indices"
     if name == "savgol" and isinstance(step, SavitzkyGolaySmoothing):
@@ -56,6 +71,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         )
     if name == "pca" and isinstance(step, PCA):
         return f"PCA to {step.n_components} components"
+    if name == "select_k" and isinstance(step, SelectBands):
+        return f"Select {step.k} bands ({step.score})"
     if name == "pca" and isinstance(step, PrincipalComponentFeatures):
         return "PCA to PC_1 and PC_2"
     if name == "ica" and isinstance(step, FastICA):
@@ -120,3 +137,56 @@ def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
         for number, (step_name, step) in enumerate(steps, start=1):
             lines.append(f"{letter}{number}. {_describe_step(step_name, step)}")
     return lines
+
+
+class InputSize(NamedTuple):
+    """How much input a fitted preprocessor uses.
+
+    Attributes:
+        n_input_features: Columns the model receives after preprocessing.
+        n_measured_bands: Spectral bands a sensor has to measure: Hyperion bands, or the bands
+            of a simulated sensor; PCA still needs all bands, band selection fewer.
+    """
+
+    n_input_features: int
+    n_measured_bands: int
+
+
+def input_size(preprocessor: ColumnTransformer) -> InputSize:
+    """Count the model features and the measured bands of a fitted preprocessor.
+
+    Assumes that every kept band is measured, so interpolation never has to fill it from
+    neighbours.
+
+    Args:
+        preprocessor: Built by ``build_preprocessor`` and fitted.
+
+    Returns:
+        Number of model features and of distinct measured bands over all branches.
+    """
+    check_is_fitted(preprocessor)
+    bands: set[str] = set()
+    for _name, branch, _columns in preprocessor.transformers_:
+        if isinstance(branch, Pipeline) and "drop_empty" in branch.named_steps:
+            bands |= _branch_bands(branch)
+    return InputSize(len(preprocessor.get_feature_names_out()), len(bands))
+
+
+def _branch_bands(branch: Pipeline) -> set[str]:
+    sources = {band: {band} for band in branch.named_steps["drop_empty"].feature_names_out_}
+    usable = set(sources)
+    mixes_bands = False
+    for step in branch.named_steps.values():
+        if isinstance(step, SavitzkyGolaySmoothing | StandardNormalVariate):
+            # every output band then depends on its neighbours or on the whole spectrum
+            mixes_bands = True
+        elif isinstance(step, SimulateSensor):
+            # the simulated sensor measures each of its broad bands once
+            sources = {name: {name} for name in step.members_}
+        elif isinstance(step, KeepEveryNthBand | SelectBands):
+            sources = {band: sources[band] for band in step.feature_names_out_}
+        elif isinstance(step, AddVegetationIndices):
+            index_bands = {band for bands in step.index_bands_.values() for band in bands}
+            reip_bands = {*step.reip_lagrangian_bands_, *step.reip_polynomial_bands_}
+            return index_bands | reip_bands
+    return usable if mixes_bands else set().union(*sources.values())

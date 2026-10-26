@@ -10,19 +10,28 @@ from sklearn.base import clone
 from awp2 import preprocessing
 from awp2.config import (
     AEZ_COL,
+    CROP_COL,
     MEAN_ALBEDO_COL,
     MONTH_COL,
     SEED,
+    SENTINEL2_BANDS,
+    STAGE_COL,
     VEGETATION_INDEX_NAMES,
+    SensorBand,
 )
 from awp2.preprocessing import (
+    AcquisitionCentering,
     AddVegetationIndices,
     AezMonthEncoder,
+    InputSize,
     InterpolateBands,
     PreprocessingConfig,
+    SelectBands,
+    SimulateSensor,
     StandardNormalVariate,
     build_preprocessor,
     describe_preprocessor,
+    input_size,
     nearest_band,
 )
 from awp2.preprocessing.indices import _polynomial_reip
@@ -37,6 +46,9 @@ class PreprocessingApiTest(unittest.TestCase):
             "InterpolateBands",
             "SavitzkyGolaySmoothing",
             "StandardNormalVariate",
+            "KeepEveryNthBand",
+            "SimulateSensor",
+            "SelectBands",
             "OrthogonalSubspaceProjection",
             "VerySparseRandomProjection",
             "LocalityPreservingProjection",
@@ -46,10 +58,13 @@ class PreprocessingApiTest(unittest.TestCase):
             "PrincipalComponentFeatures",
             "CyclicMonthEncoder",
             "MeanAlbedo",
+            "AcquisitionCentering",
             "AezMonthEncoder",
             "PreprocessingConfig",
             "build_preprocessor",
             "describe_preprocessor",
+            "InputSize",
+            "input_size",
         }
         self.assertEqual(set(preprocessing.__all__), expected)
         for name in expected:
@@ -576,3 +591,179 @@ class AezMonthEncoderTest(unittest.TestCase):
             PreprocessingConfig(use_aez_month=True, use_meta=False)
         with self.assertRaises(ValueError):
             PreprocessingConfig(use_aez_month=True, use_categorical_context=True)
+
+
+class FeatureSetSelectionTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [5, 7, 9],
+                "X427": [10.0, 20.0, 45.0],
+                "X437": [np.nan, np.nan, np.nan],
+                "X447": [12.0, 25.0, 50.0],
+                "X457": [13.0, 26.0, 51.0],
+                "X467": [14.0, 27.0, 52.0],
+            }
+        )
+
+    def _columns(self, config: PreprocessingConfig) -> list[str]:
+        return list(build_preprocessor(config).fit_transform(self.features).columns)
+
+    def test_band_step_counts_only_usable_bands(self) -> None:
+        columns = self._columns(PreprocessingConfig(use_meta=False, spectral_band_step=2))
+
+        self.assertEqual(columns, ["X427", "X457"])
+
+    def test_without_spectra_keeps_only_the_other_groups(self) -> None:
+        columns = self._columns(PreprocessingConfig(use_spectra=False))
+
+        self.assertFalse(any(column.startswith("X") for column in columns))
+        self.assertIn(AEZ_COL + "_1", columns)
+
+    def test_without_spectra_rejects_spectral_steps(self) -> None:
+        with self.assertRaisesRegex(ValueError, "spectral_band_step"):
+            PreprocessingConfig(use_spectra=False, spectral_band_step=2)
+
+    def test_without_spectra_needs_another_feature_group(self) -> None:
+        with self.assertRaisesRegex(ValueError, "another feature group"):
+            PreprocessingConfig(use_spectra=False, use_meta=False)
+
+
+class SelectBandsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bands = pd.DataFrame(
+            {
+                "X427": [1.0, 1.1, 5.0, 5.1],
+                "X437": [3.0, 1.0, 3.0, 1.0],
+                "X447": [9.0, 9.2, 1.0, 1.2],
+            }
+        )
+        self.targets = pd.DataFrame(
+            {CROP_COL: ["corn", "corn", "rice", "rice"], STAGE_COL: ["Late"] * 4}
+        )
+
+    def test_keeps_the_most_separating_bands_in_wavelength_order(self) -> None:
+        selector = SelectBands(k=2).fit(self.bands, self.targets)
+
+        self.assertEqual(selector.selected_wavelengths_, [427, 447])
+
+    def test_transform_reuses_the_bands_chosen_on_the_training_part(self) -> None:
+        selector = SelectBands(k=1).fit(self.bands, self.targets)
+        unseen = pd.DataFrame({"X427": [0.0], "X437": [100.0], "X447": [0.0]})
+
+        self.assertEqual(list(selector.transform(unseen).columns), selector.feature_names_out_)
+
+    def test_rejects_more_bands_than_available(self) -> None:
+        with self.assertRaisesRegex(ValueError, "between 1 and 3"):
+            SelectBands(k=4).fit(self.bands, self.targets)
+
+    def test_counts_as_a_reduction_method(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at most one"):
+            PreprocessingConfig(
+                use_spectral_standard_scale=True,
+                spectral_pca_components=5,
+                spectral_select_k=5,
+            )
+
+
+class SimulateSensorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bands = pd.DataFrame({"X650": [1.0, 4.0], "X660": [3.0, 6.0], "X700": [9.0, 9.0]})
+        self.sensor = (SensorBand("red", 655, 20), SensorBand("edge", 700, 4))
+
+    def test_averages_the_bands_inside_each_bandwidth(self) -> None:
+        simulated = SimulateSensor(self.sensor).fit_transform(self.bands)
+
+        self.assertEqual(list(simulated.columns), ["X655", "X700"])
+        self.assertEqual(list(simulated["X655"]), [2.0, 5.0])
+
+    def test_rejects_a_sensor_band_without_input_bands(self) -> None:
+        with self.assertRaisesRegex(ValueError, "nir"):
+            SimulateSensor((SensorBand("nir", 850, 10),)).fit(self.bands)
+
+    def test_sentinel2_config_yields_ten_surface_bands(self) -> None:
+        wavelengths_nm = range(430, 2400, 10)
+        spectra = pd.DataFrame(
+            [[0.3] * len(wavelengths_nm)], columns=[f"X{nm}" for nm in wavelengths_nm]
+        )
+        simulated = build_preprocessor(
+            PreprocessingConfig(use_meta=False, spectral_sensor="sentinel2")
+        ).fit_transform(spectra)
+
+        expected = [f"X{band.center_nm}" for band in SENTINEL2_BANDS]
+        self.assertEqual(list(simulated.columns), expected)
+
+
+class InputSizeTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 1, 2],
+                MONTH_COL: [5, 7, 9, 11],
+                "X427": [1.0, 1.1, 5.0, 5.1],
+                "X437": [3.0, 1.0, 3.0, 1.0],
+                "X447": [9.0, 9.2, 1.0, 1.2],
+                "X457": [np.nan] * 4,
+            }
+        )
+        self.targets = pd.DataFrame(
+            {CROP_COL: ["corn", "corn", "rice", "rice"], STAGE_COL: ["Late"] * 4}
+        )
+
+    def _size(self, config: PreprocessingConfig) -> InputSize:
+        preprocessor = build_preprocessor(config).fit(self.features, self.targets)
+        return input_size(preprocessor)
+
+    def test_all_measured_bands_without_reduction(self) -> None:
+        self.assertEqual(self._size(PreprocessingConfig(use_meta=False)), InputSize(3, 3))
+
+    def test_band_selection_measures_only_the_selected_bands(self) -> None:
+        size = self._size(PreprocessingConfig(spectral_select_k=1))
+
+        self.assertEqual(size.n_measured_bands, 1)
+        self.assertEqual(size.n_input_features, size.n_measured_bands + 4)
+
+    def test_snv_before_selection_still_needs_every_band(self) -> None:
+        size = self._size(PreprocessingConfig(use_spectral_snv=True, spectral_select_k=1))
+
+        self.assertEqual(size.n_measured_bands, 3)
+
+    def test_metadata_only_measures_no_band(self) -> None:
+        self.assertEqual(self._size(PreprocessingConfig(use_spectra=False)).n_measured_bands, 0)
+
+
+class AcquisitionCenteringTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.train = pd.DataFrame(
+            {
+                AEZ_COL: [1, 1, 2, 2],
+                MONTH_COL: [5, 5, 5, 5],
+                "X427": [10.0, 20.0, 40.0, 60.0],
+                "X437": [1.0, 3.0, 5.0, 7.0],
+            }
+        )
+
+    def test_subtracts_the_mean_of_each_acquisition(self) -> None:
+        centered = AcquisitionCentering().fit_transform(self.train)
+
+        self.assertEqual(list(centered.columns), ["X427", "X437"])
+        self.assertEqual(list(centered["X427"]), [-5.0, 5.0, -10.0, 10.0])
+
+    def test_unseen_acquisition_uses_the_overall_mean(self) -> None:
+        centering = AcquisitionCentering().fit(self.train)
+        unseen = pd.DataFrame({AEZ_COL: [9], MONTH_COL: [7], "X427": [32.5], "X437": [4.0]})
+
+        self.assertEqual(list(centering.transform(unseen).iloc[0]), [0.0, 0.0])
+
+    def test_option_runs_before_the_other_spectral_steps(self) -> None:
+        preprocessor = build_preprocessor(PreprocessingConfig(use_acquisition_centering=True))
+        transformed = preprocessor.fit_transform(self.train)
+
+        steps = [name for name, _step in preprocessor.named_transformers_["spectra"].steps]
+        self.assertEqual(steps[:2], ["acquisition_centering", "drop_empty"])
+        self.assertAlmostEqual(transformed["X427"].sum(), 0.0)
+
+    def test_rejects_raw_spectra_methods(self) -> None:
+        with self.assertRaisesRegex(ValueError, "NMF or OSP"):
+            PreprocessingConfig(use_acquisition_centering=True, spectral_osp_components=3)

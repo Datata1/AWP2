@@ -20,6 +20,9 @@ from mlflow.exceptions import MlflowException
 from sklearn.base import BaseEstimator
 
 from awp2.config import (
+    IMPORTANCE_GROUP_COL,
+    IMPORTANCE_MEAN_COL,
+    IMPORTANCE_METRIC_COL,
     MLFLOW_ARTIFACTS_DIR,
     MLFLOW_EXPERIMENT_KIND_TAG,
     MLFLOW_PARAM_MAX_CHARS,
@@ -216,6 +219,7 @@ def log_tuning(
     metric: str,
     candidates: pd.DataFrame,
     train: pd.DataFrame,
+    extra_metrics: Mapping[str, float] | None = None,
     system_metrics: bool = False,
 ) -> str:
     """Record a hyperparameter search as one tuning run with a nested run per candidate.
@@ -234,6 +238,7 @@ def log_tuning(
         candidates: One row per candidate with the columns ``params`` (dict of hyperparameters),
             ``mean``, ``std``, ``rank`` and ``fold_<i>`` (score per fold).
         train: Training data the cross-validation ran on.
+        extra_metrics: Further numbers of the parent run, e.g. the input size.
         system_metrics: Also record CPU/memory usage during the search.
 
     Returns:
@@ -254,7 +259,13 @@ def log_tuning(
             {f"best.{k}": repr(v)[:MLFLOW_PARAM_MAX_CHARS] for k, v in best["params"].items()}
         )
         _log_datasets({"training": train})
-        mlflow.log_metrics({f"cv_{metric}_mean": best["mean"], f"cv_{metric}_std": best["std"]})
+        mlflow.log_metrics(
+            {
+                f"cv_{metric}_mean": best["mean"],
+                f"cv_{metric}_std": best["std"],
+                **(extra_metrics or {}),
+            }
+        )
         mlflow.log_text(candidates.to_csv(index=False), "cv_results.csv")
         for number, candidate in candidates.iterrows():
             with mlflow.start_run(
@@ -277,3 +288,35 @@ def log_tuning(
                     }
                 )
     return parent.info.run_id
+
+
+def log_importance(
+    *,
+    run_id: str,
+    name: str,
+    table: pd.DataFrame,
+    figures: Mapping[str, plt.Figure] | None = None,
+) -> None:
+    """Attach a permutation-importance result to an existing run.
+
+    Stores the table as ``importance/<name>.csv`` and every mean drop as metric
+    ``importance.<name>.<metric>.<group>``, so groups can be compared across runs in the UI.
+
+    Args:
+        run_id: Run to extend, e.g. ``RunResult.run_id`` or a tuning run id.
+        name: Short label of the grouping, e.g. ``"regions"`` or ``"bands"``.
+        table: ``ImportanceResult.to_frame()`` with the columns group, metric and mean.
+        figures: Plots to store under ``importance/``, keyed by file name.
+    """
+    with mlflow.start_run(run_id=run_id):
+        mlflow.log_text(table.to_csv(index=False), f"importance/{name}.csv")
+        mlflow.log_metrics(
+            {
+                f"importance.{name}.{row[IMPORTANCE_METRIC_COL]}.{row[IMPORTANCE_GROUP_COL]}": row[
+                    IMPORTANCE_MEAN_COL
+                ]
+                for _, row in table.iterrows()
+            }
+        )
+        for file_name, fig in (figures or {}).items():
+            mlflow.log_figure(fig, f"importance/{file_name}")
