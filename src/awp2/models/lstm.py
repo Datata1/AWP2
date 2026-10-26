@@ -297,8 +297,8 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
                 month_embedding_dim=self.month_embedding_dim,
                 n_classes=n_classes,
             )
-        n_context_features = 0 if self.context_mode == LSTM_NO_CONTEXT else len(
-            adapter.context_columns_
+        n_context_features = (
+            0 if self.context_mode == LSTM_NO_CONTEXT else len(adapter.context_columns_)
         )
         return _LateFusionLSTMClassifier(
             input_size=1,
@@ -427,9 +427,7 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         return self.classes_[prediction_codes]
 
     @staticmethod
-    def _validate_sample_weight(
-        sample_weight: np.ndarray | None, n_samples: int
-    ) -> np.ndarray:
+    def _validate_sample_weight(sample_weight: np.ndarray | None, n_samples: int) -> np.ndarray:
         if sample_weight is None:
             return np.ones(n_samples, dtype=np.float32)
         weights = np.asarray(sample_weight, dtype=np.float32)

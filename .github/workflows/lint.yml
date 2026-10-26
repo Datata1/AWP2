@@ -42,6 +42,9 @@ jobs:
       - name: Pipeline diagram is up to date
         run: uv run python tools/check_pipeline_diagram.py
 
+      - name: Tests
+        run: make test
+
       - name: Comment on PR
         env:
           GH_TOKEN: ${{ github.token }}
