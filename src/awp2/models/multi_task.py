@@ -363,9 +363,7 @@ class MultiTaskMLPClassifier(ClassifierMixin, BaseEstimator):
         return y
 
     @staticmethod
-    def _validate_sample_weight(
-        sample_weight: np.ndarray | None, n_samples: int
-    ) -> np.ndarray:
+    def _validate_sample_weight(sample_weight: np.ndarray | None, n_samples: int) -> np.ndarray:
         if sample_weight is None:
             return np.ones(n_samples, dtype=np.float32)
         weights = np.asarray(sample_weight, dtype=np.float32)
@@ -546,8 +544,8 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
                 aez_embedding_dim=self.aez_embedding_dim,
                 month_embedding_dim=self.month_embedding_dim,
             )
-        n_context_features = 0 if self.context_mode == LSTM_NO_CONTEXT else len(
-            adapter.context_columns_
+        n_context_features = (
+            0 if self.context_mode == LSTM_NO_CONTEXT else len(adapter.context_columns_)
         )
         return _MultiTaskLateFusionLSTMModule(
             hidden_size=self.hidden_size,
@@ -696,9 +694,7 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
         )
 
     @staticmethod
-    def _validate_sample_weight(
-        sample_weight: np.ndarray | None, n_samples: int
-    ) -> np.ndarray:
+    def _validate_sample_weight(sample_weight: np.ndarray | None, n_samples: int) -> np.ndarray:
         if sample_weight is None:
             return np.ones(n_samples, dtype=np.float32)
         weights = np.asarray(sample_weight, dtype=np.float32)
@@ -731,9 +727,7 @@ class MultiTaskLSTMClassifier(ClassifierMixin, BaseEstimator):
         weights[present] = counts.sum() / (present.sum() * counts[present])
         return torch.from_numpy(weights)
 
-    def _logits(
-        self, inputs: dict[str, np.ndarray], indices: np.ndarray
-    ) -> tuple[Tensor, Tensor]:
+    def _logits(self, inputs: dict[str, np.ndarray], indices: np.ndarray) -> tuple[Tensor, Tensor]:
         spectrum = torch.from_numpy(inputs["spectrum"][indices])
         if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
             return self.module_(
