@@ -330,3 +330,64 @@ class SpectralLSTMClassifierTest(unittest.TestCase):
 
         self.assertEqual(predicted.shape, (n_rows,))
         self.assertTrue(set(predicted).issubset(set(targets)))
+
+class SequenceOptionsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        n_rows = 20
+        generator = np.random.default_rng(42)
+        # 1500 nm lies behind a water-absorption gap, so no step may join it with 420 nm
+        self.features = pd.DataFrame(
+            {f"X{nm}": generator.random(n_rows) for nm in (400, 410, 420, 1500, 1510)}
+        )
+        self.targets = pd.Series(
+            np.tile(["first", "second"], n_rows // 2), index=self.features.index
+        )
+
+    def test_gru_encoder_returns_one_representation_per_spectrum(self) -> None:
+        encoder = _SpectralLSTMEncoder(
+            input_size=2, hidden_size=5, num_layers=1, dropout=0.0, cell="gru"
+        )
+
+        encoded = encoder(torch.zeros(3, 4, 2))
+
+        self.assertEqual(tuple(encoded.shape), (3, 5))
+
+    def test_blocks_stay_within_gap_free_segments(self) -> None:
+        adapter = _LSTMInputAdapter("none", bands_per_step=2).fit(self.features)
+
+        self.assertEqual(adapter.step_layout_.tolist(), [[0, 1], [2, 2], [3, 4]])
+        self.assertEqual(adapter.transform(self.features)["spectrum"].shape, (20, 3, 2))
+
+    def test_wavelength_channel_adds_relative_position(self) -> None:
+        adapter = _LSTMInputAdapter("none", bands_per_step=2, wavelength_channel=True)
+        spectrum = adapter.fit(self.features).transform(self.features)["spectrum"]
+
+        self.assertEqual(spectrum.shape, (20, 3, 3))
+        self.assertEqual(spectrum[0, 0, -1], 0.0)
+        self.assertEqual(spectrum[0, -1, -1], 1.0)
+
+    def test_gru_with_blocks_and_hidden_head_fits_and_predicts(self) -> None:
+        classifier = SpectralLSTMClassifier(
+            context_mode="none",
+            hidden_size=4,
+            num_layers=1,
+            dropout=0.0,
+            max_epochs=2,
+            batch_size=4,
+            cell="gru",
+            bands_per_step=2,
+            wavelength_channel=True,
+            head_hidden_size=8,
+        )
+
+        with self.assertWarnsRegex(UserWarning, "max_epochs"):
+            classifier.fit(self.features, self.targets)
+
+        self.assertFalse(classifier.stopped_early_)
+        self.assertTrue(set(classifier.predict(self.features)).issubset(set(self.targets)))
+
+    def test_rejects_unknown_cell(self) -> None:
+        with self.assertRaisesRegex(ValueError, "cell"):
+            SpectralLSTMClassifier(context_mode="none", cell="rnn").fit(
+                self.features, self.targets
+            )

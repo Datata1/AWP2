@@ -1,6 +1,7 @@
 """Sequential LSTM components for hyperspectral signatures."""
 
 import copy
+import warnings
 from typing import Self
 
 import numpy as np
@@ -13,9 +14,13 @@ from torch import Tensor, nn
 
 from awp2.config import (
     AEZ_COL,
+    GRU_CELL,
+    LSTM_CELL,
     LSTM_DEFAULT_AEZ_EMBEDDING_DIM,
+    LSTM_DEFAULT_BANDS_PER_STEP,
     LSTM_DEFAULT_BATCH_SIZE,
     LSTM_DEFAULT_DROPOUT,
+    LSTM_DEFAULT_HEAD_HIDDEN_SIZE,
     LSTM_DEFAULT_HIDDEN_SIZE,
     LSTM_DEFAULT_LEARNING_RATE,
     LSTM_DEFAULT_MAX_EPOCHS,
@@ -28,10 +33,12 @@ from awp2.config import (
     LSTM_NO_CONTEXT,
     LSTM_STANDARD_CONTEXT,
     MONTH_COL,
+    SAVGOL_SPLIT_GAP_NM,
     SEED,
     LSTMContextMode,
+    SequenceCell,
 )
-from awp2.data import band_columns
+from awp2.data import band_columns, wavelength
 
 
 class _SpectralLSTMEncoder(nn.Module):
@@ -43,9 +50,12 @@ class _SpectralLSTMEncoder(nn.Module):
         hidden_size: int,
         num_layers: int,
         dropout: float,
+        cell: SequenceCell = LSTM_CELL,
     ) -> None:
         super().__init__()
-        self.lstm = nn.LSTM(
+        recurrent = nn.GRU if cell == GRU_CELL else nn.LSTM
+        # the attribute keeps its name so that pickled LSTM models still load
+        self.lstm = recurrent(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
@@ -55,8 +65,23 @@ class _SpectralLSTMEncoder(nn.Module):
 
     def forward(self, spectrum: Tensor) -> Tensor:
         """Return the final hidden representation for each spectral sequence."""
-        _outputs, (hidden_state, _cell_state) = self.lstm(spectrum)
+        _outputs, state = self.lstm(spectrum)
+        hidden_state = state[0] if isinstance(state, tuple) else state
         return hidden_state[-1]
+
+
+def _classifier_head(
+    n_features: int, head_hidden_size: int, dropout: float, n_classes: int
+) -> nn.Module:
+    if head_hidden_size == 0:
+        return nn.Linear(n_features, n_classes)
+    # a hidden layer lets spectrum and context interact non-linearly after the fusion
+    return nn.Sequential(
+        nn.Linear(n_features, head_hidden_size),
+        nn.ReLU(),
+        nn.Dropout(dropout),
+        nn.Linear(head_hidden_size, n_classes),
+    )
 
 
 class _CategoricalContextEncoder(nn.Module):
@@ -89,6 +114,8 @@ class _LateFusionLSTMClassifier(nn.Module):
         dropout: float,
         n_context_features: int,
         n_classes: int,
+        cell: SequenceCell = LSTM_CELL,
+        head_hidden_size: int = LSTM_DEFAULT_HEAD_HIDDEN_SIZE,
     ) -> None:
         super().__init__()
         self.spectral_encoder = _SpectralLSTMEncoder(
@@ -96,8 +123,11 @@ class _LateFusionLSTMClassifier(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
+            cell=cell,
         )
-        self.classifier = nn.Linear(hidden_size + n_context_features, n_classes)
+        self.classifier = _classifier_head(
+            hidden_size + n_context_features, head_hidden_size, dropout, n_classes
+        )
 
     def forward(self, spectrum: Tensor, context: Tensor) -> Tensor:
         """Return class logits after fusing the encoded spectrum and context."""
@@ -119,6 +149,8 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
         aez_embedding_dim: int,
         month_embedding_dim: int,
         n_classes: int,
+        cell: SequenceCell = LSTM_CELL,
+        head_hidden_size: int = LSTM_DEFAULT_HEAD_HIDDEN_SIZE,
     ) -> None:
         super().__init__()
         self.spectral_encoder = _SpectralLSTMEncoder(
@@ -126,6 +158,7 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
+            cell=cell,
         )
         self.context_encoder = _CategoricalContextEncoder(
             n_aez_categories=n_aez_categories,
@@ -133,8 +166,11 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
             aez_embedding_dim=aez_embedding_dim,
             month_embedding_dim=month_embedding_dim,
         )
-        self.classifier = nn.Linear(
-            hidden_size + aez_embedding_dim + month_embedding_dim, n_classes
+        self.classifier = _classifier_head(
+            hidden_size + aez_embedding_dim + month_embedding_dim,
+            head_hidden_size,
+            dropout,
+            n_classes,
         )
 
     def forward(self, spectrum: Tensor, aez_codes: Tensor, month_codes: Tensor) -> Tensor:
@@ -145,10 +181,23 @@ class _EmbeddingFusionLSTMClassifier(nn.Module):
 
 
 class _LSTMInputAdapter:
-    """Separate spectral sequences from the configured static context representation."""
+    """Separate spectral sequences from the configured static context representation.
 
-    def __init__(self, context_mode: LSTMContextMode) -> None:
+    Each sequence step holds ``bands_per_step`` neighbouring bands; steps never span a
+    water-absorption gap, the last step of a segment repeats its edge band. The optional
+    wavelength channel tells the network where a step lies, since the gaps make equal steps
+    cover very different wavelength distances.
+    """
+
+    def __init__(
+        self,
+        context_mode: LSTMContextMode,
+        bands_per_step: int = LSTM_DEFAULT_BANDS_PER_STEP,
+        wavelength_channel: bool = False,
+    ) -> None:
         self.context_mode = context_mode
+        self.bands_per_step = bands_per_step
+        self.wavelength_channel = wavelength_channel
 
     def fit(self, X: pd.DataFrame) -> Self:
         """Learn the fitted input columns and categorical context codes.
@@ -167,6 +216,13 @@ class _LSTMInputAdapter:
         self.band_columns_ = band_columns(X)
         if not self.band_columns_:
             raise ValueError("X must contain at least one spectral band")
+        wavelengths_nm = np.asarray([wavelength(band) for band in self.band_columns_])
+        self.step_layout_ = _step_layout(wavelengths_nm, self.bands_per_step)
+        centers = wavelengths_nm[self.step_layout_].mean(axis=1)
+        span = centers.max() - centers.min()
+        relative = (centers - centers.min()) / span if span else np.zeros_like(centers)
+        self.step_wavelengths_ = relative.astype(np.float32)
+        self.input_size_ = self.bands_per_step + int(self.wavelength_channel)
         self.context_columns_ = [column for column in X.columns if column not in self.band_columns_]
         if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
             if self.context_columns_ != [AEZ_COL, MONTH_COL]:
@@ -192,9 +248,14 @@ class _LSTMInputAdapter:
         self._validate_frame(X)
         if list(X.columns) != list(self.feature_names_in_):
             raise ValueError("X must have the same columns in the same order as during fitting")
-        inputs = {
-            "spectrum": X[self.band_columns_].to_numpy(dtype=np.float32, copy=True)[..., None]
-        }
+        bands = X[self.band_columns_].to_numpy(dtype=np.float32, copy=True)
+        spectrum = bands[:, self.step_layout_]
+        if self.wavelength_channel:
+            position = np.broadcast_to(
+                self.step_wavelengths_[None, :, None], (len(X), len(self.step_wavelengths_), 1)
+            )
+            spectrum = np.concatenate([spectrum, position], axis=2)
+        inputs = {"spectrum": np.ascontiguousarray(spectrum)}
         if self.context_mode == LSTM_NO_CONTEXT:
             return inputs
         if self.context_mode == LSTM_STANDARD_CONTEXT:
@@ -219,6 +280,16 @@ class _LSTMInputAdapter:
         return np.asarray([codes.get(int(value), 0) for value in values], dtype=np.int64)
 
 
+def _step_layout(wavelengths_nm: np.ndarray, bands_per_step: int) -> np.ndarray:
+    gaps = np.flatnonzero(np.diff(wavelengths_nm) > SAVGOL_SPLIT_GAP_NM) + 1
+    steps = []
+    for segment in np.split(np.arange(len(wavelengths_nm)), gaps):
+        for start in range(0, len(segment), bands_per_step):
+            block = segment[start : start + bands_per_step]
+            steps.append(np.pad(block, (0, bands_per_step - len(block)), mode="edge"))
+    return np.stack(steps)
+
+
 class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
     """Classify one target from a spectral sequence and optional static context.
 
@@ -235,6 +306,12 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         max_epochs: Maximum training epochs before early stopping.
         batch_size: Number of rows per optimization batch.
         random_state: Seed for training randomness and the inner validation split.
+        cell: Recurrent cell, ``"lstm"`` or ``"gru"`` (fewer parameters).
+        bands_per_step: Neighbouring bands fed together per sequence step; larger values
+            shorten the sequence.
+        wavelength_channel: Add the normalised wavelength of each step as extra input.
+        head_hidden_size: Width of a hidden layer after fusing spectrum and context; 0 keeps a
+            single linear layer.
     """
 
     def __init__(
@@ -250,6 +327,10 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         max_epochs: int = LSTM_DEFAULT_MAX_EPOCHS,
         batch_size: int = LSTM_DEFAULT_BATCH_SIZE,
         random_state: int = SEED,
+        cell: SequenceCell = LSTM_CELL,
+        bands_per_step: int = LSTM_DEFAULT_BANDS_PER_STEP,
+        wavelength_channel: bool = False,
+        head_hidden_size: int = LSTM_DEFAULT_HEAD_HIDDEN_SIZE,
     ) -> None:
         """Store unfitted hyperparameters for sklearn cloning."""
         self.context_mode = context_mode
@@ -263,6 +344,23 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         self.max_epochs = max_epochs
         self.batch_size = batch_size
         self.random_state = random_state
+        self.cell = cell
+        self.bands_per_step = bands_per_step
+        self.wavelength_channel = wavelength_channel
+        self.head_hidden_size = head_hidden_size
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore a pickled classifier, e.g. one loaded from MLflow.
+
+        Args:
+            state: Attributes of the pickled object.
+        """
+        # models stored before these options existed used their default behaviour
+        state.setdefault("cell", LSTM_CELL)
+        state.setdefault("bands_per_step", LSTM_DEFAULT_BANDS_PER_STEP)
+        state.setdefault("wavelength_channel", False)
+        state.setdefault("head_hidden_size", LSTM_DEFAULT_HEAD_HIDDEN_SIZE)
+        super().__setstate__(state)
 
     def _validate_hyperparameters(self) -> None:
         if self.context_mode not in (
@@ -283,11 +381,15 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
             raise ValueError("embedding dimensions must be positive")
         if self.max_epochs < 1 or self.batch_size < 1:
             raise ValueError("max_epochs and batch_size must be positive")
+        if self.cell not in (LSTM_CELL, GRU_CELL):
+            raise ValueError(f"Unknown cell {self.cell!r}")
+        if self.bands_per_step < 1 or self.head_hidden_size < 0:
+            raise ValueError("bands_per_step must be positive and head_hidden_size non-negative")
 
     def _build_module(self, adapter: _LSTMInputAdapter, n_classes: int) -> nn.Module:
         if self.context_mode == LSTM_EMBEDDINGS_CONTEXT:
             return _EmbeddingFusionLSTMClassifier(
-                input_size=1,
+                input_size=adapter.input_size_,
                 hidden_size=self.hidden_size,
                 num_layers=self.num_layers,
                 dropout=self.dropout,
@@ -296,17 +398,21 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
                 aez_embedding_dim=self.aez_embedding_dim,
                 month_embedding_dim=self.month_embedding_dim,
                 n_classes=n_classes,
+                cell=self.cell,
+                head_hidden_size=self.head_hidden_size,
             )
         n_context_features = (
             0 if self.context_mode == LSTM_NO_CONTEXT else len(adapter.context_columns_)
         )
         return _LateFusionLSTMClassifier(
-            input_size=1,
+            input_size=adapter.input_size_,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
             dropout=self.dropout,
             n_context_features=n_context_features,
             n_classes=n_classes,
+            cell=self.cell,
+            head_hidden_size=self.head_hidden_size,
         )
 
     def fit(
@@ -345,7 +451,9 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
         if len(target_values) < 2:
             raise ValueError("At least two rows are required for the inner validation split")
         weights = self._validate_sample_weight(sample_weight, len(X))
-        adapter = _LSTMInputAdapter(self.context_mode).fit(X)
+        adapter = _LSTMInputAdapter(
+            self.context_mode, self.bands_per_step, self.wavelength_channel
+        ).fit(X)
         inputs = adapter.transform(X)
         self._validate_inputs(inputs)
         self.classes_, target_codes = np.unique(target_values, return_inverse=True)
@@ -403,6 +511,12 @@ class SpectralLSTMClassifier(ClassifierMixin, BaseEstimator):
                     break
         else:
             self.n_epochs_ = self.max_epochs
+            warnings.warn(
+                f"Training stopped at max_epochs={self.max_epochs} while the inner validation "
+                "loss was still improving; raise max_epochs.",
+                stacklevel=2,
+            )
+        self.stopped_early_ = self.n_epochs_ < self.max_epochs
 
         assert best_state is not None
         self.module_.load_state_dict(best_state)
