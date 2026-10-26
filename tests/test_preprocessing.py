@@ -2,6 +2,7 @@
 
 import unittest
 
+import numpy as np
 import pandas as pd
 
 from awp2.config import (
@@ -298,3 +299,40 @@ class AezMonthEncoderTest(unittest.TestCase):
             PreprocessingConfig(use_aez_month=True, use_meta=False)
         with self.assertRaises(ValueError):
             PreprocessingConfig(use_aez_month=True, use_categorical_context=True)
+
+
+class FeatureSetSelectionTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.features = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2, 3],
+                MONTH_COL: [5, 7, 9],
+                "X427": [10.0, 20.0, 45.0],
+                "X437": [np.nan, np.nan, np.nan],
+                "X447": [12.0, 25.0, 50.0],
+                "X457": [13.0, 26.0, 51.0],
+                "X467": [14.0, 27.0, 52.0],
+            }
+        )
+
+    def _columns(self, config: PreprocessingConfig) -> list[str]:
+        return list(build_preprocessor(config).fit_transform(self.features).columns)
+
+    def test_band_step_counts_only_usable_bands(self) -> None:
+        columns = self._columns(PreprocessingConfig(use_meta=False, spectral_band_step=2))
+
+        self.assertEqual(columns, ["X427", "X457"])
+
+    def test_without_spectra_keeps_only_the_other_groups(self) -> None:
+        columns = self._columns(PreprocessingConfig(use_spectra=False))
+
+        self.assertFalse(any(column.startswith("X") for column in columns))
+        self.assertIn(AEZ_COL + "_1", columns)
+
+    def test_without_spectra_rejects_spectral_steps(self) -> None:
+        with self.assertRaisesRegex(ValueError, "spectral_band_step"):
+            PreprocessingConfig(use_spectra=False, spectral_band_step=2)
+
+    def test_without_spectra_needs_another_feature_group(self) -> None:
+        with self.assertRaisesRegex(ValueError, "another feature group"):
+            PreprocessingConfig(use_spectra=False, use_meta=False)

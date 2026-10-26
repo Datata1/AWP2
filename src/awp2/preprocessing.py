@@ -100,9 +100,7 @@ def _band_window(
     Raises:
         ValueError: If the resolved window contains too few available bands.
     """
-    start_band, end_band = (
-        nearest_band(target_nm, band_names) for target_nm in target_window_nm
-    )
+    start_band, end_band = (nearest_band(target_nm, band_names) for target_nm in target_window_nm)
     start_nm, end_nm = sorted((wavelength(start_band), wavelength(end_band)))
     window_bands = tuple(
         sorted(
@@ -457,6 +455,53 @@ class StandardNormalVariate(_BandTransformer):
         return pd.DataFrame(corrected, index=X.index, columns=X.columns)
 
 
+class KeepEveryNthBand(_BandTransformer):
+    """Keep every ``step``-th band, starting with the first, to coarsen the spectral sampling.
+
+    Counts the bands it receives, so after ``DropEmptyBands`` the step runs over the usable
+    bands and does not land in the empty water-absorption gaps.
+    """
+
+    def __init__(self, step: int) -> None:
+        """Set the distance between kept bands.
+
+        Args:
+            step: Distance between kept bands, in bands; 1 keeps all.
+        """
+        self.step = step
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Choose the kept bands from the column order.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If ``step`` is smaller than 1.
+        """
+        if self.step < 1:
+            raise ValueError(f"step must be at least 1, got {self.step}")
+        X = self._check(X)
+        self._set_input(X)
+        self.feature_names_out_ = list(X.columns[:: self.step])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Select the bands chosen in ``fit``.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            ``X`` reduced to every ``step``-th band.
+        """
+        return self._check(X)[self.feature_names_out_]
+
+
 class OrthogonalSubspaceProjection(_BandTransformer):
     """Unsupervised OSP by automatic target generation: iterative endmember signatures.
 
@@ -753,9 +798,7 @@ class AddVegetationIndices(_BandTransformer):
         r800, r550 = (reflectance[band] for band in index_bands["SR_800_550"])
         _, r660 = (reflectance[band] for band in index_bands["ND_750_660"])
         _, r680 = (reflectance[band] for band in index_bands["ND_800_680"])
-        r750_msr, r705_msr, r445 = (
-            reflectance[band] for band in index_bands["MSR_750_445"]
-        )
+        r750_msr, r705_msr, r445 = (reflectance[band] for band in index_bands["MSR_750_445"])
         r700, r670, _ = (reflectance[band] for band in index_bands["MCARI"])
         _, r500, _ = (reflectance[band] for band in index_bands["PSRI"])
         r531, r570 = (reflectance[band] for band in index_bands["PRI"])
@@ -1097,6 +1140,17 @@ class PreprocessingConfig(BaseModel):
     use_meta: bool = Field(
         default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
     )
+    use_spectra: bool = Field(
+        default=True,
+        description="Use the spectral bands as features; False keeps only the other enabled "
+        "groups (meta, indices, albedo, PC_1/PC_2), e.g. for an indices-only model.",
+    )
+    spectral_band_step: int | None = Field(
+        default=None,
+        ge=2,
+        description="Keep only every n-th usable band (after interpolation, smoothing and SNV) "
+        "to simulate a coarser spectral resolution; None keeps all bands.",
+    )
     use_categorical_context: bool = Field(
         default=False,
         description=(
@@ -1237,9 +1291,12 @@ class PreprocessingConfig(BaseModel):
                 region, is empty without ``use_meta`` or with a spectral feature branch; if more
                 than one reduction method is selected; if centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
-                if NMF, OSP or DBN get unsuitable input; or if Savitzky-Golay or LPP
-                arguments are set without their method or missing with it.
+                if NMF, OSP or DBN get unsuitable input; if Savitzky-Golay or LPP
+                arguments are set without their method or missing with it; or if
+                ``use_spectra=False`` keeps spectral steps or leaves no features.
         """
+        if not self.use_spectra:
+            self._check_without_spectra()
         if self.spectral_regions is not None:
             unknown = set(self.spectral_regions) - {region.name for region in SPECTRAL_REGIONS}
             if unknown:
@@ -1340,6 +1397,30 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("savgol_window_length/polyorder require use_savgol=True")
         return self
 
+    def _check_without_spectra(self) -> None:
+        spectral_steps = {
+            "use_savgol": self.use_savgol,
+            "use_spectral_snv": self.use_spectral_snv,
+            "spectral_band_step": self.spectral_band_step is not None,
+            "spectral_pca_components": self.spectral_pca_components is not None,
+            "spectral_ica_components": self.spectral_ica_components is not None,
+            "spectral_nmf_components": self.spectral_nmf_components is not None,
+            "spectral_osp_components": self.spectral_osp_components is not None,
+            "spectral_lpp_components": self.spectral_lpp_components is not None,
+            "spectral_vsrp_components": self.spectral_vsrp_components is not None,
+            "spectral_dbn_layers": self.spectral_dbn_layers is not None,
+        }
+        enabled = [name for name, active in spectral_steps.items() if active]
+        if enabled:
+            raise ValueError(f"use_spectra=False must not combine with spectral steps: {enabled}")
+        if not (
+            self.use_meta
+            or self.use_vegetation_indices
+            or self.use_mean_albedo
+            or self.use_principal_components
+        ):
+            raise ValueError("use_spectra=False needs another feature group")
+
 
 def _region_columns(frame: pd.DataFrame, regions: tuple[str, ...]) -> list[str]:
     intervals = [region for region in SPECTRAL_REGIONS if region.name in regions]
@@ -1397,6 +1478,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
+    if config.spectral_band_step is not None:
+        spectra.append(("band_step", KeepEveryNthBand(config.spectral_band_step)))
     spectra.extend(_spectral_scaler(config))
     pca_components = config.spectral_pca_components
     ica_components = config.spectral_ica_components
@@ -1496,7 +1579,8 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         )
     if config.use_aez_month:
         transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
-    transformers.append(("spectra", Pipeline(spectra), band_selector))
+    if config.use_spectra:
+        transformers.append(("spectra", Pipeline(spectra), band_selector))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
 
@@ -1534,6 +1618,8 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         return known[name]
     if name == "interpolate" and isinstance(step, InterpolateBands):
         return f"Interpolate band gaps (max {step.max_interpolation_gap_nm} nm)"
+    if name == "band_step" and isinstance(step, KeepEveryNthBand):
+        return f"Keep every {step.step}. band"
     if name == "select" and isinstance(step, SelectVegetationIndices):
         return "Keep only the vegetation indices"
     if name == "savgol" and isinstance(step, SavitzkyGolaySmoothing):
@@ -1698,7 +1784,12 @@ _ALBEDO_SCALER_NODES: tuple[_OptionNode, ...] = (
 )
 
 _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
-    _OptionNode("spectra", "drop_empty", "Leere Bänder entfernen (immer)", False),
+    _OptionNode(
+        "spectra",
+        "drop_empty",
+        f"Leere Bänder entfernen [{_config_fields('use_spectra')}, Standard]",
+        True,
+    ),
     _OptionNode(
         "spectra",
         "interpolate",
@@ -1714,6 +1805,12 @@ _SPECTRA_PREFIX_NODES: tuple[_OptionNode, ...] = (
         True,
     ),
     _OptionNode("spectra", "snv", f"SNV [{_config_fields('use_spectral_snv')}]", True),
+    _OptionNode(
+        "spectra",
+        "band_step",
+        f"Jedes n-te Band [{_config_fields('spectral_band_step')}]",
+        True,
+    ),
 )
 
 _INDICES_NODES: tuple[_OptionNode, ...] = (
@@ -1888,7 +1985,7 @@ def pipeline_options_diagram() -> str:
     a_drop, a_inter, albedo = _ALBEDO_NODES
     i_drop, i_inter, indices, select, impute = _INDICES_NODES
     pc_drop, pc_inter, pc_scale, pc_pca = _PRINCIPAL_COMPONENT_NODES
-    s_drop, s_inter, savgol, snv = _SPECTRA_PREFIX_NODES
+    s_drop, s_inter, savgol, snv, band_step = _SPECTRA_PREFIX_NODES
     month_diamond, scaler_diamond, reduction_diamond = _DIAMONDS
 
     diagram: list[str] = ["```mermaid", "flowchart TD"]
@@ -1966,14 +2063,15 @@ def pipeline_options_diagram() -> str:
     link(_node_id(s_drop), s_inter)
     link(_node_id(s_inter), savgol)
     link(_node_id(savgol), snv)
-    link(_node_id(snv), scaler_diamond)
+    link(_node_id(snv), band_step)
+    link(_node_id(band_step), scaler_diamond)
     for node in _SCALER_NODES:
         link(_node_id(scaler_diamond), node)
         link(_node_id(node), reduction_diamond)
     for node in _REDUCTION_NODES:
         link(_node_id(reduction_diamond), node)
         link(_node_id(node), concat)
-    for node in (aez, cyclic, numeric, albedo,aez_month, select):
+    for node in (aez, cyclic, numeric, albedo, aez_month, select):
         link(_node_id(node), concat)
     diagram.extend(edges)
     diagram.append("```")
