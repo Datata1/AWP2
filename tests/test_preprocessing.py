@@ -7,14 +7,17 @@ import pandas as pd
 
 from awp2.config import (
     AEZ_COL,
+    CROP_COL,
     MEAN_ALBEDO_COL,
     MONTH_COL,
+    STAGE_COL,
     VEGETATION_INDEX_NAMES,
 )
 from awp2.preprocessing import (
     AddVegetationIndices,
     AezMonthEncoder,
     PreprocessingConfig,
+    SelectBands,
     build_preprocessor,
     nearest_band,
 )
@@ -336,3 +339,40 @@ class FeatureSetSelectionTest(unittest.TestCase):
     def test_without_spectra_needs_another_feature_group(self) -> None:
         with self.assertRaisesRegex(ValueError, "another feature group"):
             PreprocessingConfig(use_spectra=False, use_meta=False)
+
+
+class SelectBandsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bands = pd.DataFrame(
+            {
+                "X427": [1.0, 1.1, 5.0, 5.1],
+                "X437": [3.0, 1.0, 3.0, 1.0],
+                "X447": [9.0, 9.2, 1.0, 1.2],
+            }
+        )
+        self.targets = pd.DataFrame(
+            {CROP_COL: ["corn", "corn", "rice", "rice"], STAGE_COL: ["Late"] * 4}
+        )
+
+    def test_keeps_the_most_separating_bands_in_wavelength_order(self) -> None:
+        selector = SelectBands(k=2).fit(self.bands, self.targets)
+
+        self.assertEqual(selector.selected_wavelengths_, [427, 447])
+
+    def test_transform_reuses_the_bands_chosen_on_the_training_part(self) -> None:
+        selector = SelectBands(k=1).fit(self.bands, self.targets)
+        unseen = pd.DataFrame({"X427": [0.0], "X437": [100.0], "X447": [0.0]})
+
+        self.assertEqual(list(selector.transform(unseen).columns), selector.feature_names_out_)
+
+    def test_rejects_more_bands_than_available(self) -> None:
+        with self.assertRaisesRegex(ValueError, "between 1 and 3"):
+            SelectBands(k=4).fit(self.bands, self.targets)
+
+    def test_counts_as_a_reduction_method(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at most one"):
+            PreprocessingConfig(
+                use_spectral_standard_scale=True,
+                spectral_pca_components=5,
+                spectral_select_k=5,
+            )

@@ -137,6 +137,7 @@ flowchart TD
     subgraph reduktion
         d_reduction{"Reduktion (max. eine)"}
         n_spectra_pca["PCA [spectral_pca_components | braucht Standard/Center]"]
+        n_spectra_select_k["Bandauswahl [spectral_select_k + spectral_select_score | überwacht, je Fold]"]
         n_spectra_ica["ICA [spectral_ica_components | braucht Standard/Center]"]
         n_spectra_nmf["NMF [spectral_nmf_components | nur roh: ohne SG/SNV/Skalierer/Indizes]"]
         n_spectra_osp["OSP [spectral_osp_components | nur roh: ohne SNV/Skalierer/Indizes]"]
@@ -196,6 +197,8 @@ flowchart TD
     n_spectra_no_scaler --> d_reduction
     d_reduction --> n_spectra_pca
     n_spectra_pca --> d_concat
+    d_reduction --> n_spectra_select_k
+    n_spectra_select_k --> d_concat
     d_reduction --> n_spectra_ica
     n_spectra_ica --> d_concat
     d_reduction --> n_spectra_nmf
