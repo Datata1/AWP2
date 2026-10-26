@@ -424,6 +424,39 @@ LSTMContextMode = Literal["none", "standard", "embeddings"]
 LSTM_NO_CONTEXT, LSTM_STANDARD_CONTEXT, LSTM_EMBEDDINGS_CONTEXT = get_args(LSTMContextMode)
 BandScore = Literal["f_classif", "mutual_info"]
 F_CLASSIF_SCORE, MUTUAL_INFO_SCORE = get_args(BandScore)
+Sensor = Literal["hyperion", "sentinel2"]
+HYPERION_SENSOR, SENTINEL2_SENSOR = get_args(Sensor)
+
+
+@dataclass(frozen=True)
+class SensorBand:
+    """One band of a simulated multispectral sensor.
+
+    Args:
+        name: Band name in the sensor documentation.
+        center_nm: Central wavelength.
+        width_nm: Full bandwidth; the simulation averages all bands inside it.
+    """
+
+    name: str
+    center_nm: int
+    width_nm: int
+
+
+# Sentinel-2A MSI surface bands (ESA). B1, B9 and B10 are left out: they sense aerosols,
+# water vapour and cirrus for atmospheric correction, not the crop.
+SENTINEL2_BANDS: tuple[SensorBand, ...] = (
+    SensorBand("B2", 492, 66),
+    SensorBand("B3", 560, 36),
+    SensorBand("B4", 665, 31),
+    SensorBand("B5", 704, 15),
+    SensorBand("B6", 740, 15),
+    SensorBand("B7", 783, 20),
+    SensorBand("B8", 833, 106),
+    SensorBand("B8A", 865, 21),
+    SensorBand("B11", 1614, 91),
+    SensorBand("B12", 2202, 175),
+)
 LABEL_SEP = "|"  # "_" occurs inside crop and stage names, so it cannot separate them
 
 SEED = 42
