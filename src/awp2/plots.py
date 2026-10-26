@@ -11,14 +11,9 @@ from matplotlib.container import BarContainer
 from awp2.config import (
     ALL_GROUPS_KIND,
     BAND_GAP_NM,
-    BAND_PATTERN,
     DOCS_FIGURES_DIR,
     FIGURE_DPI,
     FIT_TIME_COL,
-    IMPORTANCE_GROUP_COL,
-    IMPORTANCE_MEAN_COL,
-    IMPORTANCE_METRIC_COL,
-    IMPORTANCE_STD_COL,
     META_ONLY_KIND,
     MIN_CV_GAIN,
     N_COMPONENTS_COL,
@@ -30,7 +25,6 @@ from awp2.config import (
     REDUCTION_FAMILY_COL,
     REDUCTION_FAMILY_LABELS,
     REDUCTION_MAX_CV_LOSS,
-    SAVGOL_SPLIT_GAP_NM,
     SPECTRAL_REGIONS,
     SPECTRAL_REGIONS_NM,
     STD_SUFFIX,
@@ -41,7 +35,6 @@ from awp2.config import (
 )
 from awp2.data import band_columns, wavelength, wavelengths
 from awp2.evaluation import METRIC_LABELS, ErrorBreakdown, MetricName, Metrics
-from awp2.importance import ImportanceResult
 
 
 def plot_spectra(
@@ -560,44 +553,6 @@ def plot_pca_loadings(
     return ax
 
 
-def plot_band_importance(
-    result: ImportanceResult,
-    metrics: Sequence[MetricName] = ("bacc_crop", "bacc_stage"),
-    ax: plt.Axes | None = None,
-) -> plt.Axes:
-    """Plot the importance of band windows over the wavelength, spectral regions shaded.
-
-    Args:
-        result: Importance with one group per band, e.g. from ``band_window_groups``.
-        metrics: One curve (mean ± std) per metric.
-        ax: Axes to draw on; a new figure is created if omitted.
-
-    Returns:
-        The axes with the importance curves; non-band groups are left out.
-    """
-    if ax is None:
-        _, ax = plt.subplots(figsize=(12, 4.5))
-    table = result.to_frame()
-    table = table[table[IMPORTANCE_GROUP_COL].str.fullmatch(BAND_PATTERN)]
-    for metric in metrics:
-        rows = table[table[IMPORTANCE_METRIC_COL] == metric]
-        x = np.array([wavelength(band) for band in rows[IMPORTANCE_GROUP_COL]], dtype=float)
-        mean = rows[IMPORTANCE_MEAN_COL].to_numpy(dtype=float)
-        std = rows[IMPORTANCE_STD_COL].to_numpy(dtype=float)
-        # a NaN after each water-absorption gap keeps the curve from bridging it
-        breaks = np.flatnonzero(np.diff(x) > SAVGOL_SPLIT_GAP_NM) + 1
-        x, mean, std = (np.insert(values, breaks, np.nan) for values in (x, mean, std))
-        (line,) = ax.plot(x, mean, label=METRIC_LABELS.get(metric, metric), linewidth=1.5)
-        ax.fill_between(x, mean - std, mean + std, color=line.get_color(), alpha=0.2)
-    _shade_regions(ax)
-    ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_xlabel("Wellenlänge [nm]")
-    ax.set_ylabel("Abfall des Scores bei Permutation")
-    ax.legend(fontsize="small")
-    ax.grid(alpha=0.3)
-    return ax
-
-
 def plot_group_study(
     table: pd.DataFrame,
     metric: str = "bacc_combined",
@@ -746,43 +701,6 @@ def plot_importance_spectrum(
     if title:
         ax.set_title(title, pad=34)
     ax.grid(alpha=0.3)
-    return ax
-
-
-def plot_group_importance(
-    result: ImportanceResult,
-    metrics: Sequence[MetricName] = ("bacc_crop", "bacc_stage", "bacc_combined"),
-    ax: plt.Axes | None = None,
-) -> plt.Axes:
-    """Compare the importance of column groups (e.g. spectral regions) as grouped bars.
-
-    Args:
-        result: Importance with a few named groups, e.g. from ``region_groups``.
-        metrics: One bar per metric and group, with the std as error bar.
-        ax: Axes to draw on; a new figure is created if omitted.
-
-    Returns:
-        The axes with one bar group per column group, in the order of ``result``.
-    """
-    if ax is None:
-        _, ax = plt.subplots(figsize=(9, 4.5))
-    table = result.to_frame()
-    table = table[table[IMPORTANCE_METRIC_COL].isin(metrics)]
-    order = list(dict.fromkeys(table[IMPORTANCE_GROUP_COL]))
-    means = table.pivot(
-        index=IMPORTANCE_GROUP_COL, columns=IMPORTANCE_METRIC_COL, values=IMPORTANCE_MEAN_COL
-    ).loc[order, list(metrics)]
-    stds = table.pivot(
-        index=IMPORTANCE_GROUP_COL, columns=IMPORTANCE_METRIC_COL, values=IMPORTANCE_STD_COL
-    ).loc[order, list(metrics)]
-    means.columns = [METRIC_LABELS.get(metric, metric) for metric in metrics]
-    stds.columns = means.columns
-    means.plot.bar(ax=ax, yerr=stds, rot=0, width=0.75, capsize=2)
-    ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_xlabel("")
-    ax.set_ylabel("Abfall des Scores bei Permutation")
-    ax.legend(fontsize="small")
-    ax.grid(axis="y", alpha=0.3)
     return ax
 
 
