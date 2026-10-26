@@ -21,6 +21,31 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     Lokales Projektmaterial unter `data/assets/`. - Karte zum Untersuchungsgebiet Nordamerika
     sowie Erklärung der AEZ als Gruppierung nach Klima, Böden und Vegetationsperiode.
 
+- ESA (o. J.): *S2 Mission*. SentiWiki, Copernicus. https://sentiwiki.copernicus.eu/web/s2-mission.
+    - Sentinel-2 MSI: räumliche Auflösung je Band, SNR bei Referenzstrahlung (Tabelle 3),
+    Streifenbreite, Sichtfeld, Wiederholrate, Startjahre und Sen2Cor-Level-2A-Prozessierung.
+
+- ESA (2026): *Sentinel-2 Spectral Response Functions (S2-SRF)*, COPE-GSEG-EOPG-TN-15-0007,
+    Version 5.0 (04.08.2026). SentiWiki, Copernicus.
+    https://sentiwiki.copernicus.eu/web/s2-documents. - Gemessene Empfindlichkeitskurven von
+    S2A/S2B/S2C in 1-nm-Schritten sowie Bandmitte und Bandbreite; Grundlage für K1 (#191),
+    Download mit `make external`.
+
+- Pearlman, J., Segal, C., Clancy, P. et al. (2001): *The EO-1 Hyperion Imaging Spectrometer*.
+    IEEE Aerospace Conference (Foliensatz).
+    https://www.ugpti.org/smartse/research/citations/downloads/Pearlman-Hyperion_IEEE-2001.pdf.
+    - Gemessene Hyperion-Kenndaten nach dem Start: GSD 29,88 m, 7,5 km Streifen, SNR je
+    Wellenlänge (161 bei 550 nm bis 40 bei 2125 nm).
+
+- U.S. Geological Survey (o. J.): *Earth Observing-1 General Questions and Answers*. USGS EROS.
+    https://www.usgs.gov/centers/eros/earth-observing-1-general-questions-and-answers. -
+    Schwenkbarkeit über den Nachbarpfad, Anteil echter Nadir-Aufnahmen, kalibrierte Bänder.
+
+- U.S. Geological Survey (o. J.): *USGS EROS Archive – Earth Observing One (EO-1) – Hyperion*.
+    USGS EROS.
+    https://www.usgs.gov/centers/eros/science/usgs-eros-archive-earth-observing-one-eo-1-hyperion.
+    - 220 Kanäle, 357–2576 nm, 30 m, 7,7 km Szenenbreite, Missionszeitraum 2000–2017.
+
 ## Fernerkundung & Vegetation
 
 !!! todo
@@ -80,6 +105,12 @@ Format: Autor:innen (Jahr): *Titel*. Verlag/Journal. Link. – eine Zeile, wofü
     advances and remaining knowledge gaps*. Biosystems Engineering, 114(4), 358-371.
     https://doi.org/10.1016/j.biosystemseng.2012.08.009. - Wiederholte Fernerkundung für
     landwirtschaftliches Monitoring und mögliche Entscheidungsunterstützung.
+
+- Marshall, M. & Thenkabail, P. (2015): *Advantage of hyperspectral EO-1 Hyperion over
+    multispectral IKONOS, GeoEye-1, WorldView-2, Landsat ETM+, and MODIS vegetation indices in
+    crop biomass estimation*. ISPRS Journal of Photogrammetry and Remote Sensing.
+    https://doi.org/10.1016/j.isprsjprs.2015.08.001. - Hyperion-Schmalbänder schätzen die
+    Biomasse besser als Breitband-Indizes; grenzt unsere Sentinel-2-Aussage auf Klassifikation ein.
 
 - Merzlyak, M. N., Gitelson, A. A., Chivkunova, O. B. & Rakitin, V. Y. (1999): *Non-destructive
     optical detection of pigment changes during leaf senescence and fruit ripening*. Physiologia
