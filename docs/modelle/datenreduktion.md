@@ -6,9 +6,11 @@ Trainingsteil, Validierung nur einmal pro Empfehlung.
 
 ## Kernaussagen
 
-- **10 Sentinel-2-Bänder reichen.** Statt 131 Hyperion-Bändern verliert die kombinierte SVM auf
-  der Validierung nur 0,008 BAcc kombiniert (0,857 gegenüber 0,866). Der hierarchische Ansatz
-  verliert 0,006. Das sind **92 % weniger gemessene Bänder**.
+- **10 Bänder an Sentinel-2-Positionen reichen auf Hyperion-Daten.** Statt 131 Hyperion-Bändern
+  verliert die kombinierte SVM auf der Validierung nur 0,008 BAcc kombiniert (0,857 gegenüber
+  0,866). Der hierarchische Ansatz verliert 0,006. Das sind **92 % weniger gemessene Bänder**.
+  Die Bänder sind aus Hyperion simuliert; die Übertragung auf echte Sentinel-2-Aufnahmen ist
+  nicht geprüft (siehe [Einordnung](#was-die-sentinel-2-empfehlung-bedeutet-und-was-nicht)).
 - **Breite Abdeckung schlägt einzelne „beste“ Bänder.** Eine univariate Bandauswahl kommt mit
   10 Bändern nur auf 0,739 und selbst mit 80 Bändern auf 0,841, weil sie benachbarte, fast
   identische Bänder wählt. Sentinel-2 deckt VIS, Red Edge, NIR und beide SWIR-Bereiche ab.
@@ -214,11 +216,61 @@ Gruppen-Folds halten eine ganze Zelle (bzw. einen Monat oder eine Region) aus de
 
 Details: `notebooks/34_jd_gruppen_cv.ipynb`, `notebooks/37_jd_hierarchisch_gruppen_cv.ipynb`.
 
+## Was die Sentinel-2-Empfehlung bedeutet – und was nicht
+
+Unsere „Sentinel-2“-Bänder sind **aus Hyperion simuliert**: Jedes Band ist das Rechteck-Mittel der
+Hyperion-Bänder in seiner Bandbreite (`SimulateSensor`, `SENTINEL2_BANDS`). Echte
+Sentinel-2-Aufnahmen unterscheiden sich davon in mehreren Punkten:
+
+| Aspekt | Hyperion (unsere Daten) | Sentinel-2 MSI | Folge für die Aussage |
+| --- | --- | --- | --- |
+| Spektrale Antwort | 220 Kanäle à ~10 nm, 357–2576 nm[^usgs-hyp]; im Datensatz 131 Bänder in 427–925, 973–1104, 1165–1326, 1508–1770, 2052–2355 nm[^aneece] | 13 Bänder mit gemessener Empfindlichkeitskurve (SRF), Bandbreite 13–181 nm (B8 115–118 nm, B12 180–181 nm)[^srf] | Rechteck-Näherung (B8 106 nm, B12 175 nm) weicht von der SRF ab → K1 (#191). Alle SRF-Bereiche der 10 Bänder liegen in den behaltenen Hyperion-Fenstern; B5 und B6 enthalten aber nur je ein Hyperion-Band. |
+| Räumliche Auflösung | 30 m (GSD 29,88 m)[^usgs-hyp][^pearlman]; je Feld ein zufälliges Pixel abseits des Randes[^aneece] | 10 m (B2–B4, B8), 20 m (B5–B7, B8A, B11, B12)[^s2] | Ein S2-Pixel sieht ein Neuntel der Fläche; Effekt auf Mischpixel und Feldheterogenität unbekannt |
+| Signal-Rausch-Verhältnis | gemessen 144–161 (550–700 nm), 89 (1575 nm), **40 (2125 nm)**[^pearlman] | 72–174 je Band, B11 und B12 je **100**[^s2] | Referenzstrahlungen unterscheiden sich, Werte nur grob vergleichbar. Die Simulation erbt das Hyperion-Rauschen, mittelt es aber über mehrere Bänder (B12 ≈ 17 Bänder) → K2, K6 |
+| Prozessierung | Radiometrie → Bodenreflektanz mit dem SMARTS-Modell (Sichtweite, Feuchte, Druck aus NOAA, GRIDMET, NLDAS-2), dann gleitendes Mittel über 3 Bänder[^aneece] | Level-2A-Bodenreflektanz mit Sen2Cor (Atmosphäre, Gelände, Zirren)[^s2] | Andere Atmosphärenkorrektur und keine Glättung → Verteilungsverschiebung |
+| Zeitraum, Geometrie | Mission 2000–2017[^usgs-hyp], Datensatz 2008–2015[^aneece]; 7,7 km Streifen, Schwenk bis zum Nachbarpfad, echte Nadir-Aufnahmen < 1 %[^usgs-faq] | ab 2015 (S2A), 290 km Streifen, Sichtfeld 20,6°, Wiederholung 5 Tage mit zwei Satelliten[^s2] | Kaum zeitliche Überlappung → keine gelabelten Paare; das Modell müsste auf S2-Daten neu trainiert werden |
+
+**Korrekte Formulierung:** Auf Hyperion-Daten genügen zehn breite Bänder an den
+Sentinel-2-Positionen; die spektrale Information von Sentinel-2 reicht also aus. Ob ein auf
+Hyperion trainiertes Modell direkt auf echte Sentinel-2-Aufnahmen übertragbar ist, haben wir nicht
+geprüft – dafür wären echte S2-Aufnahmen mit Labels nötig.
+
+- **Grenze aus der Gruppen-CV:** Schon für unbekannte Hyperion-Aufnahmen fällt jedes Modell auf
+  0,27–0,43 (siehe [Grenzen](#grenzen-unbekannte-aufnahmen)). Ein anderer Sensor ist eine
+  mindestens so große Verschiebung.
+- **Nur Klassifikation:** Für die Biomasse-Schätzung zeigen Marshall & Thenkabail einen Vorteil
+  der Hyperion-Schmalbänder gegenüber Breitband-Sensoren.[^marshall] Unser Ergebnis gilt nur für
+  Kultur und Stadium.
+
+### Kontrollexperimente
+
+Sie trennen, **warum** die Sentinel-2-Bänder reichen: Lage, Breite oder bloße Abdeckung. Alle je
+10 Bänder, CV auf dem Trainingsteil, kombinierte RBF-SVM, gamma je Variante neu gesucht.
+
+| # | Variante | beantwortet | CV kombiniert |
+| --- | --- | --- | --- |
+| – | Referenz: alle Bänder / Sentinel-2 (Rechteck) | – | 0,859 / 0,860 |
+| K1 | Sentinel-2 mit echter SRF (#191) | Hängt das Ergebnis an der Rechteck-Näherung? | folgt |
+| K2 | Hyperion-10: nächstes Einzelband je S2-Bandmitte | Bringt das Mitteln etwas oder zählt nur die Lage? | folgt |
+| K3 | 10 gleichmäßig verteilte Bänder | Reicht beliebige gleichmäßige Abdeckung? | folgt |
+| K4 | 10 zufällige Bänder, 20 Ziehungen | Liegt Sentinel-2 klar über Zufall? | folgt |
+| K5 | univariate Bandauswahl k = 10 | Ist datengetriebene Auswahl schlechter? | 0,739 |
+| K6 | Sentinel-2, Bandmitten ±10 nm, Rauschen 0,5/1/2 % (nur Testfold) | Wie empfindlich gegen Sensorunterschiede? | folgt |
+| K7 | optional: Landsat-8/9 OLI (7 Bänder, ohne Red Edge) | Wie viel bringt Red Edge? | folgt |
+
+[^usgs-hyp]: U.S. Geological Survey (o. J.): USGS EROS Archive – EO-1 Hyperion, siehe [Quellen](../domaene/quellen.md).
+[^aneece]: Aneece & Thenkabail (2018), Abschnitte 2.2.1–2.2.4, siehe [Quellen](../domaene/quellen.md).
+[^srf]: ESA (2026): Sentinel-2 Spectral Response Functions, Version 5.0, Blatt „Bandwidth and mid-wavelength“, siehe [Quellen](../domaene/quellen.md).
+[^pearlman]: Pearlman et al. (2001), Folien „Hyperion Specifications“ und „Hyperion Measured SNR“, siehe [Quellen](../domaene/quellen.md).
+[^s2]: ESA (o. J.): SentiWiki – S2 Mission, siehe [Quellen](../domaene/quellen.md).
+[^usgs-faq]: U.S. Geological Survey (o. J.): Earth Observing-1 General Questions and Answers, siehe [Quellen](../domaene/quellen.md).
+[^marshall]: Marshall & Thenkabail (2015), siehe [Quellen](../domaene/quellen.md).
+
 ## Empfehlung
 
 | Frage | Antwort |
 | --- | --- |
-| Minimaler Input ohne Qualitätsverlust | 10 Sentinel-2-Bänder + AEZ + Monat |
+| Minimaler Input ohne Qualitätsverlust | 10 Bänder an Sentinel-2-Positionen (aus Hyperion simuliert) + AEZ + Monat |
 | Endmodell für die Abgabe | kombinierte RBF-SVM auf allen Bändern (höchste BAcc und Macro-F1) |
 | Für neue Aufnahmen | hierarchische SVM mit Sentinel-2-Eingabe |
 | Nicht empfohlen | univariate Bandauswahl, Bandauswahl je Ebene, PCA (auch auf Sentinel-2) |

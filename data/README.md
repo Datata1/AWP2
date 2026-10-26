@@ -10,6 +10,7 @@ prüfen das Format (pandera-Schema in `src/awp2/data/schema.py`). Pfade aus `awp
 | `raw/` | Originaldaten, genau so wie geliefert. **Nie verändern.** | Du, per Hand kopiert |
 | `interim/` | Bereinigter Datensatz (`train_clean.parquet`) | `make data` |
 | `processed/` | Split-Zuordnung für alle (`split.csv`: train/val, CV-Fold) | `make data` |
+| `external/` | Fremde Referenzdaten, z. B. Sentinel-2-SRF der ESA (Version per Prüfsumme fixiert) | `make external` |
 | `assets/` | Aufgabenstellung, Orga-Unterlagen (aus ILIAS) – nicht in git, da das Repo öffentlich ist | Du, per Hand |
 
 Fluss: `raw/` → Pipeline → `interim/` → Pipeline → `processed/` → Modelle
