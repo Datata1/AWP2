@@ -520,6 +520,32 @@ LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on 
 MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 # a CV gain below this is within the fold-to-fold noise of the reference (std about 0.010)
 MIN_CV_GAIN = 0.005
+
+# Data-quality flags (#196) only mark rows for review; nothing is removed by them.
+QualityFlag = Literal["haze", "dark", "ndvi_outlier", "rare_context", "class_outlier"]
+LABEL_SUSPECT_COL = "label_suspect"
+HAZE_FLAG, DARK_FLAG, NDVI_OUTLIER_FLAG, RARE_CONTEXT_FLAG, CLASS_OUTLIER_FLAG = get_args(
+    QualityFlag
+)
+ANY_FLAG_COL = "any_flag"
+# The blue reflectance (median 16 %) lies far above the 3-6 % of vegetation at the surface, so
+# absolute literature thresholds (e.g. Fmask) do not transfer. Every rule therefore flags only
+# Tukey's "far out" values: below Q1 - 3 IQR or above Q3 + 3 IQR (Tukey 1977).
+TUKEY_FAR_OUT_FACTOR = 3.0
+# Haze Optimized Transform as in Fmask (Zhu & Woodcock 2012): haze raises blue against red
+HAZE_BLUE_NM = 470
+HAZE_RED_NM = 660
+HAZE_RED_WEIGHT = 0.5
+# very low NIR points to shadow or open water instead of vegetation or soil
+DARK_NIR_NM = 860
+NDVI_INDEX = "ND_800_680"
+# month x crop x stage combinations this rare in training are phenologically suspicious
+RARE_CONTEXT_MAX_COUNT = 3
+# class-wise outliers: robust Mahalanobis distance on PCA scores of each crop/stage class
+OUTLIER_PCA_COMPONENTS = 5
+OUTLIER_MIN_CLASS_ROWS = 30
+# the consensus filter needs at least two independent opinions on a label
+MIN_CONSENSUS_MODELS = 2
 CNN_DEFAULT_FILTERS = 16
 CNN_DEFAULT_KERNEL_SIZE = 5
 CNN_DEFAULT_DROPOUT = 0.2

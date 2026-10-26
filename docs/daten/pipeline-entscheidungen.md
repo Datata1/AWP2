@@ -58,7 +58,7 @@ Balanced Accuracy als Hauptmetrik.
 ## Offen – kommt nach der EDA (#20, #30)
 
 - Glättung der Spektren (z. B. Savitzky-Golay)
-- Umgang mit Ausreißern
+- Umgang mit Ausreißern: vorläufig **keine** Entfernung – die Regelprüfung (#196) findet keine Messfehler, nur abweichende Aufnahmen und mehrdeutige Stadien ([EDA](eda.md#datenqualitat-regelprufung-196)); Beleg per CV folgt in #197
 - Bandauswahl, Vegetationsindizes als Features
 - Split-Strategie, falls räumliche Cluster gefunden werden (dann Gruppen in `cv_splits`)
 - `Month` ist zyklisch; ggf. als sin/cos kodieren
