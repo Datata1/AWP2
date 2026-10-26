@@ -57,7 +57,7 @@ Abgabeformat; sie sind nicht mit einer Analyse von `train.csv` oder `test.csv` b
 !!! info "Data Understanding"
     - Train enthält 5.591 und Test 1.397 Beobachtungen mit jeweils 198 Bandspalten. Von diesen Bändern sind in beiden Dateien 67 vollständig leer; 131 enthalten mindestens eine Messung.
     - Die Labels sind unausgewogen: `rice` hat 93 Beobachtungen, `Harvest` 180 und das seltenste beobachtete Crop-Stage-Paar `cotton|Harvest` 11.
-    - Alle beobachteten Crop-Stage-Paare bleiben rechnerisch bei einem 70/30-Split und fünf inneren CV-Folds vertreten; die Schätzung seltener Paare bleibt dennoch unsicher.
+    - Alle beobachteten Crop-Stage-Paare bleiben rechnerisch bei einem 70/30- und einem 80/20-Split mit fünf inneren CV-Folds vertreten; die Schätzung seltener Paare bleibt dennoch unsicher.
     - `AEZ` und `Month` sind mit den Labels assoziiert. Sie können hilfreichen Kontext liefern, aber auch Shortcut-Lernen fördern.
     - Train und Test haben kompatible Eingabetypen und ähnliche robuste Spektralkennwerte; das schließt eine Verteilungsverschiebung in einzelnen Bändern nicht aus.
     - Die mittleren Spektren unterscheiden sich nach Kultur und teils nach Stadium innerhalb einer Kultur. Die Gruppen überlappen jedoch sichtbar.
@@ -129,6 +129,6 @@ Diese Befunde beschreiben nur die vorliegende Stichprobe. Sie sind kein Leistung
 | Duplikate | Zwei Paare von Trainingszeilen sind exakt gleich; zwischen Train und Test gibt es keine exakten vollständigen Eingaben oder Spektren. | Vor dem gemeinsamen Split entfernen. | Exakte Wiederholungen können einen zufälligen Split optimistisch machen. |
 | Ausreißer | Sprung-Screening und Near-Duplicates liefern Kandidaten, aber keinen belegten Messfehler. | Keine automatische Zeilenentfernung. Eine spätere Regel nur im Trainingsanteil festlegen und gegen die Variante ohne Entfernung validieren. | Die EDA liefert keinen fachlich begründeten Schwellenwert. |
 | Glättung / Rauschen | Es gibt keinen EDA-Beleg für eine pauschale Glättung. | Keine Standardglättung; Savitzky-Golay nur als vorab festgelegte Pipeline-Variante vergleichen. | Glättung kann Rauschen reduzieren, aber schmale relevante Strukturen verwischen. |
-| Split-Strategie | Labels und Crop-Stage-Paare sind unausgewogen; alle beobachteten Paare sind rechnerisch für 70/30 und fünf innere Folds ausreichend vertreten. Räumliche Gruppen sind nicht verfügbar. | Nach `Crop|Stage` stratifizieren; Balanced Accuracy und Macro-F1 für Crop und Stage berichten. | Seltene Paare bleiben trotz formaler Fold-Fähigkeit unsicher. Eine räumliche Gruppenvalidierung ist ohne Feld- oder Bild-IDs nicht ableitbar. |
+| Split-Strategie | Labels und Crop-Stage-Paare sind unausgewogen; alle beobachteten Paare sind rechnerisch für 70/30 und 80/20 mit fünf inneren Folds ausreichend vertreten. Räumliche Gruppen sind nicht verfügbar. | Nach `Crop|Stage` stratifizieren; Balanced Accuracy und Macro-F1 für Crop und Stage berichten. | Seltene Paare bleiben trotz formaler Fold-Fähigkeit unsicher. Eine räumliche Gruppenvalidierung ist ohne Feld- oder Bild-IDs nicht ableitbar. |
 
 Alle lernbaren Schritte gehören in eine sklearn-`Pipeline` und werden pro Trainingsfold angepasst. `AEZ`, `Month`, Indizes, PCA und eine mögliche Bandauswahl werden jeweils als getrennte Varianten mit und ohne Metadaten verglichen.

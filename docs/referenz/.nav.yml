@@ -5,5 +5,7 @@ nav:
   - evaluation.md
   - experiment.md
   - tracking.md
+  - explain.md
+  - group_study.md
   - glob: "*"
     ignore_no_matches: true

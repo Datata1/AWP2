@@ -20,6 +20,7 @@ WS 2026/27), team of 3, final deadline 2026-10-31.
 | Run Python | `uv run python …` — never bare `python` / `pip` |
 | Add a package | `uv add <pkg>` (dev tools: `uv add --group dev <pkg>`) |
 | Lint / format | `make lint`, `make format` |
+| Tests | `make test` (also in CI) |
 | Docs preview / build | `make docs`, `make docs-build` |
 | Jupyter | `make lab` |
 

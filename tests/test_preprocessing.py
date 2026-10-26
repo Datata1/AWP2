@@ -35,6 +35,52 @@ class NearestBandTest(unittest.TestCase):
             nearest_band(420, ["X437", "X447", "X498"])
 
 
+class SpectralRegionSelectionTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.frame = pd.DataFrame(
+            {
+                AEZ_COL: [1, 2],
+                MONTH_COL: [3, 4],
+                "X671": [999.0, 999.0],
+                "X681": [10.0, 12.0],
+                "X691": [float("nan"), 16.0],
+                "X742": [30.0, 32.0],
+                "X752": [999.0, 999.0],
+            }
+        )
+
+    def test_selection_precedes_interpolation(self) -> None:
+        config = PreprocessingConfig(spectral_regions=("Red Edge",), use_meta=False)
+        transformer = build_preprocessor(config)
+        result = transformer.fit_transform(self.frame)
+        self.assertEqual(list(result.columns), ["X681", "X691", "X742"])
+        changed = self.frame.assign(X671=-999.0, X752=-999.0)
+        pd.testing.assert_frame_equal(result, transformer.transform(changed))
+        self.assertTrue(result.notna().all().all())
+
+    def test_empty_selection_is_metadata_only(self) -> None:
+        result = build_preprocessor(PreprocessingConfig(spectral_regions=())).fit_transform(
+            self.frame
+        )
+        self.assertTrue(all(not column.startswith("X") for column in result.columns))
+        self.assertIn("Month_sin", result)
+        self.assertTrue(any(column.startswith("AEZ_") for column in result.columns))
+
+    def test_default_retains_all_bands(self) -> None:
+        result = build_preprocessor(PreprocessingConfig(use_meta=False)).fit_transform(self.frame)
+        self.assertEqual(list(result.columns), ["X671", "X681", "X691", "X742", "X752"])
+
+    def test_invalid_configs_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "known names"):
+            PreprocessingConfig(spectral_regions=("unknown",))
+        with self.assertRaisesRegex(ValueError, "unique names"):
+            PreprocessingConfig(spectral_regions=("Red Edge", "Red Edge"))
+        with self.assertRaisesRegex(ValueError, "requires use_meta"):
+            PreprocessingConfig(spectral_regions=(), use_meta=False)
+        with self.assertRaisesRegex(ValueError, "nonempty spectral_regions"):
+            PreprocessingConfig(spectral_regions=(), use_mean_albedo=True)
+
+
 class VegetationIndexCatalogueTest(unittest.TestCase):
     def setUp(self) -> None:
         self.bands = pd.DataFrame(
