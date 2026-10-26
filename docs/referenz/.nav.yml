@@ -3,6 +3,7 @@ nav:
   - data.md
   - preprocessing.md
   - evaluation.md
+  - importance.md
   - experiment.md
   - tracking.md
   - explain.md
