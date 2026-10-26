@@ -17,9 +17,9 @@ Entwicklungsstadien fachlich bedeuten, steht in der [Domäne](../domaene/kulturp
 
 | | |
 | --- | --- |
-| Bestes Modell | `combined_svm_expanded` (Kombinierte Klasse, MLflow-Run `65232eab`) |
-| BAcc Crop / Stage / kombiniert | 0.931 / 0.906 / **0.866** |
-| Macro-F1 kombiniert · Samples-F1 | 0.830 · 0.909 |
+| Bestes Modell | `combined_svm_aez_month` (Kombinierte Klasse, MLflow-Run `17dc9e16`, 80/20-Split) |
+| BAcc Crop / Stage / kombiniert | 0.923 / 0.922 / **0.869** |
+| Macro-F1 kombiniert · Samples-F1 | 0.859 · 0.920 |
 
 Wichtigste Erkenntnis: Die erweiterte Suche verbessert die skalierte RBF-SVM im Ansatz mit
 kombinierten Klassen deutlich und verhindert ungültige Crop/Stage-Paare. Fehler entstehen

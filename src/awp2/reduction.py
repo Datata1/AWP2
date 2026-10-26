@@ -24,7 +24,7 @@ from awp2.config import (
 )
 from awp2.data import load_split
 from awp2.evaluation import MetricName, evaluate
-from awp2.experiment import TuneConfig, cv_folds, out_of_fold_predictions, tune
+from awp2.experiment import RunConfig, TuneConfig, cv_folds, out_of_fold_predictions, tune
 from awp2.preprocessing import PreprocessingConfig
 
 CURVE_METRICS: tuple[MetricName, ...] = ("bacc_crop", "bacc_stage", "bacc_combined")
@@ -111,8 +111,6 @@ def reduction_curve(
             tuning run id, best hyperparameters, and per metric its mean and
             ``<metric>_std``.
     """
-    split = load_split()
-    folds = cv_folds(template.folds)
     rows = []
     for variant in variants:
         config = TuneConfig.model_validate(
@@ -123,13 +121,7 @@ def reduction_curve(
             }
         )
         tuned = tune(model, config)
-        predictions = out_of_fold_predictions(tuned.best_model, config)
-        fold_scores = pd.DataFrame(
-            [
-                evaluate(split.y_train.iloc[fold.val], predictions.iloc[fold.val]).model_dump()
-                for fold in folds
-            ]
-        )[list(metrics)]
+        scores = fold_scores(out_of_fold_predictions(tuned.best_model, config), config, metrics)
         rows.append(
             {
                 REDUCTION_VARIANT_COL: variant.name,
@@ -137,8 +129,8 @@ def reduction_curve(
                 **tuned.input_size._asdict(),
                 REDUCTION_TUNING_RUN_COL: tuned.run_id,
                 REDUCTION_BEST_PARAMS_COL: tuned.best_params,
-                **fold_scores.mean().to_dict(),
-                **fold_scores.std().add_suffix(STD_SUFFIX).to_dict(),
+                **scores.mean().to_dict(),
+                **scores.std().add_suffix(STD_SUFFIX).to_dict(),
             }
         )
     return pd.DataFrame(rows)
@@ -149,3 +141,27 @@ def _variant(
 ) -> ReductionVariant:
     preprocessing = PreprocessingConfig.model_validate({**dict(base), **changes})
     return ReductionVariant(name=name, family=family, preprocessing=preprocessing)
+
+
+def fold_scores(
+    predictions: pd.DataFrame,
+    config: TuneConfig | RunConfig,
+    metrics: Sequence[MetricName] = CURVE_METRICS,
+) -> pd.DataFrame:
+    """Score out-of-fold predictions separately on every held-out fold.
+
+    Args:
+        predictions: Output of ``out_of_fold_predictions`` for ``config``.
+        config: Configuration whose ``folds`` produced the predictions.
+        metrics: Metrics to report.
+
+    Returns:
+        One row per fold, one column per metric.
+    """
+    y = load_split().y_train
+    return pd.DataFrame(
+        [
+            evaluate(y.iloc[fold.val], predictions.iloc[fold.val]).model_dump()
+            for fold in cv_folds(config.folds)
+        ]
+    )[list(metrics)]

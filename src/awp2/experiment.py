@@ -1,6 +1,7 @@
 """Tune and evaluate models on the shared split and track both steps in MLflow."""
 
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,6 +57,9 @@ from awp2.preprocessing import (
     input_size,
 )
 from awp2.tracking import TrackedRun, estimator_params, log_run, log_tuning
+
+TrainFilter = Callable[[pd.DataFrame, pd.DataFrame], pd.Series]
+"""Marks training rows (``True``) to leave out, given raw features and targets."""
 
 _MODEL_STEP = "model"
 _PREPROCESS_STEP = "preprocess"
@@ -369,7 +373,11 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     )
 
 
-def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig) -> pd.DataFrame:
+def out_of_fold_predictions(
+    model: BaseEstimator,
+    config: TuneConfig | RunConfig,
+    train_filter: TrainFilter | None = None,
+) -> pd.DataFrame:
     """Predict every training row with preprocessing + ``model`` fitted on the other folds.
 
     Uses the folds of the training part from ``cv_folds(config.folds)`` and never touches the
@@ -380,6 +388,8 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
     Args:
         model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
         config: Configuration the model was tuned or evaluated with, e.g. ``TuneResult.config``.
+        train_filter: Optional rule that marks rows to leave out of training, e.g. outliers.
+            It sees only the training rows of each fold; every held-out row is still predicted.
 
     Returns:
         Out-of-fold predictions with the columns ``Crop`` and ``Stage``, in the row order of
@@ -388,9 +398,12 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
     split = load_split()
     predictions = []
     for fold in cv_folds(config.folds):
-        y_fold = split.y_train.iloc[fold.train]
+        X_fold, y_fold = split.X_train.iloc[fold.train], split.y_train.iloc[fold.train]
+        if train_filter is not None:
+            keep = ~train_filter(X_fold, y_fold)
+            X_fold, y_fold = X_fold[keep], y_fold[keep]
         pipeline = _pipeline(model, config.preprocessing)
-        pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+        pipeline.fit(X_fold, y_fold, **_fit_params(config, y_fold))
         fold_index = split.X_train.index[fold.val]
         predictions.append(
             as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)

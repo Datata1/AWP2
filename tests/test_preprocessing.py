@@ -16,6 +16,7 @@ from awp2.config import (
     SensorBand,
 )
 from awp2.preprocessing import (
+    AcquisitionCentering,
     AddVegetationIndices,
     AezMonthEncoder,
     InputSize,
@@ -447,3 +448,39 @@ class InputSizeTest(unittest.TestCase):
 
     def test_metadata_only_measures_no_band(self) -> None:
         self.assertEqual(self._size(PreprocessingConfig(use_spectra=False)).n_measured_bands, 0)
+
+
+class AcquisitionCenteringTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.train = pd.DataFrame(
+            {
+                AEZ_COL: [1, 1, 2, 2],
+                MONTH_COL: [5, 5, 5, 5],
+                "X427": [10.0, 20.0, 40.0, 60.0],
+                "X437": [1.0, 3.0, 5.0, 7.0],
+            }
+        )
+
+    def test_subtracts_the_mean_of_each_acquisition(self) -> None:
+        centered = AcquisitionCentering().fit_transform(self.train)
+
+        self.assertEqual(list(centered.columns), ["X427", "X437"])
+        self.assertEqual(list(centered["X427"]), [-5.0, 5.0, -10.0, 10.0])
+
+    def test_unseen_acquisition_uses_the_overall_mean(self) -> None:
+        centering = AcquisitionCentering().fit(self.train)
+        unseen = pd.DataFrame({AEZ_COL: [9], MONTH_COL: [7], "X427": [32.5], "X437": [4.0]})
+
+        self.assertEqual(list(centering.transform(unseen).iloc[0]), [0.0, 0.0])
+
+    def test_option_runs_before_the_other_spectral_steps(self) -> None:
+        preprocessor = build_preprocessor(PreprocessingConfig(use_acquisition_centering=True))
+        transformed = preprocessor.fit_transform(self.train)
+
+        steps = [name for name, _step in preprocessor.named_transformers_["spectra"].steps]
+        self.assertEqual(steps[:2], ["acquisition_centering", "drop_empty"])
+        self.assertAlmostEqual(transformed["X427"].sum(), 0.0)
+
+    def test_rejects_raw_spectra_methods(self) -> None:
+        with self.assertRaisesRegex(ValueError, "NMF or OSP"):
+            PreprocessingConfig(use_acquisition_centering=True, spectral_osp_components=3)
