@@ -426,6 +426,8 @@ Kontext erst mit dem letzten LSTM-Zustand.
 
 Mit 10 simulierten Sentinel-2-Bändern statt 131 Hyperion-Bändern bleibt die Qualität praktisch
 gleich. Ergebnisse, Grenzen und Empfehlung: [Datenreduktion](../datenreduktion.md).
+PCA hält die Qualität ab 15 Komponenten, spart aber keine Messungen und kaum Zeit
+(#213, [Lohnt sich PCA?](../datenreduktion.md#lohnt-sich-pca)).
 
 ## Fazit
 
