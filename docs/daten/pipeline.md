@@ -15,9 +15,9 @@ flowchart TD
 ## 1. Artefakte erzeugen
 
 ```bash
-make data   # nach dem Kopieren der Rohdaten und wenn sich die Pipeline ändert
-# Für einen dokumentierten 80/20-Split:
-make data DATA_ARGS="--validation-size 0.2"
+make data   # nach dem Kopieren der Rohdaten und wenn sich die Pipeline ändert (80/20)
+# Für ein anderes Protokoll, z. B. die früheren 70/30:
+make data DATA_ARGS="--validation-size 0.3"
 ```
 
 | Datei | Inhalt |
@@ -28,7 +28,7 @@ make data DATA_ARGS="--validation-size 0.2"
 
 Die Dateien sind nicht in git, aber deterministisch – bei allen byte-identisch.
 
-Der Standard ist weiterhin 70/30. Ein anderer Split, etwa 80/20, ist ein anderes
+Der Standard ist 80/20 (bis 2026-10-20: 70/30). Ein anderer Split ist ein anderes
 Evaluationsprotokoll: Ergebnisse dürfen nur mit Läufen verglichen werden, die dieselbe
 `split.validation_size` in MLflow haben.
 
@@ -121,10 +121,12 @@ flowchart TD
         n_principal_components_pca["PC_1 + PC_2 [use_principal_components]"]
     end
     subgraph spektren
-        n_spectra_drop_empty["Leere Bänder entfernen (immer)"]
+        n_spectra_drop_empty["Leere Bänder entfernen [use_spectra, Standard]"]
         n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
+        n_spectra_sensor["Sentinel-2 simulieren [spectral_sensor = sentinel2]"]
         n_spectra_savgol["Savitzky-Golay [use_savgol + savgol_window_length + savgol_polyorder]"]
         n_spectra_snv["SNV [use_spectral_snv]"]
+        n_spectra_band_step["Jedes n-te Band [spectral_band_step]"]
     end
     subgraph skalierung
         d_scaler{"Skalierung (XOR)"}
@@ -136,6 +138,7 @@ flowchart TD
     subgraph reduktion
         d_reduction{"Reduktion (max. eine)"}
         n_spectra_pca["PCA [spectral_pca_components | braucht Standard/Center]"]
+        n_spectra_select_k["Bandauswahl [spectral_select_k + spectral_select_score | überwacht, je Fold]"]
         n_spectra_ica["ICA [spectral_ica_components | braucht Standard/Center]"]
         n_spectra_nmf["NMF [spectral_nmf_components | nur roh: ohne SG/SNV/Skalierer/Indizes]"]
         n_spectra_osp["OSP [spectral_osp_components | nur roh: ohne SNV/Skalierer/Indizes]"]
@@ -151,7 +154,7 @@ flowchart TD
     d_month -->|"False"| n_month_month
     X --> n_albedo_drop_empty
     X --> n_indices_drop_empty
-    X --> n_spectra_drop_empty
+    X -.-> n_spectra_drop_empty
     X -.-> n_aez_month_aez_month
     n_albedo_drop_empty --> n_albedo_interpolate
     n_albedo_interpolate -.-> n_albedo_albedo
@@ -181,9 +184,11 @@ flowchart TD
     n_principal_components_standard_scale -.-> n_principal_components_pca
     n_principal_components_pca --> d_concat
     n_spectra_drop_empty --> n_spectra_interpolate
-    n_spectra_interpolate -.-> n_spectra_savgol
+    n_spectra_interpolate -.-> n_spectra_sensor
+    n_spectra_sensor -.-> n_spectra_savgol
     n_spectra_savgol -.-> n_spectra_snv
-    n_spectra_snv --> d_scaler
+    n_spectra_snv -.-> n_spectra_band_step
+    n_spectra_band_step --> d_scaler
     d_scaler --> n_spectra_standard_scale
     n_spectra_standard_scale --> d_reduction
     d_scaler --> n_spectra_minmax_scale
@@ -194,6 +199,8 @@ flowchart TD
     n_spectra_no_scaler --> d_reduction
     d_reduction --> n_spectra_pca
     n_spectra_pca --> d_concat
+    d_reduction --> n_spectra_select_k
+    n_spectra_select_k --> d_concat
     d_reduction --> n_spectra_ica
     n_spectra_ica --> d_concat
     d_reduction --> n_spectra_nmf
