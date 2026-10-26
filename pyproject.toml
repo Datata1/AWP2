@@ -30,6 +30,8 @@ default-groups = ["dev", "docs"]
 [tool.ruff]
 line-length = 100
 extend-include = ["*.ipynb"]
+# archived notebooks are kept for history only and are no longer maintained
+extend-exclude = ["notebooks/archiv"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ANN", "D", "DOC201", "DOC501"]
