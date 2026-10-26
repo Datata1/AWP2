@@ -401,6 +401,8 @@ def plot_band_importance(
     ax.set_xlabel("Wellenlänge [nm]")
     ax.set_ylabel("Abfall des Scores bei Permutation")
     ax.legend(fontsize="small")
+    ax.grid(alpha=0.3)
+    return ax
 
 
 def plot_group_study(
