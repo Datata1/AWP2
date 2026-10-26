@@ -1,6 +1,6 @@
 DATA_ARGS ?=
 
-.PHONY: help setup data lab docs docs-build lint lint-ruff lint-ty test format mlflow stunden clean
+.PHONY: help setup data external lab docs docs-build lint lint-ruff lint-ty test format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -11,6 +11,9 @@ setup: ## Umgebung installieren + nbstripout-Git-Filter aktivieren
 
 data: ## Pipeline-Artefakte erzeugen (bereinigter Datensatz + Split in data/)
 	uv run python -m awp2.data.artifacts $(DATA_ARGS)
+
+external: ## Externe Referenzdaten laden (Sentinel-2-SRF nach data/external/)
+	uv run python -m awp2.data.external
 
 lab: ## Jupyter Lab starten
 	uv run jupyter lab
