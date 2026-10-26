@@ -24,6 +24,7 @@ den `nbstripout`-Git-Filter, der Notebook-Outputs beim Commit entfernt.
 | `make lab` | Jupyter Lab starten |
 | `make docs` | Doku unter <http://127.0.0.1:8000> anzeigen (Live-Reload) |
 | `make lint` / `make format` | Code prüfen / formatieren |
+| `make test` | Tests ausführen (läuft auch in der CI) |
 | `make help` | Alle Befehle anzeigen |
 
 ## Pakete hinzufügen

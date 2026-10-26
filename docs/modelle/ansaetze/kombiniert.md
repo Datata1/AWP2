@@ -451,6 +451,11 @@ lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene S
 
 ![Häufigste Verwechslungen](../img/combined_hist_gradient_boosting_confusions.png)
 
+## Datenreduktion
+
+Mit 10 simulierten Sentinel-2-Bändern statt 131 Hyperion-Bändern bleibt die Qualität praktisch
+gleich. Ergebnisse, Grenzen und Empfehlung: [Datenreduktion](../datenreduktion.md).
+
 ## Fazit
 
 **Verglichen – vorläufig führend.** Die RBF-SVM mit Rohspektren, AEZ und Month verbessert die

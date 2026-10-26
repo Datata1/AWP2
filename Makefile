@@ -1,6 +1,6 @@
 DATA_ARGS ?=
 
-.PHONY: help setup data lab docs docs-build lint lint-ruff lint-ty format mlflow stunden clean
+.PHONY: help setup data lab docs docs-build lint lint-ruff lint-ty test format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -28,6 +28,9 @@ lint-ruff:
 
 lint-ty:
 	uv run ty check src
+
+test: ## Tests ausführen (unittest, ohne echte Daten)
+	uv run python -m unittest discover -s tests
 
 format: ## Code formatieren (ruff)
 	uv run ruff format .
