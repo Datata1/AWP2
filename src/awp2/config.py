@@ -479,6 +479,14 @@ REDUCTION_FAMILY_COL = "family"
 REDUCTION_VARIANT_COL = "variant"
 REDUCTION_TUNING_RUN_COL = "tuning_run"
 REDUCTION_BEST_PARAMS_COL = "best_params"
+# PCA study (#213): dense at few components, where the curve bends, sparse above
+PCA_STUDY_COMPONENTS = (1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 60, 80)
+PCA_STUDY_SENTINEL2_COMPONENTS = (2, 3, 5, 8)
+N_COMPONENTS_COL = "n_components"
+FIT_TIME_COL = "fit_s"  # wall time of preprocessing + model fit on one training fold
+PREDICT_TIME_COL = "predict_s"  # wall time of preprocessing + prediction of one held-out fold
+# a PCA variant within the loss rule is only worth validating if it at least halves the time
+PCA_MIN_SPEEDUP = 2.0
 # a reduced input counts as equivalent if it loses at most this much CV-BAcc against all bands
 REDUCTION_MAX_CV_LOSS = 0.01
 N_INPUT_FEATURES_COL = "n_input_features"  # field names of preprocessing.InputSize

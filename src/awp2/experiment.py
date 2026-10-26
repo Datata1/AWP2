@@ -1,9 +1,10 @@
 """Tune and evaluate models on the shared split and track both steps in MLflow."""
 
+import time
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,8 +19,10 @@ from awp2.config import (
     AEZ_FOLDS,
     AEZ_MONTH_FOLDS,
     AEZ_MONTH_SEP,
+    FIT_TIME_COL,
     MLFLOW_EXPERIMENT,
     MONTH_COL,
+    PREDICT_TIME_COL,
     RANDOM_FOLDS,
     SLUG_PATTERN,
     FoldGrouping,
@@ -373,6 +376,21 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
     )
 
 
+class TimedPredictions(NamedTuple):
+    """Out-of-fold predictions together with the time each fold took.
+
+    Attributes:
+        predictions: Columns ``Crop`` and ``Stage``, in the row order of
+            ``load_split().y_train``.
+        timings: One row per fold with the wall times ``fit_s`` (preprocessing + model fit on
+            the training folds) and ``predict_s`` (preprocessing + prediction of the held-out
+            fold) in seconds.
+    """
+
+    predictions: pd.DataFrame
+    timings: pd.DataFrame
+
+
 def out_of_fold_predictions(
     model: BaseEstimator,
     config: TuneConfig | RunConfig,
@@ -395,20 +413,44 @@ def out_of_fold_predictions(
         Out-of-fold predictions with the columns ``Crop`` and ``Stage``, in the row order of
             ``load_split().y_train``.
     """
+    return timed_out_of_fold_predictions(model, config, train_filter).predictions
+
+
+def timed_out_of_fold_predictions(
+    model: BaseEstimator,
+    config: TuneConfig | RunConfig,
+    train_filter: TrainFilter | None = None,
+) -> TimedPredictions:
+    """Like :func:`out_of_fold_predictions`, and measure fit and prediction time per fold.
+
+    Args:
+        model: Estimator that predicts ``Crop`` **and** ``Stage``; it is cloned per fold.
+        config: Configuration the model was tuned or evaluated with, e.g. ``TuneResult.config``.
+        train_filter: Optional rule that marks rows to leave out of training, e.g. outliers.
+
+    Returns:
+        The out-of-fold predictions and the wall times of every fold.
+    """
     split = load_split()
     predictions = []
+    timings = []
     for fold in cv_folds(config.folds):
         X_fold, y_fold = split.X_train.iloc[fold.train], split.y_train.iloc[fold.train]
         if train_filter is not None:
             keep = ~train_filter(X_fold, y_fold)
             X_fold, y_fold = X_fold[keep], y_fold[keep]
         pipeline = _pipeline(model, config.preprocessing)
+        start = time.perf_counter()
         pipeline.fit(X_fold, y_fold, **_fit_params(config, y_fold))
-        fold_index = split.X_train.index[fold.val]
-        predictions.append(
-            as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), fold_index)
-        )
-    return pd.concat(predictions).loc[split.y_train.index]
+        fitted = time.perf_counter()
+        predicted = pipeline.predict(split.X_train.iloc[fold.val])
+        done = time.perf_counter()
+        timings.append({FIT_TIME_COL: fitted - start, PREDICT_TIME_COL: done - fitted})
+        predictions.append(as_target_frame(predicted, split.X_train.index[fold.val]))
+    return TimedPredictions(
+        predictions=pd.concat(predictions).loc[split.y_train.index],
+        timings=pd.DataFrame(timings),
+    )
 
 
 def out_of_fold_importance(
