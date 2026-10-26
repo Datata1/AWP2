@@ -12,10 +12,22 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-from awp2.config import MLFLOW_EXPERIMENT, SLUG_PATTERN
+from awp2.config import (
+    AEZ_COL,
+    AEZ_FOLDS,
+    AEZ_MONTH_FOLDS,
+    AEZ_MONTH_SEP,
+    MLFLOW_EXPERIMENT,
+    MONTH_COL,
+    RANDOM_FOLDS,
+    SLUG_PATTERN,
+    FoldGrouping,
+)
 from awp2.data import (
+    Fold,
     TrainValSplit,
     balanced_sample_weight,
+    cv_splits,
     load_folds,
     load_split,
     load_split_config,
@@ -67,6 +79,11 @@ class _ExperimentConfig(BaseModel):
         pattern=SLUG_PATTERN,
         description="MLflow experiment = the question the run answers; the default is the main "
         "task, other questions (e.g. the band-reduction study) get their own.",
+    )
+    folds: FoldGrouping = Field(
+        default=RANDOM_FOLDS,
+        description="Cross-validation folds: the shared random folds, or group folds that keep "
+        "each AEZ x month cell, month or AEZ in one fold to score unseen acquisitions.",
     )
     preprocessing: PreprocessingConfig = Field(
         default_factory=PreprocessingConfig,
@@ -161,6 +178,33 @@ class TuneResult:
     input_size: InputSize
 
 
+def cv_folds(grouping: FoldGrouping = RANDOM_FOLDS) -> list[Fold]:
+    """Cross-validation folds of the training part.
+
+    Rows of one AEZ x month cell probably come from the same acquisition (same atmosphere and
+    illumination); random folds then let a model recognise the acquisition. Group folds keep a
+    whole group in one fold and score how well the model carries over to unseen ones.
+
+    Args:
+        grouping: ``"random"`` for the shared folds of ``make data``, or ``"aez_month"``,
+            ``"month"`` or ``"aez"`` for stratified group folds.
+
+    Returns:
+        ``CV_FOLDS`` folds as row positions within ``load_split().X_train``.
+    """
+    if grouping == RANDOM_FOLDS:
+        return load_folds()
+    split = load_split()
+    X = split.X_train
+    if grouping == AEZ_MONTH_FOLDS:
+        groups = X[AEZ_COL].astype(str) + AEZ_MONTH_SEP + X[MONTH_COL].astype(str)
+    elif grouping == AEZ_FOLDS:
+        groups = X[AEZ_COL]
+    else:
+        groups = X[MONTH_COL]
+    return list(cv_splits(X, split.y_train, groups=groups))
+
+
 def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
     return Pipeline(
         [(_PREPROCESS_STEP, build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
@@ -193,13 +237,14 @@ def _shared_params(config: _ExperimentConfig) -> dict[str, str | bool | float]:
         },
         "balance_samples": config.balance_samples,
         "split.validation_size": load_split_config().validation_size,
+        "cv.folds": config.folds,
     }
 
 
 def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
     """Search hyperparameters by cross-validation on the training part.
 
-    Uses the shared folds (``load_folds()``) and never touches the validation part, so the
+    Uses the folds of ``config.folds`` (``cv_folds``) and never touches the validation part, so the
     subsequent :func:`run` on the validation part stays an honest estimate. If
     ``config.track``, MLflow gets one tuning run with a nested run per candidate.
 
@@ -234,7 +279,7 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
         _pipeline(model, config.preprocessing),
         {f"{_MODEL_STEP}__{key}": values for key, values in config.param_grid.items()},
         scoring=scorer(config.metric),
-        cv=load_folds(),
+        cv=cv_folds(config.folds),
         refit=False,
     )
     search.fit(split.X_train, split.y_train, **_fit_params(config, split.y_train))
@@ -327,7 +372,7 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
 def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig) -> pd.DataFrame:
     """Predict every training row with preprocessing + ``model`` fitted on the other folds.
 
-    Uses the shared folds of the training part (``load_folds()``) and never touches the
+    Uses the folds of the training part from ``cv_folds(config.folds)`` and never touches the
     validation part – for analysing errors before the single :func:`run`. Fits exactly like
     :func:`tune`/:func:`run` (``config.preprocessing``, ``config.balance_samples``); nothing is
     tracked.
@@ -342,7 +387,7 @@ def out_of_fold_predictions(model: BaseEstimator, config: TuneConfig | RunConfig
     """
     split = load_split()
     predictions = []
-    for fold in load_folds():
+    for fold in cv_folds(config.folds):
         y_fold = split.y_train.iloc[fold.train]
         pipeline = _pipeline(model, config.preprocessing)
         pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
@@ -375,7 +420,7 @@ def out_of_fold_importance(
     """
     split = load_split()
     drops = []
-    for fold in load_folds():
+    for fold in cv_folds(config.folds):
         y_fold = split.y_train.iloc[fold.train]
         pipeline = _pipeline(model, config.preprocessing)
         pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))

@@ -22,9 +22,9 @@ from awp2.config import (
     STD_SUFFIX,
     ReductionFamily,
 )
-from awp2.data import load_folds, load_split
+from awp2.data import load_split
 from awp2.evaluation import MetricName, evaluate
-from awp2.experiment import TuneConfig, out_of_fold_predictions, tune
+from awp2.experiment import TuneConfig, cv_folds, out_of_fold_predictions, tune
 from awp2.preprocessing import PreprocessingConfig
 
 CURVE_METRICS: tuple[MetricName, ...] = ("bacc_crop", "bacc_stage", "bacc_combined")
@@ -112,7 +112,7 @@ def reduction_curve(
             ``<metric>_std``.
     """
     split = load_split()
-    folds = load_folds()
+    folds = cv_folds(template.folds)
     rows = []
     for variant in variants:
         config = TuneConfig.model_validate(
