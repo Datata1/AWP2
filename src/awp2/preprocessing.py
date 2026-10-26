@@ -2,8 +2,9 @@
 
 import re
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import NamedTuple, Self
 
 import numpy as np
@@ -47,6 +48,7 @@ from awp2.config import (
     SEED,
     SENTINEL2_BANDS,
     SENTINEL2_SENSOR,
+    SPECTRAL_REGIONS,
     TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
     VEGETATION_INDEX_SPECS,
@@ -1310,6 +1312,11 @@ class PreprocessingConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
+    spectral_regions: tuple[str, ...] | None = Field(
+        default=None,
+        description="Restrict every spectral branch to these SPECTRAL_REGIONS before "
+        "interpolation. None keeps all bands; () gives a metadata-only baseline.",
+    )
     use_meta: bool = Field(
         default=True, description="Use AEZ (one-hot) and Month as features next to the spectrum."
     )
@@ -1480,8 +1487,9 @@ class PreprocessingConfig(BaseModel):
 
         Raises:
             ValueError: If ``use_aez_month`` is set without ``use_meta`` or with
-                ``use_categorical_context``; if more than one reduction method is selected; if
-                centering,
+                ``use_categorical_context``; if ``spectral_regions`` repeats or does not know a
+                region, is empty without ``use_meta`` or with a spectral feature branch; if more
+                than one reduction method is selected; if centering,
                 scalers, PCA, ICA or the deprecated ``scale`` flag are combined ambiguously;
                 if NMF, OSP or DBN get unsuitable input; if Savitzky-Golay or LPP
                 arguments are set without their method or missing with it; or if
@@ -1499,6 +1507,21 @@ class PreprocessingConfig(BaseModel):
             raise ValueError(
                 "spectral_sensor='sentinel2' must not combine with savgol or spectral_band_step"
             )
+        if self.spectral_regions is not None:
+            unknown = set(self.spectral_regions) - {region.name for region in SPECTRAL_REGIONS}
+            if unknown:
+                raise ValueError(f"spectral_regions requires known names; unknown: {unknown}")
+            if len(set(self.spectral_regions)) != len(self.spectral_regions):
+                raise ValueError("spectral_regions requires unique names")
+            if not self.spectral_regions:
+                if not self.use_meta:
+                    raise ValueError("Empty spectral_regions requires use_meta=True")
+                if (
+                    self.use_mean_albedo
+                    or self.use_vegetation_indices
+                    or self.use_principal_components
+                ):
+                    raise ValueError("Spectral feature branches require nonempty spectral_regions")
         if self.use_aez_month and (not self.use_meta or self.use_categorical_context):
             raise ValueError("use_aez_month requires use_meta without use_categorical_context")
         if self.use_spectral_standard_scale and self.use_spectral_minmax_scale:
@@ -1612,6 +1635,16 @@ class PreprocessingConfig(BaseModel):
             raise ValueError("use_spectra=False needs another feature group")
 
 
+def _region_columns(frame: pd.DataFrame, regions: tuple[str, ...]) -> list[str]:
+    intervals = [region for region in SPECTRAL_REGIONS if region.name in regions]
+    return [
+        column
+        for column in frame.columns
+        if re.fullmatch(BAND_PATTERN, column)
+        and any(region.start_nm <= wavelength(column) < region.end_nm for region in intervals)
+    ]
+
+
 def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTransformer:
     """Build the standard preprocessing as one sklearn transformer.
 
@@ -1635,6 +1668,11 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         ```
     """
     config = config or PreprocessingConfig()
+    band_selector = (
+        make_column_selector(pattern=BAND_PATTERN)
+        if config.spectral_regions is None
+        else partial(_region_columns, regions=config.spectral_regions)
+    )
     if config.scale:
         warnings.warn(
             "PreprocessingConfig(scale=...) is deprecated and will be removed soon; "
@@ -1720,7 +1758,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                         *_spectral_scaler(config),
                     ]
                 ),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_vegetation_indices:
@@ -1741,7 +1779,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
             (
                 "indices",
                 Pipeline(index_steps),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_principal_components:
@@ -1756,15 +1794,18 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                         ("pca", PrincipalComponentFeatures()),
                     ]
                 ),
-                make_column_selector(pattern=BAND_PATTERN),
+                band_selector,
             )
         )
     if config.use_aez_month:
         transformers.append(("aez_month", AezMonthEncoder(), [AEZ_COL, MONTH_COL]))
     if config.use_spectra:
-        transformers.append(
-            ("spectra", Pipeline(spectra), make_column_selector(pattern=_spectra_columns(config)))
+        spectra_columns = (
+            partial(_with_acquisition_context, band_selector=band_selector)
+            if config.use_acquisition_centering
+            else band_selector
         )
+        transformers.append(("spectra", Pipeline(spectra), spectra_columns))
     preprocessor = ColumnTransformer(transformers, verbose_feature_names_out=False)
     return preprocessor.set_output(transform="pandas")
 
@@ -1822,10 +1863,11 @@ def _branch_bands(branch: Pipeline) -> set[str]:
     return usable if mixes_bands else set().union(*sources.values())
 
 
-def _spectra_columns(config: PreprocessingConfig) -> str:
-    if config.use_acquisition_centering:
-        return f"{BAND_PATTERN}|^{AEZ_COL}$|^{MONTH_COL}$"
-    return BAND_PATTERN
+def _with_acquisition_context(
+    frame: pd.DataFrame, band_selector: Callable[[pd.DataFrame], list[str]]
+) -> list[str]:
+    # acquisition centering groups the spectra by AEZ and month, so it needs both columns
+    return [AEZ_COL, MONTH_COL, *band_selector(frame)]
 
 
 def _spectral_scaler(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:
