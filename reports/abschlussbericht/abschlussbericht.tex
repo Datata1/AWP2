@@ -7,6 +7,9 @@
 \usepackage[a4paper,margin=2.5cm]{geometry}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{caption}
+\captionsetup[figure]{format=hang,font=small,labelfont=bf,labelsep=colon,
+	justification=raggedright,singlelinecheck=true,skip=8pt}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{tikz}
@@ -136,6 +139,10 @@ Abbildung~\ref{fig:methodik-pipeline} zeigt den gemeinsamen Ablauf von der
 Bereinigung bis zur protokollierten Bewertung. Die Vorverarbeitung wird
 innerhalb jedes Trainingsfolds und anschlie\ss{}end beim Fit auf dem
 gesamten Trainingsanteil jeweils neu angepasst.
+Hyperparameter und Merkmalsvarianten werden innerhalb des Trainingsanteils
+verglichen; der interne Holdout dient der anschlie\ss{}enden Bewertung.
+Das Diagramm beschreibt den vorgesehenen Ablauf, nicht eine von allen
+Modellvergleichen unabh\"angige Abschlusspr\"ufung.
 
 \begin{figure}[htbp]
 \centering
@@ -172,11 +179,7 @@ gesamten Trainingsanteil jeweils neu angepasst.
 	\draw[arrow] (holdout) -- (evaluate);
 	\draw[arrow] (evaluate.south) -- ++(0,-0.35) -| (tracking.north);
 \end{tikzpicture}
-\caption{Standardprotokoll mit getrennten Datenrollen. Hyperparameter und
-	Merkmalsvarianten werden innerhalb des Trainingsanteils verglichen;
-	der interne Holdout dient der anschlie\ss{}enden Bewertung.
-	Das Diagramm beschreibt den vorgesehenen Ablauf, nicht eine von
-	allen Modellvergleichen unabh\"angige Abschlusspr\"ufung.}
+\caption{Gemeinsame Pipeline mit getrennter Trainings-CV und Holdout-Bewertung.}
 \label{fig:methodik-pipeline}
 \end{figure}
 
