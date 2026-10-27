@@ -9,6 +9,8 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
@@ -130,24 +132,253 @@ Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
 
 \section{Methodik und Validierung}
 
+Abbildung~\ref{fig:methodik-pipeline} zeigt den gemeinsamen Ablauf von der
+Bereinigung bis zur protokollierten Bewertung. Die Vorverarbeitung wird
+innerhalb jedes Trainingsfolds und anschlie\ss{}end beim Fit auf dem
+gesamten Trainingsanteil jeweils neu angepasst.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+	>={Stealth[length=2mm]},
+	box/.style={draw, rounded corners=2pt, align=center, font=\small,
+		text width=6cm, minimum height=13mm, inner sep=2mm},
+	wide/.style={box, text width=13.2cm},
+	arrow/.style={->, thick}
+]
+	\node[wide] (clean) at (0,0)
+		{Rohdaten: Schema pr\"ufen, zwei exakte Duplikate entfernen};
+	\node[wide] (split) at (0,-1.8)
+		{Fester Split nach \texttt{Crop|Stage}, Seed 42};
+	\node[box] (train) at (-3.6,-4.3)
+		{80\,\% Training: \texttt{tune()} mit f\"unf CV-Folds\\
+		 Vorverarbeitung + Modell je Trainingsfold fitten};
+	\node[box] (holdout) at (3.6,-4.3)
+		{20\,\% interner Holdout\\Keine Hyperparametersuche};
+	\node[box] (fit) at (-3.6,-6.7)
+		{Gew\"ahlte Konfiguration: \texttt{run()}\\
+		 Pipeline auf dem gesamten Trainingsanteil fitten};
+	\node[box] (evaluate) at (3.6,-6.7)
+		{Holdout transformieren und vorhersagen\\
+		 \texttt{evaluate()}: Crop, Stage und Paare};
+	\node[wide] (tracking) at (0,-8.9)
+		{MLflow: CV-Suche und Bewertung mit Konfiguration, Daten-Hash,
+		 Git-Stand und Run-ID protokollieren};
+	\draw[arrow] (clean) -- (split);
+	\draw[arrow] (split.south) -- ++(0,-0.35) -| (train.north);
+	\draw[arrow] (split.south) -- ++(0,-0.35) -| (holdout.north);
+	\draw[arrow] (train) -- (fit);
+	\draw[arrow] (fit) -- (evaluate);
+	\draw[arrow] (holdout) -- (evaluate);
+	\draw[arrow] (evaluate.south) -- ++(0,-0.35) -| (tracking.north);
+\end{tikzpicture}
+\caption{Standardprotokoll mit getrennten Datenrollen. Hyperparameter und
+	Merkmalsvarianten werden innerhalb des Trainingsanteils verglichen;
+	der interne Holdout dient der anschlie\ss{}enden Bewertung.
+	Das Diagramm beschreibt den vorgesehenen Ablauf, nicht eine von
+	allen Modellvergleichen unabh\"angige Abschlusspr\"ufung.}
+\label{fig:methodik-pipeline}
+\end{figure}
+
 \subsection{Datenaufbereitung und Merkmalsbildung}
-% Gew\"ahlte Bereinigung, Imputation und Skalierung fachlich begr\"unden.
-% Verwendete Bandselektion, Vegetationsindizes, PCA oder weitere Merkmale
-% beschreiben; genutzte Metadaten und deren Kodierung nennen.
-% Dokumentieren, welche Transformationen ausschlie\ss lich auf den jeweiligen
-% Trainingsanteilen innerhalb der gemeinsamen Pipeline angepasst werden.
+
+Alle Ans\"atze verwenden die gemeinsame Daten- und Vorverarbeitungspipeline
+des Pakets \texttt{awp2}. Beim Laden pr\"uft ein Pandera-Schema Spalten,
+Datentypen, Wertebereiche und zul\"assige Labels. Vor der Aufteilung werden
+zwei exakt doppelte Beobachtungen entfernt, damit identische Messungen nicht
+zugleich im Training und in der Validierung vorkommen. Dar\"uber hinaus
+werden keine als Ausrei\ss{}er markierten Beobachtungen pauschal ausgeschlossen:
+Die dokumentierte Regelpr\"ufung liefert keinen hinreichenden Nachweis f\"ur
+Messfehler. Die Kennung \texttt{id} dient nur der Zuordnung; sie und die
+Zielspalten \texttt{Crop} und \texttt{Stage} sind keine Eingabemerkmale.
+
+Die modellabh\"angige Aufbereitung wird durch \texttt{PreprocessingConfig}
+festgelegt und gemeinsam mit dem Klassifikator in einer scikit-learn-Pipeline
+ausgef\"uhrt. Vollst\"andig leere Bandspalten werden im jeweiligen Trainingsanteil
+erkannt und entfernt. In der bereinigten Datenbasis verbleiben so 131 der
+198 Bandspalten. Einzelne L\"ucken werden innerhalb einer Beobachtung anhand
+der Wellenl\"ange linear interpoliert, sofern die beiden St\"utzb\"ander
+h\"ochstens 15\,nm auseinanderliegen. Bei gr\"o\ss{}eren Abst\"anden und am
+Spektralrand wird der n\"achste verf\"ugbare Messwert verwendet. Das begrenzt
+die Interpolation \"uber breite, nicht gemessene Spektralbereiche.
+F\"ur vollst\"andig fehlende Spektren stehen die im Trainingsanteil bestimmten
+Bandmediane als R\"uckfall zur Verf\"ugung.
+
+Die Skalierung richtet sich nach der Modellfamilie. F\"ur abstandsbasierte
+Verfahren wie die RBF-SVM werden die Spektralmerkmale standardisiert;
+Baummodelle k\"onnen ohne Skalierung arbeiten. Mittelwerte, Varianzen,
+Imputationswerte, Kategorien und gelernte Projektionen werden ausschlie\ss{}lich
+auf dem jeweiligen Trainingsfold bestimmt. Die zur Bewertung zur\"uckgehaltenen
+Beobachtungen werden nur transformiert. Dadurch gelangen keine Informationen
+aus dem Bewertungsfold in diese Anpassungsschritte.
+
+\paragraph{Kontext und spektrale Varianten.}
+Bei aktivierten Metadaten wird \texttt{AEZ} one-hot-kodiert.
+Der Aufnahmemonat wird standardm\"a\ss{}ig durch Sinus und Kosinus mit einer
+Periode von zw\"olf Monaten dargestellt; die numerische Monatszahl bleibt
+eine Vergleichsvariante. Die aktuelle kombinierte SVM verwendet au\ss{}erdem
+Indikatoren f\"ur die im Training beobachteten AEZ-Monat-Kombinationen.
+Sequenzmodelle k\"onnen alternativ kategoriale Kontext-Embeddings nutzen.
+Dabei bleibt das Spektrum eine Folge entlang der Wellenl\"ange, nicht entlang
+der Zeit. Der Nutzen dieser Kontextmerkmale wird gegen spektrale Eingaben
+ohne Metadaten gepr\"uft, weil sie auch regionale oder saisonale
+Stichprobenabh\"angigkeiten abbilden k\"onnen.
+
+Untersuchte spektrale Varianten umfassen Vegetationsindizes,
+Savitzky-Golay-Gl\"attung, Standard Normal Variate (SNV), PCA und Bandauswahl.
+Indizes werden in einem eigenen Zweig aus den interpolierten, nicht
+SNV-transformierten Reflektanzen berechnet, damit Verh\"altnisse ihre
+urspr\"ungliche Bedeutung behalten. PCA und \"uberwachte Bandauswahl werden
+je Trainingsfold gelernt. Eine Verringerung der PCA-Komponenten reduziert
+die Zahl der Modellmerkmale, nicht automatisch die Zahl ben\"otigter
+Messb\"ander. Die gew\"ahlten Varianten und ihre Ergebnisse werden in den
+Kapiteln zum Modellvergleich und zur Datenreduktion getrennt ausgewiesen;
+nicht jede verf\"ugbare Pipeline-Option geh\"ort zum Referenzmodell.
 
 \subsection{Evaluationsprotokoll und Reproduzierbarkeit}
-% Gemeinsame Split- und Fold-Artefakte, Anteile, Stratifizierung und Seed nennen.
-% Cross-Validation f\"ur die Hyperparametersuche von der anschlie\ss enden
-% Holdout-Auswertung trennen; tats\"achliches Auswahlverfahren offenlegen.
-% Falls wiederholt Holdout-Ergebnisse verglichen wurden, die dadurch begrenzte
-% Unabh\"angigkeit der finalen Bewertung diskutieren.
-% Balanced Accuracy als Hauptmetrik sowie Macro-F1 f\"ur Crop und Stage angeben.
-% Samples-F1 f\"ur die gemeinsame Crop-/Stage-Vorhersage pr\"azise definieren.
-% Umgang mit Klassenungleichgewicht und ung\"ultigen Vorhersagepaaren erl\"autern.
-% Code-Commit, Umgebung (uv.lock), Konfigurationen, MLflow-Run-IDs und Schritte
-% zur Reproduktion bzw. Vorhersage auf den Abgabedaten referenzieren.
+
+\paragraph{Datenaufteilung und Modellauswahl.}
+Seit dem 20.10.2026 verwendet das gemeinsame Standardprotokoll 80\,\% der
+bereinigten gelabelten Daten zum Training und 20\,\% als internen Holdout.
+Die Aufteilung wird mit dem festen Seed 42 nach dem kombinierten Label
+\texttt{Crop|Stage} stratifiziert. Innerhalb des Trainingsanteils werden
+f\"unf ebenfalls stratifizierte, zuf\"allig gemischte CV-Folds verwendet.
+Stratifizierung nach Paaren ber\"ucksichtigt die seltenen Kombinationen
+besser als eine Aufteilung nur nach Kulturart oder Stadium.
+Die Zuordnung jeder Beobachtung und die Split-Konfiguration werden als
+gemeinsame Artefakte gespeichert und \"uber \texttt{load\_split()} und
+\texttt{load\_folds()} geladen; eigene Aufteilungen einzelner Ans\"atze
+sind nicht Teil dieses Standardprotokolls.
+Tabelle~\ref{tab:methodik-split} fasst das aktuelle Protokoll zusammen.
+Die Fallzahlen stammen aus \path{data/processed/split.csv};
+der Holdout-Anteil ist in \path{data/processed/split_config.json} festgelegt.
+
+\begin{table}[htbp]
+\centering
+\caption{Aktuelle Split- und CV-Konfiguration nach der Duplikatbereinigung.}
+\label{tab:methodik-split}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+	\toprule
+	Bestandteil & Umfang bzw. Einstellung \\
+	\midrule
+	Bereinigte gelabelte Daten & 5.589 Beobachtungen \\
+	Trainingsanteil & 4.471 Beobachtungen (ca. 80\,\%) \\
+	Interner Holdout & 1.118 Beobachtungen (ca. 20\,\%) \\
+	Trainings-CV & F\"unf Folds, nur innerhalb der 4.471 Trainingszeilen \\
+	Bewertungsanteil je CV-Fold & 894--895 Beobachtungen \\
+	Fit-Anteil je CV-Fold & 3.576--3.577 Beobachtungen \\
+	Stratifizierung & Kombiniertes Label \texttt{Crop|Stage} \\
+	Zufallsstartwert & \texttt{SEED = 42} \\
+	\bottomrule
+\end{tabularx}
+\end{table}
+
+\texttt{tune()} vergleicht Hyperparameterkandidaten per Grid Search
+ausschlie\ss{}lich innerhalb des Trainingsanteils. Standardm\"a\ss{}ig wird
+die mittlere kombinierte Balanced Accuracy \"uber die f\"unf Bewertungsfolds
+optimiert. Merkmalsvarianten werden ebenfalls anhand der Trainings-CV
+verglichen. Nach der Auswahl passt \texttt{run()} die gesamte Pipeline
+auf dem Trainingsanteil an und bewertet ihre Vorhersagen auf dem Holdout.
+CV-Mittelwerte und Fold-Streuung werden von den Holdout-Kennzahlen
+getrennt berichtet; die Fold-Streuung ist kein Konfidenzintervall und
+belegt allein keine statistische Signifikanz eines Unterschieds.
+
+Fr\"uhere Experimente beruhen auf einem 70/30-Split. Deren Kennzahlen sind
+nicht unmittelbar mit dem aktuellen 80/20-Protokoll vergleichbar.
+F\"ur direkte Vergleiche m\"ussen Split, Fold-Zuordnung und Bewertungsmetrik
+\"ubereinstimmen; unterschiedliche Eingaben und Suchbudgets sind offenzulegen.
+Der vorgesehene Ablauf sieht eine Holdout-Bewertung je ausgew\"ahltem
+Ansatz vor. Das Experimentprotokoll enth\"alt jedoch mehrere Modell- und
+Merkmalsvergleiche auf demselben Holdout. Dieser ist daher keine vollst\"andig
+unabh\"angige Abschlusspr\"ufung der gesamten Modellwahl; eine Auswahl anhand
+bereits bekannter Validierungswerte kann die Leistungssch\"atzung optimistisch
+machen. Die ungelabelten Abgabedaten sind davon getrennt und erlauben ohne
+externe R\"uckmeldung keine eigene Berechnung der Vorhersageg\"ute.
+
+\paragraph{Metriken und Klassenungleichgewicht.}
+Die gemeinsame Funktion \texttt{evaluate()} berechnet Balanced Accuracy und
+Macro-F1 jeweils f\"ur Kulturart, Stadium und das kombinierte Paar.
+Die Balanced Accuracy mittelt den Recall gleichgewichtet \"uber die
+tats\"achlichen Klassen und verhindert so, dass h\"aufige Klassen die
+Hauptmetrik dominieren. Macro-F1 erg\"anzt diese Sicht um klassenweise
+Precision und Recall. Samples-F1 bewertet dagegen den Anteil korrekt
+vorhergesagter Labels je Beobachtung. Bei genau einer Kultur- und einer
+Stadiumsvorhersage gilt:
+\[
+	F1_{\mathrm{samples}} = \frac{1}{2n}\sum_{i=1}^{n}
+	\left(\mathbf{1}(\widehat{c}_i=c_i) +
+	\mathbf{1}(\widehat{s}_i=s_i)\right).
+\]
+Hier bezeichnet $n$ die Zahl der Beobachtungen und $\mathbf{1}$ die
+Indikatorfunktion; $c_i$ und $s_i$ sind die wahren Kultur- und
+Stadienlabels, die mit Dach bezeichneten Werte ihre Vorhersagen.
+Eine Beobachtung tr\"agt somit 1, 0{,}5 oder 0 bei. Samples-F1 ist
+keine klassenbalancierte Metrik und kein Anteil ausschlie\ss{}lich
+vollst\"andig korrekter Paare.
+
+Dem Klassenungleichgewicht begegnen die Modelle je nach Verfahren mit
+ausgeglichenen Klassen- oder Stichprobengewichten beziehungsweise
+angepassten Klassenprioren. Bei kombinierten Klassifikatoren beziehen sich
+die Gewichte auf Crop-Stage-Paare, bei hierarchischen Verfahren auf die
+jeweilige Klassifikationsstufe. Die konkrete Einstellung geh\"ort zur
+Modellkonfiguration. Zus\"atzlich wird der Anteil vorhergesagter Paare
+au\ss{}erhalb der im Training beobachteten Kombinationen ausgewiesen.
+Kombinierte Klassen und entsprechende Paarbeschr\"ankungen vermeiden solche
+Ausgaben konstruktiv; die Bewertungsfunktion selbst korrigiert sie nicht.
+Confusion Matrices sowie Precision, Recall und Fallzahlen je Klasse
+erg\"anzen die aggregierten Kennzahlen in der Fehleranalyse.
+
+\paragraph{Abh\"angigkeiten und Reproduktion.}
+Ein zuf\"alliger Split belegt keine \"Ubertragbarkeit auf neue Regionen
+oder Aufnahmezeitpunkte. Erg\"anzende Analysen verwenden deshalb Gruppen-CV
+nach AEZ, Monat oder deren Kombination, ausschlie\ss{}lich auf dem
+Trainingsanteil. AEZ-Monat-Gruppen sind dabei Kontextgruppen und ohne
+eindeutige Aufnahme- oder Feldkennung kein Nachweis einer Trennung
+tats\"achlicher Satellitenaufnahmen oder Felder. Die Ergebnisse dieses
+abweichenden Protokolls werden separat von der Standard-CV eingeordnet.
+Abbildung~\ref{fig:methodik-gruppen-cv} zeigt am kombinierten Ansatz,
+wie stark sich die Bewertung mit der Fold-Art \"andert. Bei allen B\"andern
+betr\"agt die kombinierte CV-Balanced-Accuracy etwa 0{,}859 bei zuf\"alligen
+Folds, gegen\"uber 0{,}378 bei getrennten AEZ-Monat-Gruppen,
+0{,}421 bei getrennten Monaten und 0{,}284 bei getrennten AEZ.
+Diese Unterschiede begrenzen die Interpretation der Standard-CV:
+Gute Vorhersagen innerhalb der vorhandenen Datenverteilung belegen keine
+vergleichbare Leistung f\"ur nicht im Training vertretene Kontextgruppen.
+Die Grafik stammt aus \path{notebooks/34_jd_gruppen_cv.ipynb};
+die zugeh\"origen L\"aufe stehen im MLflow-Experiment \texttt{split-leakage}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\linewidth,trim=855bp 0 0 28bp,clip]
+    {../../docs/modelle/img/gruppen_cv_vergleich.png}
+\caption{Zuf\"allige und gruppierte Trainings-CV im 80/20-Protokoll
+	f\"ur den kombinierten Ansatz (Ausschnitt: kombinierte Balanced Accuracy).
+	\texttt{random} bezeichnet zuf\"allige stratifizierte Folds;
+	die \"ubrigen Fold-Arten trennen AEZ-Monat-Gruppen, Monate bzw. AEZ.
+	Verglichen werden alle B\"ander, simulierte Sentinel-2-B\"ander,
+	Spektren ohne Metadaten und ausschlie\ss{}lich Metadaten.
+	Die Fehlerbalken zeigen die Standardabweichung \"uber die Folds,
+	keine Konfidenzintervalle.}
+\label{fig:methodik-gruppen-cv}
+\end{figure}
+
+Die Reproduktion beginnt mit \texttt{uv sync --locked} und der Bereitstellung
+der Rohdaten. \texttt{make data} erzeugt die bereinigten Daten sowie die
+Split- und Fold-Artefakte. Die Python-Umgebung ist durch
+\path{pyproject.toml} und \path{uv.lock} festgelegt, Seed und Standardanteile
+durch \path{src/awp2/config.py}. Notebooks rufen wiederverwendbare Funktionen
+des Pakets auf; Vorverarbeitung und Bewertungslogik stehen in
+\path{src/awp2/preprocessing.py}, \path{src/awp2/experiment.py} und
+\path{src/awp2/evaluation.py}.
+Bei aktivierter Nachverfolgung speichert MLflow Tuning-Kandidaten,
+Konfigurationen, Datenfingerabdr\"ucke, Git-Stand, Metriken und Modellartefakte.
+Das gemeinsame Experimentprotokoll in \path{docs/modelle/experimente.md}
+verweist auf die Run-IDs; dokumentierte Tracking-Ausf\"alle sind als
+L\"ucken der Nachvollziehbarkeit zu ber\"ucksichtigen.
+Ein fester Seed allein garantiert zudem keine bit-identischen Resultate
+bei unterschiedlichen Laufzeitumgebungen oder nichtdeterministischen
+Mehrthread-Verfahren. F\"ur das finale Modell sind deshalb der ausgewertete
+Code-Stand, seine Konfiguration und die konkrete Run-ID gemeinsam anzugeben.
 
 \section{Modellvergleich und Auswahl}
 
