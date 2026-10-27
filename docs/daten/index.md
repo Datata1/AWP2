@@ -58,9 +58,10 @@ Challenge-Export sind weiterhin zu klären.
 | `train.csv` | 5591 | Features + Labels `Crop`, `Stage` |
 | `test.csv` | 1397 | Nur Features, keine Labels |
 
-!!! question "Offen"
-    Ist `test.csv` bereits der finale Validierungsdatensatz für die Bewertung, oder kommt dieser
-    später separat? (Laut Aufgabenstellung erhalten wir ihn „gegen Ende des Projekts".)
+!!! info "Rolle von `test.csv`"
+    `test.csv` ist der finale (ungelabelte) Validierungsdatensatz für die Bewertung. Die Vorhersagen
+    darauf sind die abzugebende CSV; dafür wird das beste Modell auf allen Trainingsdaten
+    trainiert (`make predict`, siehe [Endmodell](../modelle/endmodell.md)).
 
 ## Spalten
 
