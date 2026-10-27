@@ -45,7 +45,7 @@ from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 split = load_split()
 model = Pipeline(
     [
-        ("preprocess", build_preprocessor(PreprocessingConfig(scale=True))),
+        ("preprocess", build_preprocessor(PreprocessingConfig(use_spectral_standard_scale=True))),
         ("model", DummyClassifier(strategy="most_frequent")),  # ← euer Ansatz
     ]
 )
@@ -191,7 +191,7 @@ class SpectralLSTM(BaseEstimator, ClassifierMixin):
 | --- | --- |
 | Alle Hyperparameter als Argumente von `__init__`, dort nur speichern | `tune()` kopiert das Modell mit `clone()` und setzt Werte über diese Namen |
 | `X` ist ein DataFrame aus Bändern **und** ggf. `AEZ`/`Month` | Für ein LSTM/1D-CNN die Bandspalten zur Sequenz `(n, Bänder, 1)` umformen; Metadaten getrennt einspeisen oder `use_meta=False` |
-| Skalierung einschalten (`PreprocessingConfig(scale=True)`) | Netze lernen auf unskalierten Reflektanzen schlecht |
+| Skalierung einschalten (`PreprocessingConfig(use_spectral_standard_scale=True)`) | Netze lernen auf unskalierten Reflektanzen schlecht |
 | Seed aus `awp2.config` im Framework setzen | Sonst ist jeder Lauf anders und Vergleiche sind wertlos |
 | Kleine Grids, `log_model=False` beim Ausprobieren | `tune()` trainiert jeden Kandidaten 5-mal; das Speichern großer Netze kostet Zeit |
 

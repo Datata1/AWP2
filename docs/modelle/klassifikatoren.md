@@ -16,7 +16,7 @@ Klassifikatoren lassen sich mit mehreren Ansätzen kombinieren.
 
 Diese Modelle erhalten die 198 Spektralbänder sowie optional AEZ und Month als eine
 Merkmalszeile. Sie sind der erste Vergleich, weil sie mit der vorhandenen sklearn-Pipeline
-direkt nutzbar und bei rund 3.900 Trainingszeilen gut kontrollierbar sind.
+direkt nutzbar und bei rund 4.500 Trainingszeilen (bis 2026-10-20 rund 3.900) gut kontrollierbar sind.
 
 | Familie | Kandidaten | Voraussetzungen | Priorität |
 | --- | --- | --- | --- |
@@ -53,7 +53,7 @@ benötigen.
 Die Liste ist kein Auftrag, jede Kombination zu testen. Ein sinnvoller Vergleich deckt
 unterschiedliche Hypothesen ab und bleibt auf dem gemeinsamen Split nachvollziehbar.
 
-1. Kombinierte Klasse mit Random Forest: abgeschlossen, aktuelle Referenz für BAcc kombiniert.
+1. Kombinierte Klasse mit Random Forest: abgeschlossen, Startreferenz für BAcc kombiniert (inzwischen von der RBF-SVM übertroffen, siehe [Experimente](experimente.md)).
 2. Hierarchischer Ansatz mit Random Forest: prüft, ob kulturabhängige Stadien helfen.
 3. Kombinierte Klasse mit SVM: testet eine nichtlineare Entscheidungsgrenze mit Skalierung.
 4. Kombinierte Klasse mit Extra Trees oder HistGradientBoosting: testet alternative

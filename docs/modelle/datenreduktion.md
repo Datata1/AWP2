@@ -271,7 +271,7 @@ Sie trennen, **warum** die Sentinel-2-Bänder reichen: Lage, Breite oder bloße 
 | Frage | Antwort |
 | --- | --- |
 | Minimaler Input ohne Qualitätsverlust | 10 Bänder an Sentinel-2-Positionen (aus Hyperion simuliert) + AEZ + Monat |
-| Endmodell für die Abgabe | kombinierte RBF-SVM auf allen Bändern (höchste BAcc und Macro-F1) |
+| Endmodell für die Abgabe | kombinierte RBF-SVM auf allen Bändern mit AEZ × Monat (`combined_svm_aez_month`, BAcc kombiniert 0,869) |
 | Für neue Aufnahmen | hierarchische SVM mit Sentinel-2-Eingabe |
 | Nicht empfohlen | univariate Bandauswahl, Bandauswahl je Ebene, PCA (auch auf Sentinel-2) |
 

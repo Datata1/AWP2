@@ -22,7 +22,7 @@ flowchart TD
 
 Die Hypothese lautet: Spektrale Muster, die für eine Kultur hilfreich sind, unterstützen auch die
 Erkennung ihres Entwicklungsstadiums. Die gemeinsame Repräsentation kann deshalb mit den rund
-3.900 Trainingszeilen besser generalisieren als zwei vollständig getrennte MLPs.
+4.500 Trainingszeilen (bis 2026-10-20 rund 3.900) besser generalisieren als zwei vollständig getrennte MLPs.
 
 ## Vor- und Nachteile
 

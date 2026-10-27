@@ -31,7 +31,8 @@ der CV auf dem Trainingsanteil; die Validierung wird danach genau einmal verwend
 | 3 | Der Kontext oder Vegetationsindizes tragen eigenständige Information bei. | Bester tabellarischer Klassifikator aus 1--2 | Jeweils genau eine Ablation: `use_meta=False` oder `use_vegetation_indices=True` | Behalten, wenn die CV besser ist und die Validierung den Gewinn nicht widerlegt. |
 | 4 | Lokale Muster benachbarter Wellenlängen helfen über die Tabelle hinaus. | Kleine 1D-CNN, sequenziell | Spektren skalieren; AEZ/Month getrennt als Kontextzweig oder bewusst ausschalten | Nur bauen, wenn die tabellarische Referenz und deren Ablationen dokumentiert sind. |
 
-Die Reihenfolge ist absichtlich konservativ: Mit rund 3.900 Trainingszeilen und 23 kombinierten
+Die Reihenfolge ist absichtlich konservativ: Mit rund 4.500 Trainingszeilen (bis 2026-10-20
+rund 3.900) und 23 kombinierten
 Klassen ist die tabellarische RBF-SVM bereits stark. Ein sequenzielles Netz ist ein begründeter
 Vergleich, aber keine Abkürzung zu besseren Ergebnissen.
 

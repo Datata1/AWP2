@@ -226,8 +226,9 @@ Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet
   Helligkeit bzw. Bodenanteil, stärkere Gewichtung früher und später Stadien.
 - **Kombiniert vs. hierarchisch** unterscheiden sich bei den Treffern nicht signifikant; der
   BAcc-Vorsprung des kombinierten Ansatzes kommt von wenigen kleinen Klassen und ist zusätzlich
-  durch unterschiedliche Vorverarbeitung verzerrt. Für die Abgabe bleibt `combined_svm_expanded`
-  vorn, die Begründung sollte diese Unsicherheit nennen.
+  durch unterschiedliche Vorverarbeitung verzerrt. Diese Analyse stammt aus der 70/30-Zeit; dort lag
+  `combined_svm_expanded` vorn, aktuell führt `combined_svm_aez_month` (80/20, 0.869). Die
+  Begründung sollte diese Unsicherheit nennen.
 - **Hierarchisch** profitiert direkt von einer besseren Kulturstufe (Oracle-Kultur 0.939), ein
   vergleichbarer Oracle-Wert für den kombinierten Ansatz fehlt aber – welcher Ansatz mehr
   gewinnen würde, ist offen.

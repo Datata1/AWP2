@@ -76,7 +76,7 @@ Im Lauf liegt unter *Artifacts* die Confusion Matrix; alle Modelle stehen im Tab
 Direkt vergleichbar sind nur Läufe mit gleichem Dataset-Hash (Spalte *Dataset*).
 
 !!! warning "Nicht auf der Validierung tunen"
-    `run()` bewertet auf dem 30-%-Holdout – er ist für den Vergleich **fertiger** Ansätze da.
+    `run()` bewertet auf dem 20-%-Holdout – er ist für den Vergleich **fertiger** Ansätze da.
     Wer viele `run()`-Aufrufe mit verschiedenen Hyperparametern startet und den besten nimmt,
     tuned auf dem Holdout und überschätzt den Score. Hyperparameter per Cross-Validation mit
     `load_folds()` wählen ([Pipeline → Tunen](../daten/pipeline.md#3-tunen)), dann das Ergebnis
