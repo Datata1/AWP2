@@ -10,7 +10,8 @@ Quer zu allen Ansätzen: Wie sieht das Modell das Spektrum?
 ## Entscheidung für M2
 
 **Zuerst tabellarisch arbeiten.** Tabellarische Modelle passen zur vorhandenen sklearn-Pipeline,
-erlauben einen fairen Vergleich auf dem festen Split und sind bei rund 3.900 Trainingszeilen
+erlauben einen fairen Vergleich auf dem festen Split und sind bei rund 4.500 Trainingszeilen
+(80/20; bis 2026-10-20 rund 3.900 bei 70/30)
 deutlich weniger überanpassungsanfällig als tiefe Netze. Welche tabellarische Konfiguration die
 Referenz bildet, entscheidet jede Ansatzseite anhand ihrer Experimente.
 

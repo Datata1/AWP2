@@ -230,7 +230,7 @@ ist dafür kein aussagekräftiger Test.[^3]
 | Training | Auf diesem Teil werden Modell und Vorverarbeitung gelernt. |
 | Cross-Validation-Folds | Der Trainingsanteil wird fünfmal intern geteilt, um Hyperparameter und Varianten zu vergleichen. |
 | Validierung | Bleibt während des Tunings unangetastet und bewertet die gewählte Variante genau einmal. |
-| Unbeschriftete Testdaten | Enthalten keine Zielwerte und dürfen keine Modellentscheidung beeinflussen. Ob `test.csv` bereits dem späteren Challenge-Datensatz entspricht, ist noch offen. |
+| Unbeschriftete Testdaten | `test.csv` ist der finale Validierungsdatensatz der Challenge. Er enthält keine Zielwerte und darf keine Modellentscheidung beeinflussen; das Endmodell sagt ihn nach dem Training auf allen beschrifteten Daten vorher. |
 
 Ein **Holdout** ist ein Teil der beschrifteten Daten, der vor jeder Modellarbeit beiseitegelegt
 und erst ganz am Ende einmal zur Bewertung genutzt wird – das Modell hat ihn nie gesehen, und

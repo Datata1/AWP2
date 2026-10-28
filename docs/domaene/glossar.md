@@ -21,7 +21,7 @@ Jede:r ergänzt die Begriffe aus der eigenen Seite.
 | F1-Score | Harmonisches Mittel von Precision und Recall. Er ist nur hoch, wenn ein Modell eine Klasse sowohl zuverlässig vorhersagt als auch möglichst vollständig findet. | [ML-Aufgabe](ml-aufgabe.md#bewertungsmetriken) |
 | Fernerkundung | Gewinnung von Informationen aus der Entfernung, etwa mit Sensoren auf Satelliten. | [Fernerkundung](fernerkundung.md#grundlagen-der-optischen-fernerkundung) |
 | Hierarchische Klassifikation | Mehrstufige Vorhersage, hier zuerst `Crop` und anschließend `Stage` innerhalb der vorhergesagten Kultur. | [ML-Aufgabe](ml-aufgabe.md#mogliche-formulierungen) |
-| Holdout | Beschrifteter Datenteil, der vor der Modellarbeit beiseitegelegt und nur einmal zur abschließenden Bewertung genutzt wird. Bei uns dasselbe wie die 30-%-Validierung. | [ML-Aufgabe](ml-aufgabe.md#validierung) |
+| Holdout | Beschrifteter Datenteil, der vor der Modellarbeit beiseitegelegt und nur einmal zur abschließenden Bewertung genutzt wird. Bei uns dasselbe wie die 20-%-Validierung. | [ML-Aufgabe](ml-aufgabe.md#validierung) |
 | Hyperspektral | Viele schmale, aufeinanderfolgende Spektralbänder erfassen ein detailliertes Spektrum. | [Fernerkundung](fernerkundung.md#multispektral-vs-hyperspektral) |
 | Klassenungleichgewicht | Manche Klassen haben sehr viel weniger Beobachtungen als andere. Bei uns betrifft das insbesondere Reis und `Harvest`. | [ML-Aufgabe](ml-aufgabe.md#klassenungleichgewicht) |
 | Klassengewichte | Gewichte beim Training, die Fehler bei seltenen Klassen stärker berücksichtigen. | [ML-Aufgabe](ml-aufgabe.md#mogliche-gegenmanahmen) |

@@ -5,7 +5,7 @@ Statusmeeting oder per Matrix bzw. `dozenten@domaenenprojekt2.de`.
 
 | # | Frage | Gestellt am | Antwort |
 | --- | --- | --- | --- |
-| 1 | Ist `test.csv` bereits der finale Validierungsdatensatz, oder kommt dieser später? | | |
+| 1 | Ist `test.csv` bereits der finale Validierungsdatensatz, oder kommt dieser später? | | Ja, `test.csv` ist der finale Validierungsdatensatz (27.10.2026). |
 | 2 | Meilenstein-Termine: 08./15./22.10. (Aufgabenbeschreibung), 09./16./23.10. (Folien) oder – laut Folien „bis zum Statusmeeting“ – unser Dienstagstermin 06./13./20.10.? | | |
 | 3 | M3 spricht von „1–2-jährigen Sequenzen, Sommerfenster, wenigen Zeitstempeln" – ist bei uns die Reduktion der Spektralbänder gemeint? | | |
 | 4 | Aus welcher Quelle stammt der Datensatz (GHISA?)? Welche Regionen Nordamerikas und Aufnahmejahre umfasst er, welche AEZ-Einteilung nutzen die Codes, und gibt es offizielle Definitionen der Stadien-Labels? | | |
