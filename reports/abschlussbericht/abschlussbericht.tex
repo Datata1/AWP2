@@ -7,8 +7,13 @@
 \usepackage[a4paper,margin=2.5cm]{geometry}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{caption}
+\captionsetup[figure]{format=hang,font=small,labelfont=bf,labelsep=colon,
+	justification=raggedright,singlelinecheck=true,skip=8pt}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
@@ -130,24 +135,125 @@ Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
 
 \section{Methodik und Validierung}
 
+Abbildung~\ref{fig:methodik-pipeline} fasst die Trennung von Modellauswahl
+und Holdout-Bewertung zusammen.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+	>={Stealth[length=2mm]},
+	box/.style={draw, rounded corners=2pt, align=center, font=\small,
+		text width=4cm, minimum height=10mm, inner sep=2mm},
+	arrow/.style={->, thick}
+]
+	\node[box] (clean) at (-5,0) {Daten pr\"ufen\\und bereinigen};
+	\node[box] (split) at (0,0) {Stratifizierter\\80/20-Split};
+	\node[box] (train) at (5,0) {Training\\CV und Modellauswahl};
+	\node[box] (holdout) at (0,-1.45) {Holdout\\bleibt zur\"uckgehalten};
+	\node[box] (fit) at (5,-2.9) {Finales Training\\auf allen Trainingsdaten};
+	\node[box] (evaluate) at (0,-2.9) {Bewertung\\auf dem Holdout};
+	\draw[arrow] (clean) -- (split);
+	\draw[arrow] (split) -- (train);
+	\draw[arrow] (split) -- (holdout);
+	\draw[arrow] (train) -- (fit);
+	\draw[arrow] (fit) -- (evaluate);
+	\draw[arrow] (holdout) -- (evaluate);
+\end{tikzpicture}
+\caption{Kompakter Ablauf mit getrennter Trainings-CV und Holdout-Bewertung.}
+\label{fig:methodik-pipeline}
+\end{figure}
+
 \subsection{Datenaufbereitung und Merkmalsbildung}
-% Gew\"ahlte Bereinigung, Imputation und Skalierung fachlich begr\"unden.
-% Verwendete Bandselektion, Vegetationsindizes, PCA oder weitere Merkmale
-% beschreiben; genutzte Metadaten und deren Kodierung nennen.
-% Dokumentieren, welche Transformationen ausschlie\ss lich auf den jeweiligen
-% Trainingsanteilen innerhalb der gemeinsamen Pipeline angepasst werden.
+
+Alle Ans\"atze nutzen die gemeinsame Pipeline des Pakets \texttt{awp2}.
+Die Rohdaten werden auf Format, Wertebereiche und zul\"assige Labels gepr\"uft.
+Nach dem Entfernen zweier exakter Duplikate verbleiben 5.589 Beobachtungen.
+Ausrei\ss{}er werden nicht pauschal entfernt, da kein ausreichender Nachweis
+f\"ur Messfehler vorliegt. Die Kennung \texttt{id} und die Zielspalten sind
+keine Eingabemerkmale.
+
+Von 198 Bandspalten bleiben nach Ausschluss vollst\"andig leerer B\"ander
+131 nutzbar. Fehlende Werte werden entlang der Wellenl\"ange linear
+interpoliert, wenn die St\"utzb\"ander h\"ochstens 15\,nm auseinanderliegen;
+sonst wird der n\"achste Messwert verwendet. Bei vollst\"andig fehlenden
+Spektren dienen Trainingsmediane als Ersatz. Die Skalierung ist
+modellabh\"angig: SVMs erhalten standardisierte Spektren, Baummodelle
+ben\"otigen dies nicht.
+
+Als Kontextmerkmale dienen \texttt{AEZ} und \texttt{Month}. Die Zone wird
+one-hot-kodiert, der Monat standardm\"a\ss{}ig zyklisch durch Sinus und Kosinus
+dargestellt. Ihr Nutzen wird gegen Modelle ohne Metadaten gepr\"uft.
+Weitere Varianten umfassen Vegetationsindizes, Gl\"attung, spektrale Normalisierung, PCA und
+Bandauswahl; ihre Ergebnisse folgen im Modellvergleich und bei der
+Datenreduktion. S\"amtliche datenabh\"angigen Aufbereitungsschritte werden
+zusammen mit dem Modell nur auf den jeweiligen Trainingsdaten angepasst,
+nicht auf den zur Bewertung zur\"uckgehaltenen Beobachtungen.
 
 \subsection{Evaluationsprotokoll und Reproduzierbarkeit}
-% Gemeinsame Split- und Fold-Artefakte, Anteile, Stratifizierung und Seed nennen.
-% Cross-Validation f\"ur die Hyperparametersuche von der anschlie\ss enden
-% Holdout-Auswertung trennen; tats\"achliches Auswahlverfahren offenlegen.
-% Falls wiederholt Holdout-Ergebnisse verglichen wurden, die dadurch begrenzte
-% Unabh\"angigkeit der finalen Bewertung diskutieren.
-% Balanced Accuracy als Hauptmetrik sowie Macro-F1 f\"ur Crop und Stage angeben.
-% Samples-F1 f\"ur die gemeinsame Crop-/Stage-Vorhersage pr\"azise definieren.
-% Umgang mit Klassenungleichgewicht und ung\"ultigen Vorhersagepaaren erl\"autern.
-% Code-Commit, Umgebung (uv.lock), Konfigurationen, MLflow-Run-IDs und Schritte
-% zur Reproduktion bzw. Vorhersage auf den Abgabedaten referenzieren.
+
+\paragraph{Aufteilung und Modellauswahl.}
+Tabelle~\ref{tab:methodik-split} zeigt das aktuelle Standardprotokoll.
+Die Aufteilung erfolgt mit Seed 42 stratifiziert nach \texttt{Crop|Stage},
+damit auch seltene Zielpaare in beiden Teilen vertreten sind.
+Alle Ans\"atze laden dieselbe gespeicherte Zuordnung.
+
+\begin{table}[htbp]
+\centering
+\caption{Gemeinsame Datenaufteilung nach der Duplikatbereinigung.}
+\label{tab:methodik-split}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+	\toprule
+	Bestandteil & Umfang bzw. Verwendung \\
+	\midrule
+	Training & 4.471 Beobachtungen (80\,\%) \\
+	Interner Holdout & 1.118 Beobachtungen (20\,\%) \\
+	Trainings-CV & 5 Folds innerhalb des Trainingsanteils \\
+	\bottomrule
+\end{tabularx}
+\end{table}
+
+Hyperparameter und Merkmalsvarianten werden mit stratifizierter
+Cross-Validation (CV) ausschlie\ss{}lich im Trainingsanteil verglichen.
+Dabei wird jeweils auf vier Teilmengen trainiert und auf der f\"unften
+bewertet. Die Auswahl erfolgt anhand der mittleren kombinierten Balanced
+Accuracy. Anschlie\ss{}end wird die gew\"ahlte Pipeline auf dem gesamten
+Trainingsanteil angepasst und auf dem Holdout bewertet. Neuronale Modelle
+nutzen zus\"atzlich einen internen Trainingsanteil f\"ur fr\"uhes Stoppen.
+CV- und Holdout-Ergebnisse werden getrennt berichtet; \"altere 70/30-L\"aufe
+sind nicht direkt mit dem aktuellen Protokoll vergleichbar.
+
+\paragraph{Bewertungsmetriken.}
+Die Hauptmetrik ist die \textbf{Balanced Accuracy (BAcc)}. Sie mittelt den
+Recall, also den Anteil richtig erkannter Beobachtungen einer Klasse,
+gleichgewichtet \"uber die tats\"achlichen Klassen. Dadurch erhalten seltene
+Klassen dasselbe Gewicht wie h\"aufige. Erg\"anzend wird \textbf{Macro-F1}
+berichtet: der ungewichtete Mittelwert der klassenweisen F1-Werte, die
+Precision und Recall als harmonisches Mittel verbinden.
+Mit $R_k$ als Recall und $F1_k$ als F1-Wert der Klasse $k$ gilt jeweils
+f\"ur die $K$ ber\"ucksichtigten Klassen:
+\[
+	\mathrm{BAcc} = \frac{1}{K}\sum_{k=1}^{K} R_k,
+	\qquad
+	F1_{\mathrm{macro}} = \frac{1}{K}\sum_{k=1}^{K} F1_k.
+\]
+Beide Metriken werden f\"ur Kulturart, Stadium und das kombinierte Paar
+berechnet. Das Klassenungleichgewicht wird je nach Modell durch
+Klassen- oder Stichprobengewichte beziehungsweise gleiche Klassenprioren
+ber\"ucksichtigt. Confusion Matrices und der Anteil vorhergesagter Paare,
+die im Training nicht vorkamen, erg\"anzen die Fehleranalyse.
+
+\paragraph{Grenzen und Nachvollziehbarkeit.}
+Da mehrere Ans\"atze auf demselben Holdout bewertet wurden, ist dieser keine
+vollst\"andig unabh\"angige Abschlusspr\"ufung der Modellwahl. Zus\"atzliche
+Gruppen-CV nach AEZ, Monat oder deren Kombination zeigt deutlich geringere
+Leistungen bei unbekannten Kontextgruppen. Gute zuf\"allige CV-Ergebnisse
+belegen daher keine \"Ubertragbarkeit auf neue Regionen oder Zeitpunkte.
+Ohne Aufnahme- oder Feldkennungen l\"asst sich auch keine sichere Trennung
+tats\"achlicher Aufnahmen oder Felder nachweisen.
+
+Split-Artefakte, Seed und \texttt{uv.lock} st\"utzen die Reproduktion.
+MLflow dient zur Laufdokumentation; Tracking-Ausf\"alle und
+nichtdeterministische Berechnungen bleiben Einschr\"ankungen.
 
 \section{Modellvergleich und Auswahl}
 \label{sec:modellvergleich}
