@@ -15,6 +15,7 @@ EXTERNAL_DATA_DIR = DATA_DIR / "external"  # third-party reference data, downloa
 
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
+PREDICTIONS_DIR = REPORTS_DIR / "predictions"  # CSV submissions for the unlabelled test.csv
 FIGURES_DIR = REPORTS_DIR / "figures"  # scratch figures, not in git
 DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "daten" / "img"  # figures shown in the docs, in git
 MODEL_DOCS_FIGURES_DIR = PROJECT_ROOT / "docs" / "modelle" / "img"  # model results, in git

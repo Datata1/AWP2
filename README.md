@@ -23,4 +23,24 @@ uv run mkdocs serve           # Starts a local development server at http://127.
 Rohdaten nach `data/raw/` kopieren (siehe [data/README.md](data/README.md)).
 Ausführliche Anleitung: [docs/entwicklung/index.md](docs/entwicklung/index.md) bzw. `make docs`.
 
+## Vorhersage für `test.csv`
+
+Das Endmodell wird auf allen Trainingsdaten (`data/raw/train.csv`) trainiert und sagt
+`data/raw/test.csv` vorher. Das Ergebnis ist `test.csv` mit den zusätzlichen Spalten `Crop` und
+`Stage`.
+
+```bash
+make predict          # offizielles Modell (combined_svm_aez_month)
+make predict-automl   # AutoML-Modell (automl_final)
+```
+
+Ausgabe: `reports/predictions/<modell>.csv`. Ohne `make` (z. B. unter Windows):
+
+```bash
+uv run python tools/predict_combined_svm_aez_month.py
+uv run python tools/predict_combined_svm_aez_month.py --test-file <csv> --output <csv>   # optional
+```
+
+Details: [docs/modelle/endmodell.md](docs/modelle/endmodell.md).
+
 So arbeiten wir zusammen (Issue → Branch → PR): [docs/entwicklung/workflow.md](docs/entwicklung/workflow.md).
