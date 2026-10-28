@@ -4,7 +4,7 @@
 
 Referenzwerte für M1 (#27) – bewusst **kein** begründeter Ansatz, sondern die Messlatte für
 alle weiteren: eine Untergrenze ohne Lernen und ein einfaches Modell, das Crop und Stage ohne
-eigene Logik gemeinsam vorhersagt. Notebook: `notebooks/01_jd_baseline.ipynb`.
+eigene Logik gemeinsam vorhersagt. Notebook: `notebooks/03_baseline/01_jd_baseline.ipynb`.
 
 | Klassifikator | BAcc Crop | BAcc Stage | BAcc kombiniert | Samples-F1 | MLflow-Run |
 | --- | --- | --- | --- | --- | --- |
@@ -31,7 +31,7 @@ beste Einstellung `max_depth=20`, `max_features=0.3`, `min_samples_leaf=1` – C
 
 #### EDA-Merkmalsablage
 
-Notebook: `notebooks/02_duac1011_eda-baseline.ipynb`. Dieselbe Random-Forest-Architektur
+Notebook: `notebooks/03_baseline/02_duac1011_eda-baseline.ipynb`. Dieselbe Random-Forest-Architektur
 verglich drei durch die EDA motivierte Eingabevarianten; die Auswahl erfolgte nur per CV.
 
 ![Tuning der EDA-Merkmalsablage](../img/spectral_baseline_tuning.png)

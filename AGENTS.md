@@ -40,7 +40,9 @@ Always commit `pyproject.toml` and `uv.lock` together.
   (not in git). Figures shown in the docs → `awp2.plots.save_doc_figure()` into `docs/daten/img/`
   (data, EDA) or `MODEL_DOCS_FIGURES_DIR` = `docs/modelle/img/` (model results).
 - Plots: use and extend `awp2.plots` (e.g. `plot_spectra()`) instead of ad-hoc plotting code.
-- Notebook names: `<nr>_<initials>_<topic>.ipynb`, e.g. `03_jd_baseline.ipynb`.
+- Notebooks live in topic folders in report order (`01_daten`, `02_validierung`, `03_baseline`, `04_kombiniert`, `05_hierarchisch`, `06_multi-task`, `07_sequenz`, `08_datenreduktion`, `09_analyse`, `archiv`), numbered per folder:
+  `notebooks/<folder>/<nr>_<initials>_<topic>.ipynb`, `_` between the parts and `-` inside the
+  topic, e.g. `notebooks/05_hierarchisch/03_jd_tuning.ipynb`. `archiv/` is unmaintained and not linted.
 
 ## ML rules
 

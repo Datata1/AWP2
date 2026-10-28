@@ -46,8 +46,32 @@ fürs Tuning; der Holdout bleibt für den Endvergleich.
 | Vegetationsindizes aus interpolierten Reflektanzen (eigener Zweig) | Der Katalog ordnet jede Zielwellenlänge dem nächsten nicht leeren Hyperion-Band innerhalb von 5 nm zu und berechnet die Formeln aus Reflektanzanteilen. Auf SNV-standardisierten Spektren (Mittelwert 0, Varianz 1) wären die Verhältnisse bedeutungslos; deshalb nutzt der Zweig die Rohreflektanzen und wird erst nach der Indexauswahl mit derselben konfigurierten Methode wie die Spektren skaliert. Beide Skaler werden pro Trainingsfold separat gefittet. |
 | AEZ × Monat als eigene Indikatoren (`use_aez_month`) | Kulturfehler häufen sich in bestimmten Regionen zu bestimmten Zeiten ([Fehleranalyse](../modelle/fehleranalyse.md)). Ein Indikator je Kombination macht diesen Kontext direkt sichtbar und gibt ihm in Abstandsmodellen mehr Gewicht. Nur im Training beobachtete Kombinationen; unbekannte ergeben lauter Nullen. Hierarchische SVM: Kulturfehler im Mai (Training, out-of-fold) 25,4 % → 22,1 %, Gesamt-CV aber nur im Rauschen ([#114](https://github.com/Datata1/AWP2/issues/114)) – optional. **Kombinierte SVM (80/20, #197):** CV 0,859 → 0,864, Validierung 0,866 → 0,869 – für das Endmodell übernommen. Normalisierung pro Aufnahme (`use_acquisition_centering`) geprüft und verworfen (−0,010) |
 | Optionen als pydantic-`PreprocessingConfig` | Tippfehler oder falsche Typen (`scale="yes"`) fallen sofort auf |
+| Fachmodule mit stabiler öffentlicher Paket-API | Transformer, Konfiguration, Aufbau und Darstellung haben getrennte Zuständigkeiten. Notebooks importieren weiterhin aus `awp2.preprocessing`; explizite Exporte erhalten auch die bisherigen Klassenpfade gespeicherter Pipelines. Jeder parallele Zweig erhält eigene Transformer-Instanzen, damit seine Trainingsstatistiken unabhängig bleiben. |
 | Spektralregionen vorab auswählen (`spectral_regions`) | Nur für Analysen: Das Modell sieht nur die genannten Regionen (Grenzen wie [Domänen-Doku](../domaene/vegetation.md)), `()` ergibt ein reines Metadatenmodell. Die Auswahl erfolgt **vor** Interpolation, Skalierung und allen Spektralzweigen, damit ausgeschlossene Bänder weder Nachbarwerte noch Skalierung beeinflussen. Feste Wellenlängenintervalle statt datengetriebener Auswahl, daher kein Leakage. Standard ist `None` (alle Bänder); Ergebnisse siehe [Feature Importance](../modelle/feature-importance.md), Abschnitt 6 |
-| Pipeline-Grafik generiert (`pipeline_options_diagram`) | Handgezeichnete Grafiken veralten; die CI prüft Stand und Vollständigkeit (alle baubaren Schritte) |
+| Pipeline-Optionen als Tabelle dokumentieren | Schritte, Konfigurationsfelder und Einschränkungen bleiben auch bei vielen optionalen Zweigen überschaubar. Die konkreten Schritte eines Experiments liefert `describe_preprocessor()` als Text. |
+
+### Polynomiale REIP-Schätzung
+
+`REIP_POLYNOMIAL` sucht das Maximum der spektralen Steigung: An einer Nullstelle der
+zweiten Ableitung muss die dritte Ableitung negativ sein. Ein Minimum der Steigung wird
+verworfen; ohne gültiges Maximum liefert der Index `NaN`, das im Indexzweig mit dem
+Trainingsmedian aufgefüllt wird.
+
+Die Korrektur vom 23.10.2026 verändert mögliche Featurewerte bei
+`use_vegetation_indices=True`. Frühere Experimentergebnisse werden nicht überschrieben;
+für ihre Reproduktion ist der damalige Code-Stand erforderlich. Auch gespeicherte
+Pipelines verwenden beim Laden die installierte Implementierung des Transformers.
+
+### Diagnostischer NDVI in den Fehleranalysen
+
+`ndvi()` berechnet den diagnostischen NDVI aus den festen Bändern `X854` und `X671`.
+Damit bleiben die Aufrufe der beiden Fehleranalyse-Notebooks und deren Banddefinition
+erhalten. Der Helfer imputiert und begrenzt keine Werte; fehlende Werte und Nenner von
+null behalten das Verhalten der direkten pandas-Berechnung.
+
+Dieser diagnostische NDVI ist nicht mit dem Katalogindex `ND_800_680` gleichzusetzen:
+Eine andere Bandwahl verändert die Werte. Der Helfer ergänzt keine Features in
+`build_preprocessor()` und benötigt keine zusätzliche Pipeline-Option.
 
 ## Klassenungleichgewicht
 
@@ -58,7 +82,7 @@ Balanced Accuracy als Hauptmetrik.
 ## Offen – kommt nach der EDA (#20, #30)
 
 - Glättung der Spektren (z. B. Savitzky-Golay)
-- Umgang mit Ausreißern: **keine** Entfernung. Die Regelprüfung (#196) findet keine Messfehler, und das Entfernen der markierten Zeilen nur im Trainingsfold kostet 0,034 CV-BAcc kombiniert (#197, Notebook `40_jd_ausreisser_kontext`)
+- Umgang mit Ausreißern: **keine** Entfernung. Die Regelprüfung (#196) findet keine Messfehler, und das Entfernen der markierten Zeilen nur im Trainingsfold kostet 0,034 CV-BAcc kombiniert (#197, Notebook `01_daten/04_jd_ausreisser-kontext`)
 - Bandauswahl, Vegetationsindizes als Features
 - Split-Strategie, falls räumliche Cluster gefunden werden (dann Gruppen in `cv_splits`)
 - `Month` ist zyklisch; ggf. als sin/cos kodieren

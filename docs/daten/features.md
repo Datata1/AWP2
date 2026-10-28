@@ -17,7 +17,7 @@ Vorverarbeitung und Merkmalsbildung werden immer in `PreprocessingConfig` und ei
 sklearn-`Pipeline` umgesetzt. Im jeweiligen Trainingsfold werden vollständig leere Bänder
 erkannt, einzelne Lücken bei Stützbändern mit höchstens 15 nm Abstand interpoliert und
 bei größeren Abständen mit dem nächstgelegenen Messwert gefüllt; erst danach werden neue
-Merkmale berechnet. Der 30-%-Holdout
+Merkmale berechnet. Der 20-%-Holdout
 bleibt bis zur einmaligen Bewertung des per Cross-Validation ausgewählten Ansatzes unangetastet.
 Details zum Ablauf stehen in der [Pipeline](pipeline.md) und in der
 [ML-Aufgabe](../domaene/ml-aufgabe.md#data-leakage).

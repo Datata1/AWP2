@@ -4,10 +4,10 @@ Hier halten wir fest, was wir über die Domäne wissen müssen, bevor wir mit de
 Fernerkundung, Vegetation, Kulturpflanzen und die ML-Aufgabe. Grundlage für den
 M1-Kurzreport „Problemverständnis" und den Abschlussbericht.
 
-!!! info "So füllen wir die Seiten"
-    Jeder Abschnitt enthält Leitfragen als TODO. Beantworten, Leitfragen dann löschen.
+!!! info "So pflegen wir die Seiten"
     Kurz und mit eigenen Worten; Quellen als Fußnote (`[^1]`) und in [Quellen](quellen.md)
-    eintragen; neue Fachbegriffe ins [Glossar](glossar.md).
+    eintragen; neue Fachbegriffe ins [Glossar](glossar.md). Offene Punkte stehen als
+    `!!! todo` in den jeweiligen Abschnitten.
 
 ## Leseleitfaden
 

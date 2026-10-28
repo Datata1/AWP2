@@ -1,6 +1,6 @@
 DATA_ARGS ?=
 
-.PHONY: help setup data external lab docs docs-build lint lint-ruff lint-ty test format mlflow stunden clean
+.PHONY: help setup data external predict predict-automl lab docs docs-build lint lint-ruff lint-ty test format mlflow stunden clean
 
 help: ## Diese Hilfe anzeigen
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -14,6 +14,12 @@ data: ## Pipeline-Artefakte erzeugen (bereinigter Datensatz + Split in data/)
 
 external: ## Externe Referenzdaten laden (Sentinel-2-SRF nach data/external/)
 	uv run python -m awp2.data.external
+
+predict: ## Bestes Modell auf allen Trainingsdaten trainieren, test.csv vorhersagen
+	uv run python tools/predict_combined_svm_aez_month.py
+
+predict-automl: ## AutoML-Modell auf allen Trainingsdaten trainieren, test.csv vorhersagen
+	uv run python tools/predict_automl_final.py
 
 lab: ## Jupyter Lab starten
 	uv run jupyter lab

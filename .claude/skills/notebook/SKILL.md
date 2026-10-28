@@ -1,6 +1,6 @@
 ---
 name: notebook
-description: Create a new Jupyter notebook in notebooks/ following the project naming and setup conventions.
+description: Create a new Jupyter notebook in the fitting notebooks/<folder>/ following the project naming and setup conventions.
 argument-hint: "<initials> <topic>"
 disable-model-invocation: true
 ---
@@ -10,10 +10,13 @@ disable-model-invocation: true
 Arguments: `$ARGUMENTS` → first word = author initials (lowercase), rest = topic.
 If initials are missing, derive them from `git config user.name` and confirm.
 
-1. Determine the next number: highest `NN_` prefix in `notebooks/*.ipynb` + 1, two digits
-   (start at `01`).
-2. File name: `notebooks/<NN>_<initials>_<topic_snake_case>.ipynb`.
-3. Create the notebook (nbformat 4, kernel `python3`, language python) with these cells:
+1. Pick the topic folder (report order): `01_daten`, `02_validierung`, `03_baseline`, `04_kombiniert`, `05_hierarchisch`, `06_multi-task`, `07_sequenz`, `08_datenreduktion`, `09_analyse`.
+   Ask the user if the topic does not clearly fit one; never create notebooks in `archiv/`.
+2. Determine the next number: highest `NN_` prefix in `notebooks/<folder>/*.ipynb` + 1, two
+   digits (start at `01`).
+3. File name: `notebooks/<folder>/<NN>_<initials>_<topic-kebab-case>.ipynb` (`_` between the
+   parts, `-` inside the topic).
+4. Create the notebook (nbformat 4, kernel `python3`, language python) with these cells:
 
    **Markdown:**
    ```markdown
@@ -47,5 +50,5 @@ If initials are missing, derive them from `git config user.name` and confirm.
    train.shape
    ```
 
-4. Remind the user: start with `make lab`; reusable code belongs in `src/awp2/`, not in the
+5. Remind the user: start with `make lab`; reusable code belongs in `src/awp2/`, not in the
    notebook; outputs are stripped on commit by nbstripout.
