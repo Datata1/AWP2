@@ -42,7 +42,7 @@ Never tune further because of the validation score – new ideas go back to step
 ## 5. Analyse
 - Report all of `result.metrics` (`model_dump()`), and `invalid_combinations` if > 0.
 - In the notebook, back every finding with a plot right below its markdown cell (see
-  `notebooks/01_jd_baseline.ipynb`): `plot_metric_comparison` (vs. baseline/best so far),
+  `notebooks/03_baseline/01_jd_baseline.ipynb`): `plot_metric_comparison` (vs. baseline/best so far),
   `plot_tuning_candidates`, `plot_confusion_matrices`, `plot_top_confusions`,
   `plot_class_recall` from `awp2.plots` / `awp2.evaluation`.
 - Name the most confused classes and a hypothesis why (spectral similarity, stage overlap, few

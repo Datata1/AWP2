@@ -27,7 +27,10 @@ Dank `autoreload` sind Änderungen in `src/` ohne Kernel-Neustart verfügbar.
 
 ## Namen von Notebooks
 
-`<nr>_<kürzel>_<thema>.ipynb`, z. B. `01_jd_exploration.ipynb`. Am einfachsten mit `/notebook`.
+Notebooks liegen in Themenordnern in Leserichtung des Berichts (`01_daten`, `02_validierung`, `03_baseline`, `04_kombiniert`, `05_hierarchisch`, `06_multi-task`, `07_sequenz`, `08_datenreduktion`, `09_analyse`, `archiv`), nummeriert je Ordner:
+`notebooks/<ordner>/<nr>_<kürzel>_<thema>.ipynb` – `_` zwischen den Teilen, `-` im Thema, z. B.
+`notebooks/05_hierarchisch/03_jd_tuning.ipynb`. Kürzel: `jd`, `duac1011`. `archiv/` enthält ersetzte
+Notebooks und wird nicht mehr gepflegt. Am einfachsten mit `/notebook`.
 
 ## Sprache
 

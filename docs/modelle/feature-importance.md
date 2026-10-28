@@ -2,8 +2,8 @@
 
 Welche Wellenlängen und Metadaten die Referenz-SVM für Kultur und Wachstumsstadium nutzt und ob
 das zur Domäne passt (#34, Bonus der Aufgabenstellung). Notebooks:
-`notebooks/33_qmowo_feature-importance.ipynb` (Permutation Importance und SHAP) und
-`notebooks/34_qmowo_spectral-groups.ipynb` (Gruppen einzeln, Abschnitt 6). Bausteine:
+`notebooks/09_analyse/02_duac1011_feature-importance.ipynb` (Permutation Importance und SHAP) und
+`notebooks/09_analyse/03_duac1011_spektralgruppen.ipynb` (Gruppen einzeln, Abschnitt 6). Bausteine:
 `permutation_importance()`, `feature_groups()` ([`awp2.explain`](../referenz/explain.md)),
 `plot_importance_spectrum()`, `plot_importance_heatmap()` ([`awp2.plots`](../referenz/plots.md)).
 
@@ -198,7 +198,7 @@ Katalog-Indizes (#123). Eine Spitze ohne graue Linie wird von keinem Index genut
 kennt. Dort fällt die Red Edge (7 Bänder) kaum auf, obwohl sie fachlich wichtig ist. Zwei Effekte
 verzerren das Bild: **Redundanz** (andere Regionen ersetzen die gemischte) und **Größe** (NIR 44
 Bänder, Red Edge 7). Deshalb kommen drei Sichten dazu. Notebook:
-`notebooks/34_qmowo_spectral-groups.ipynb`, Bausteine: `size_matched_windows()`
+`notebooks/09_analyse/03_duac1011_spektralgruppen.ipynb`, Bausteine: `size_matched_windows()`
 ([`awp2.explain`](../referenz/explain.md)), `run_group_study()`
 ([`awp2.group_study`](../referenz/group_study.md)), `PreprocessingConfig(spectral_regions=...)`.
 

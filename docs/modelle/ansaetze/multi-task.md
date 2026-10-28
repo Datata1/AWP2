@@ -70,7 +70,7 @@ Abbildungen in `docs/modelle/img/`.
 
 ### Tabellarisches Multi-Task-MLP
 
-Notebook: `notebooks/10_duac1011_multi-task-mlp.ipynb`. Das Modell hat zwei gemeinsame
+Notebook: `notebooks/06_multi-task/01_duac1011_mlp.ipynb`. Das Modell hat zwei gemeinsame
 ReLU-Schichten und danach getrennte Crop- und Stage-Heads. Die Spektren werden standardisiert,
 AEZ wird One-Hot-kodiert und Month zyklisch kodiert.
 
@@ -109,7 +109,7 @@ der Vorhersage ausschließlich Kombinationen, die im jeweiligen Training beobach
 - Die Varianten ohne Kontext und mit Standardkontext wurden nicht ausgeführt, weil bereits der
         Embedding-Lauf keine Verbesserung erkennen ließ. Sie haben deshalb keine CV- oder
         Holdout-Metrik und ändern die Referenz nicht.
-- Notebook: `notebooks/27_duac1011-multi-task-lstm-embeddings.ipynb`. MLflow konnte den Lauf
+- Notebook: `notebooks/06_multi-task/05_duac1011_lstm-embeddings.ipynb`. MLflow konnte den Lauf
         wegen eines nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständige Ausgabe steht im
         Notebook-Output.
 
@@ -140,7 +140,7 @@ Holdout-Metrik oder Referenz.
 
 ## Fehleranalyse: PCA-20 gegen kombinierte SVM
 
-Notebook: `notebooks/11_duac1011_multi-task-fehleranalyse.ipynb` (#32). Beide
+Notebook: `notebooks/06_multi-task/02_duac1011_mlp-fehleranalyse.ipynb` (#32). Beide
 Referenzmodelle werden mit ihren vorher per CV festgelegten Einstellungen neu trainiert und ohne
 Tracking auf der gemeinsamen Validierung verglichen. Der Refit bestätigt den Abstand: das
 Multi-Task-MLP erreicht BAcc Crop/Stage/kombiniert von 0,920 / 0,902 / **0,764**, die

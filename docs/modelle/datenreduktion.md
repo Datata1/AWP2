@@ -63,7 +63,7 @@ liegt in `awp2.reduction` und `awp2.preprocessing` (`PreprocessingConfig.spectra
 
 Einschränkung: Der Macro-F1 kombiniert fällt mit Sentinel-2 um 0,046 – mehr Fehlalarme in
 Klassen mit 2–13 Validierungsbeispielen (z. B. `cotton|Harvest`). Details:
-`notebooks/33_jd_datenreduktion.ipynb`.
+`notebooks/08_datenreduktion/02_jd_datenreduktion.ipynb`.
 
 ## Ergebnis: hierarchisch
 
@@ -79,7 +79,7 @@ Klassen mit 2–13 Validierungsbeispielen (z. B. `cotton|Harvest`). Details:
   Vereinigung der Bänder wächst schnell (52 bei k=10), die Qualität bleibt bei 0,685.
 - Die Kulturfehler kosten rund 0,10 – die Kultur-Stufe ist der Engpass.
 
-Details: `notebooks/36_jd_hierarchisch_reduktion.ipynb`.
+Details: `notebooks/08_datenreduktion/03_jd_hierarchisch-reduktion.ipynb`.
 
 ## Fachliche Begründung der Bänder
 
@@ -110,7 +110,7 @@ jedes n-te Band) besser als wenige ausgewählte Nachbarbänder. Hintergrund zu d
 Die Netze sind mit 10 Sensorbändern besser als mit 131 Bändern: Kürzere Sequenzen sind mit rund
 4.500 Trainingszeilen leichter zu lernen. Hierarchisch leiden die Stage-Netze zusätzlich unter
 wenigen Zeilen je Kultur. Die SVM bleibt in beiden Ansätzen vorn. Details:
-`notebooks/35_jd_sequenzmodelle.ipynb`, `notebooks/38_jd_hierarchisch_sequenzmodelle.ipynb`.
+`notebooks/07_sequenz/07_jd_sequenzmodelle.ipynb`, `notebooks/07_sequenz/08_jd_hierarchisch-sequenzmodelle.ipynb`.
 
 ## Merkmalsnutzen je Modellfamilie
 
@@ -128,7 +128,7 @@ Merkmal, lineare Modelle können kein Verhältnis bilden – ihnen liefern Indiz
   lineare Modelle reichen die Indizes.
 - Die SVM bleibt mit Abstand das beste Modell.
 
-Details: `notebooks/41_jd_indizes_modellfamilien.ipynb`.
+Details: `notebooks/08_datenreduktion/04_jd_indizes-modellfamilien.ipynb`.
 
 ## Lohnt sich PCA?
 
@@ -191,7 +191,7 @@ in kleinen Komponenten – darum versagt PCA mit wenigen Komponenten.
 - Einschränkungen: Referenz ist die Vorverarbeitung aus #155 (CV 0,859), nicht AEZ × Monat
   (0,864); Zeiten aus einem Lauf ohne Wiederholung; alle k auf denselben Folds getunt.
 
-Details: `notebooks/42_jd_pca_studie.ipynb`, MLflow-Läufe `pca_study_*` im Experiment
+Details: `notebooks/08_datenreduktion/05_jd_pca-studie.ipynb`, MLflow-Läufe `pca_study_*` im Experiment
 `band-reduction` (z. B. Referenz `057c5238`, Knie k = 8 `e689bdf6`).
 
 ## Grenzen: unbekannte Aufnahmen
@@ -214,7 +214,7 @@ Gruppen-Folds halten eine ganze Zelle (bzw. einen Monat oder eine Region) aus de
   Sentinel-2 ist dort gleichauf oder besser.
 - Mehr Trainingsdaten (80/20 statt 70/30) helfen nur bei bekannten Aufnahmen.
 
-Details: `notebooks/34_jd_gruppen_cv.ipynb`, `notebooks/37_jd_hierarchisch_gruppen_cv.ipynb`.
+Details: `notebooks/02_validierung/02_jd_gruppen-cv.ipynb`, `notebooks/02_validierung/03_jd_hierarchisch-gruppen-cv.ipynb`.
 
 ## Was die Sentinel-2-Empfehlung bedeutet – und was nicht
 

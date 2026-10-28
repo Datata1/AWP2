@@ -1,7 +1,7 @@
 # Fehleranalyse
 
 Welche Klassen verwechselt werden, warum, und weshalb Baseline, kombinierter und hierarchischer
-Ansatz unterschiedlich abschneiden (#32). Notebook: `notebooks/10_jd_fehleranalyse.ipynb`,
+Ansatz unterschiedlich abschneiden (#32). Notebook: `notebooks/09_analyse/01_jd_fehleranalyse.ipynb`,
 Bausteine: `error_breakdown()`, `recall_by_class()`, `compare_predictions()`
 ([Einen Ansatz entwickeln](ansatz-entwickeln.md#5-ergebnis-ansehen)).
 
@@ -113,8 +113,8 @@ der Abstand von 0.022 über die Verteilung auf die Klassen.
 ## Was bedeutet das für die Vorverarbeitung?
 
 Die Fehleranalyse liefert Hypothesen; die folgenden Ablationen aus den Notebooks
-`09_jd_hierarchical_tuning.ipynb`, `08_duac1011_combined-svm-snv.ipynb`,
-`07_duac1011_combined-svm-pca.ipynb` und `07_duac1011_combined-svm-month-encoding.ipynb`
+`05_hierarchisch/03_jd_tuning.ipynb`, `04_kombiniert/09_duac1011_svm-snv.ipynb`,
+`08_datenreduktion/01_duac1011_svm-reduktionsverfahren.ipynb` und `04_kombiniert/08_duac1011_svm-monatskodierung.ipynb`
 prüfen sie ausschließlich per CV auf dem Trainingsteil.
 
 - **Absolute Helligkeit erhalten:** Die hellen, als Baumwolle erkannten Weizenspektren sprechen
@@ -189,7 +189,7 @@ Mais → Soja (22), Soja → Mais (22), Mais → Winterweizen (16), Soja → Win
 
 ## Alle hierarchischen Klassifikatoren
 
-Ergänzt in #104 (`notebooks/17_jd_hierarchical_vergleich.ipynb`): neun hierarchische
+Ergänzt in #104 (`notebooks/05_hierarchisch/10_jd_vergleich.ipynb`): neun hierarchische
 Klassifikatoren, siehe [Vergleich aller Klassifikatoren](ansaetze/hierarchisch.md#vergleich-aller-klassifikatoren).
 
 - In allen neun liegt der größere Teil der Fehler bei der Kultur (8,6–23 % falsche Kultur,
@@ -206,7 +206,7 @@ Klassifikatoren, siehe [Vergleich aller Klassifikatoren](ansaetze/hierarchisch.m
 
 Die ergänzende Analyse des PCA-20-Multi-Task-MLP steht in
 [Multi-Task](ansaetze/multi-task.md#fehleranalyse-pca-20-gegen-kombinierte-svm) und im Notebook
-`notebooks/11_duac1011_multi-task-fehleranalyse.ipynb`.
+`notebooks/06_multi-task/02_duac1011_mlp-fehleranalyse.ipynb`.
 
 - Gegen die kombinierte SVM liegt das MLP bei BAcc kombiniert um 0,102 zurück (0,764 vs. 0,866),
   obwohl beide ausschließlich gültige Paare ausgeben.
