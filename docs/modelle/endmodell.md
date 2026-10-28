@@ -19,6 +19,9 @@ make predict-automl   # reports/predictions/automl_final.csv
 uv run python tools/predict_combined_svm_aez_month.py --test-file <csv> --output <csv>
 ```
 
+Das Training braucht keinen Seed: SVM und Vorverarbeitung sind deterministisch (Vorhersagen mit
+Seed `None`, 42 und 7 sind identisch).
+
 Die CSV ist `test.csv` (`id`, `AEZ`, `Month`, alle Bänder) mit den zwei zusätzlichen Spalten
 `Crop` und `Stage`. Vorhersagen sind immer gültige
 Kultur-Stadium-Kombinationen, weil die Modelle auf der kombinierten Klasse trainieren.
