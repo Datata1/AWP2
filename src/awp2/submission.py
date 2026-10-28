@@ -64,7 +64,7 @@ def fit_and_predict_test(
     )
 
 
-def write_predictions(test: pd.DataFrame, path: Path) -> Path:
+def create_prediction(test: pd.DataFrame, path: Path) -> Path:
     """Write the test rows with their predicted columns as CSV, ``id`` as first column.
 
     Args:
@@ -93,5 +93,5 @@ def main(name: str, model: BaseEstimator, preprocessing: PreprocessingConfig) ->
     args = parser.parse_args()
 
     result = fit_and_predict_test(model, preprocessing, args.test_file)
-    path = write_predictions(result.test, args.output)
+    path = create_prediction(result.test, args.output)
     print(f"{name}: fitted on {result.train_rows} rows, wrote {len(result.test)} to {path}")
