@@ -17,7 +17,7 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.55em}
 \setlength{\emergencystretch}{2em}
-\graphicspath{{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
+\graphicspath{{img/}{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
 
 \title{Abschlussbericht\\Kulturpflanzen- und Entwicklungsstadiumsklassifikation}
 \author{Dom\"anenprojekt 2\\Team: AE-ROOT}
@@ -150,23 +150,139 @@ Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
 % zur Reproduktion bzw. Vorhersage auf den Abgabedaten referenzieren.
 
 \section{Modellvergleich und Auswahl}
+\label{sec:modellvergleich}
 
 \subsection{Baseline und untersuchte Strategien}
-% Baseline und tats\"achlich untersuchte Strategien beschreiben, beispielsweise
-% gemeinsame Klassen, hierarchische Klassifikation und Multi-Task-Learning.
-% Relevante Modellfamilien mit ihren Vor- und Nachteilen begr\"unden.
-% Suchr\"aume, Suchbudget und wichtigste gew\"ahlte Hyperparameter zusammenfassen.
-% Nur entscheidungsrelevante Experimente aufnehmen; vollst\"andige Laufhistorie
-% \"uber Experimentdokumentation und MLflow referenzieren.
+
+Alle Modelle durchlaufen dasselbe Verfahren: Hyperparameter werden per
+f\"unffacher Kreuzvalidierung (CV) auf dem Trainingsanteil gesucht, der
+CV-Gewinner wird genau einmal auf dem Holdout bewertet. Das
+Klassenungleichgewicht wird \"uber ausgeglichene Klassengewichte ber\"ucksichtigt.
+Als Untergrenze dient ein Dummy-Klassifikator, der immer die h\"aufigste Klasse
+vorhersagt (BAcc kombiniert 0,044). Die eigentliche Baseline ist ein Random
+Forest, der Kulturart und Stadium gemeinsam vorhersagt (0,743); er liefert
+vereinzelt unm\"ogliche Kombinationen (0,3\,\%).
+
+Verglichen wurden vier Strategien, die sich darin unterscheiden, wie die
+Abh\"angigkeit zwischen Kulturart und Stadium genutzt wird:
+
+\begin{itemize}
+	\item \textbf{Kombinierte Klasse:} Kulturart und Stadium bilden zusammen eine
+		von 23 Klassen (\texttt{Crop|Stage}). Es entstehen nur beobachtete Paare;
+		seltene Paare haben jedoch wenige Beispiele (Baumwolle/\texttt{Harvest}: 11).
+	\item \textbf{Hierarchisch:} Zuerst wird die Kulturart bestimmt, dann entscheidet
+		ein eigenes Modell je Kultur \"uber das Stadium. Jeder Kulturfehler wird
+		damit zum Stadiumsfehler.
+	\item \textbf{Multi-Task:} Ein neuronales Netz mit gemeinsamen Schichten und
+		zwei Ausg\"angen sagt beide Gr\"o\ss en vorher.
+	\item \textbf{Sequenzmodelle:} 1D-CNN, LSTM und GRU lesen das Spektrum als
+		geordnete Folge entlang der Wellenl\"ange (keine Zeitreihe).
+\end{itemize}
+
+Unabh\"angig trainierte Einzelmodelle f\"ur Kulturart und Stadium wurden nicht
+untersucht. Als Klassifikatoren dienten RBF-SVM, Baum-Ensembles (Random Forest,
+Extra Trees, HistGradientBoosting), lineare Modelle, kNN und MLP. Die SVM passt zu
+stark korrelierten B\"andern, weil sie glatte nichtlineare Grenzen lernt; sie
+braucht standardisierte Eingaben. Baumverfahren sind unempfindlich gegen die
+Skalierung und dienen als Gegenprobe. Die Suchr\"aume blieben klein (meist unter
+30 Kandidaten, f\"ur die zweistufige SVM 144). Eine sp\"atere breite Suche
+pr\"ufte zus\"atzlich 384 Kandidaten (acht Modellkonfigurationen, sechs
+Vorverarbeitungen, acht Einstellungen). Die vollst\"andige Laufhistorie steht im
+Experimentprotokoll der Projektdokumentation und in MLflow.
 
 \subsection{Vergleich und finales Modell}
-% Modelle unter vergleichbaren Splits, Metriken und Eingaben gegen\"uberstellen.
-% Unterschiede in Suchbudget oder Evaluationsbedingungen kenntlich machen.
-% Eine kompakte Ergebnistabelle mit Baseline und wichtigsten Kandidaten zeigen.
-% CV-Ergebnisse und Holdout-Ergebnisse getrennt kennzeichnen; vorhandene
-% Streuungen berichten, keine Unsicherheiten ohne entsprechende Messung angeben.
-% Modellwahl anhand der vorab benannten Kriterien begr\"unden; Leistung,
-% Komplexit\"at, Rechenaufwand und Robustheit gegeneinander abw\"agen.
+
+Tabelle~\ref{tab:vergleich} stellt die wichtigsten Kandidaten gegen\"uber. Die
+Werte stammen aus zwei Splitprotokollen (70/30 bis zum 20.\,Oktober, danach
+80/20) und sind nur innerhalb eines Blocks vergleichbar. CV-Werte sind
+Mittelwerte der f\"unf Trainingsfolds, Holdout-Werte einmalige Bewertungen.
+
+\begin{table}[htbp]
+	\centering
+	\small
+	\begin{tabular}{@{}lccccc@{}}
+		\toprule
+		& CV & \multicolumn{3}{c}{Holdout-BAcc} & Macro-F1 \\
+		\cmidrule(lr){3-5}
+		Modell & komb. & Crop & Stage & komb. & komb. \\
+		\midrule
+		\multicolumn{6}{@{}l}{\emph{Split 80/20}} \\
+		Kombiniert, RBF-SVM mit AEZ\,$\times$\,Monat & 0,864 & 0,923 & 0,922 & 0,869 & 0,859 \\
+		Kombiniert, RBF-SVM (breite Suche) & 0,867 & 0,932 & 0,920 & 0,883 & 0,858 \\
+		Hierarchisch, SVM $\to$ SVM & 0,846 & 0,918 & 0,905 & 0,845 & 0,827 \\
+		Kombiniert, GRU (10 Sentinel-2-B\"ander) & 0,794 & 0,908 & 0,890 & 0,832 & 0,773 \\
+		\midrule
+		\multicolumn{6}{@{}l}{\emph{Split 70/30}} \\
+		Dummy (h\"aufigste Klasse) & -- & 0,200 & 0,167 & 0,044 & 0,009 \\
+		Baseline: Random Forest & 0,750 & 0,890 & 0,870 & 0,743 & 0,708 \\
+		Kombiniert, Random Forest & 0,788 & 0,874 & 0,876 & 0,779 & 0,762 \\
+		Kombiniert, Extra Trees & 0,812 & 0,886 & 0,895 & 0,804 & 0,796 \\
+		Kombiniert, RBF-SVM & 0,847 & 0,931 & 0,906 & 0,866 & 0,830 \\
+		Hierarchisch, SVM $\to$ SVM & 0,839 & 0,920 & 0,902 & 0,844 & 0,820 \\
+		Multi-Task-MLP (PCA-20) & 0,728 & 0,920 & 0,902 & 0,765 & 0,726 \\
+		Kombiniert, LSTM (Embeddings) & 0,711 & 0,812 & 0,793 & 0,700 & 0,613 \\
+		Kombiniert, 1D-CNN & 0,611 & 0,819 & 0,712 & 0,626 & 0,559 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Wichtigste Kandidaten. Alle Modelle au\ss er der Random-Forest-Baseline
+		sagen nur g\"ultige Crop-Stage-Paare vorher. BAcc: Balanced Accuracy;
+		komb.: gemeinsame Crop-Stage-Klasse.}
+	\label{tab:vergleich}
+\end{table}
+
+Die kombinierte RBF-SVM liegt in beiden Protokollen vorn. Im 70/30-Split
+erreicht sie 0,866 und damit 0,12 mehr als die Baseline und 0,06 mehr als Extra
+Trees. Die hierarchische SVM bleibt in beiden Protokollen rund 0,02 darunter.
+Werden die Stadien mit der wahren Kultur angesteuert, steigt sie auf 0,94; der
+Engpass ist also die Kulturstufe, vor allem Winterweizen gegen Baumwolle und
+Mais gegen Soja. Weiches Routing, gemischte Klassifikatoren je Stufe und eine
+gewichtete Abstimmung brachten keinen CV-Gewinn von mindestens 0,005, der
+vorab als Mindestschwelle festgelegt war.
+
+Das Multi-Task-Netz erreicht bei Kulturart und Stadium fast die SVM, aber nur
+0,765 f\"ur das Paar. Sequenzmodelle bleiben deutlich zur\"uck; ein GRU auf
+zehn Sentinel-2-B\"andern ist mit 0,832 das beste davon. Bei rund 4.500
+Trainingszeilen bringen die neuronalen Netze keinen Vorteil.
+
+Zur zweiten Untersuchungsfrage: AEZ und Monat tragen am meisten. Ohne sie f\"allt
+die SVM von 0,845 auf 0,779 (70/30). Vegetationsindizes helfen der SVM nicht
+(0,842), verbessern aber Baumverfahren und logistische Regression in der CV um
+0,015 bis 0,029. SNV, PCA-20 und andere Monatskodierungen brachten keinen
+Gewinn; nur AEZ-Monat-Indikatoren verbesserten die SVM geringf\"ugig (CV +0,005,
+Holdout +0,003).
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.85\linewidth]{modellfamilien_cv.png}
+	\caption{Beste CV-BAcc je Modellkonfiguration der breiten Suche (80/20, je
+		48 Kandidaten; Balken: Standardabweichung \"uber die f\"unf Folds). Das
+		Maximum \"uber 48 Kandidaten macht alle Werte optimistisch.}
+	\label{fig:modellfamilien}
+\end{figure}
+
+Abbildung~\ref{fig:modellfamilien} pr\"uft, ob die Rangfolge von der
+Hyperparameterwahl abh\"angt. Die SVM erreicht die h\"ochste CV-BAcc (0,867),
+gefolgt von Extra Trees (0,861) und SVM $\to$ Extra Trees (0,860). Die
+Abst\"ande liegen innerhalb der Fold-Streuung von 0,013 bis 0,020; eine
+verl\"assliche Reihenfolge der Spitzengruppe und ein Vorteil von kombiniert oder
+hierarchisch sind damit nicht belegt. Am schw\"achsten sind
+HistGradientBoosting (0,827) und Extra Trees $\to$ HGB (0,839); beide brauchen
+je Kandidat (f\"unf CV-Anpassungen) im Median rund 107 beziehungsweise 175\,s
+statt 4\,s f\"ur die SVM.
+
+\textbf{Modellwahl.} Entscheidend war die CV-BAcc kombiniert; der Holdout dient
+nur als einmalige Best\"atigung. Zus\"atzlich z\"ahlen g\"ultige Paare, geringer
+Rechenaufwand und Robustheit. Bei unbekannten Aufnahmen ist die hierarchische
+SVM etwas besser (0,42 statt 0,38), beide Modelle fallen jedoch stark ab
+(Kapitel~6). Gew\"ahlt wird daher die einfachere kombinierte RBF-SVM auf allen
+131 B\"andern mit AEZ-Monat-Indikatoren ($C=300$, $\gamma=0{,}003$): 0,869
+BAcc kombiniert auf dem Holdout. Die breite Suche landet in derselben
+Modellfamilie und findet mit gegl\"atteten Spektren, Albedo und Indizes eine
+Variante mit 0,883. Der Abstand liegt innerhalb der CV-Streuung und wurde auf
+einem mehrfach genutzten Holdout gemessen; er best\"atigt die Modellfamilie,
+belegt aber keine gesicherte Verbesserung.
+% ENTSCHEIDUNG: Abgabemodell laut Doku auf main ist combined_svm_aez_month (Run 17dc9e16);
+% der AutoML-Gewinner (Run c99e3915, 0,883) ist als zweites Modell eingefroren.
 
 \section{Datenreduktion}
 % Vollst\"andigen Input und ausgew\"ahlte reduzierte Varianten vergleichen.
