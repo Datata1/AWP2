@@ -22,12 +22,13 @@ class Submission(NamedTuple):
 
     Attributes:
         pipeline: Preprocessing + model, fitted on all labelled rows.
-        predictions: Columns ``Crop`` and ``Stage``, indexed by the ``id`` of the test rows.
+        test: The test rows (``AEZ``, ``Month``, bands) with the predicted columns ``Crop`` and
+            ``Stage`` appended, indexed by ``id``.
         train_rows: Number of labelled rows the pipeline was fitted on.
     """
 
     pipeline: Pipeline
-    predictions: pd.DataFrame
+    test: pd.DataFrame
     train_rows: int
 
 
@@ -46,7 +47,8 @@ def fit_and_predict_test(
         test_file: CSV file with the unlabelled rows to predict.
 
     Returns:
-        The fitted pipeline, the predictions and the number of training rows.
+        The fitted pipeline, the test rows with the predicted columns and the number of training
+            rows.
     """
     dataset = prepare_dataset(load_train())
     pipeline = Pipeline(
@@ -55,21 +57,25 @@ def fit_and_predict_test(
     pipeline.fit(dataset.X, dataset.y)
     X_test = load_test(test_file)
     predictions = as_target_frame(pipeline.predict(X_test), X_test.index)
-    return Submission(pipeline=pipeline, predictions=predictions, train_rows=len(dataset.X))
+    return Submission(
+        pipeline=pipeline,
+        test=pd.concat([X_test, predictions], axis=1),
+        train_rows=len(dataset.X),
+    )
 
 
-def write_predictions(predictions: pd.DataFrame, path: Path) -> Path:
-    """Write predictions as CSV with the ``id`` as first column.
+def write_predictions(test: pd.DataFrame, path: Path) -> Path:
+    """Write the test rows with their predicted columns as CSV, ``id`` as first column.
 
     Args:
-        predictions: Columns ``Crop`` and ``Stage``, indexed by ``id``.
+        test: Test rows with the appended columns ``Crop`` and ``Stage``, indexed by ``id``.
         path: Target file; missing parent directories are created.
 
     Returns:
         ``path``.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    predictions.rename_axis(ID_COL).to_csv(path)
+    test.rename_axis(ID_COL).to_csv(path)
     return path
 
 
@@ -87,5 +93,5 @@ def main(name: str, model: BaseEstimator, preprocessing: PreprocessingConfig) ->
     args = parser.parse_args()
 
     result = fit_and_predict_test(model, preprocessing, args.test_file)
-    path = write_predictions(result.predictions, args.output)
-    print(f"{name}: fitted on {result.train_rows} rows, wrote {len(result.predictions)} to {path}")
+    path = write_predictions(result.test, args.output)
+    print(f"{name}: fitted on {result.train_rows} rows, wrote {len(result.test)} to {path}")
