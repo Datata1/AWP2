@@ -66,6 +66,12 @@ Die lineare Interpolation einzelner Bandlücken ist standardmäßig auf Stützb�
 15 nm Abstand begrenzt. Bei größeren Abständen wird der nähere Messwert übernommen; die Grenze
 lässt sich über `PreprocessingConfig(max_interpolation_gap_nm=...)` anpassen.
 
+Die Implementierung ist im Paket `awp2.preprocessing` nach Verantwortung aufgeteilt:
+Bandtransformationen, Indizes, Reduktionen, Metadaten, Konfiguration, Pipeline-Aufbau und
+Darstellung. Öffentliche Imports bleiben unverändert; die
+[API-Referenz](../referenz/preprocessing.md) beschreibt die Zuständigkeiten und den
+Erweiterungspfad.
+
 `AEZ` wird one-hot-kodiert. Standardmäßig ersetzt die zyklische Kodierung den numerischen
 `Month` durch `Month_sin` und `Month_cos` mit einer Jahresperiode von 12 Monaten. Bei
 `scale=True` werden diese beiden Merkmale mit dem Trainingsfold skaliert. Für den Vergleich mit
@@ -73,158 +79,32 @@ der numerischen Monatszahl kann `PreprocessingConfig(use_cyclic_month=False)` ge
 
 ### Ablauf der Vorverarbeitung
 
-Datensicht: durchgezogen = immer, gestrichelt = optional (entfällt wenn deaktiviert),
-Rauten = Verzweigung (Skalierung: genau eine Option, Reduktion: höchstens eine, Monat:
-je nach `use_cyclic_month`). Jedes Kästchen nennt seine `PreprocessingConfig`-Felder.
-Grafik generiert (`pipeline_options_diagram`) – bei Pipeline-Änderungen neu erzeugen,
-`tools/check_pipeline_diagram.py` (CI) prüft Stand und Vollständigkeit:
+Die spektralen Schritte laufen in der angegebenen Reihenfolge. Metadaten und zusätzliche
+Merkmale werden in unabhängigen Zweigen verarbeitet und anschließend mit den Spektren
+zusammengeführt. Alle lernenden Schritte werden nur auf dem jeweiligen Trainingsfold gefittet.
 
-```bash
-uv run python -c "from awp2.preprocessing import pipeline_options_diagram; print(pipeline_options_diagram())"
-```
+| Zweig | Schritt | Option und Einschränkung |
+| --- | --- | --- |
+| Spektren | Regionen auswählen | `spectral_regions`; vor Interpolation und allen Spektralzweigen; `()` ergibt ein Metadatenmodell |
+| Spektren | Pro Aufnahme zentrieren | `use_acquisition_centering`; zieht das mittlere Trainingsspektrum je AEZ × Monat ab, vor allen anderen Spektralschritten; unbekannte Aufnahmen nutzen den Gesamtmittelwert; nicht mit NMF oder OSP kombinierbar |
+| Spektren | Spektren abschalten | `use_spectra=False`; behält nur die übrigen Merkmalsgruppen, keine Spektralschritte erlaubt |
+| Alle Spektralzweige | Leere Bänder entfernen und Lücken auffüllen | Immer aktiv; `max_interpolation_gap_nm` begrenzt die lineare Interpolation |
+| Spektren | Sentinel-2 simulieren | `spectral_sensor="sentinel2"`; mittelt die Bänder in die 10 Sentinel-2-Oberflächenbänder; nicht mit Savitzky-Golay oder `spectral_band_step` kombinierbar |
+| Spektren | Savitzky-Golay-Glättung | `use_savgol` mit `savgol_window_length` und `savgol_polyorder`; getrennt nach Wellenlängensegment |
+| Spektren | SNV-Streukorrektur | `use_spectral_snv`; entfernt die Helligkeit pro Spektrum |
+| Spektren | Jedes n-te Band | `spectral_band_step`; simuliert eine gröbere spektrale Auflösung, nach SNV |
+| Spektren | Skalieren oder zentrieren | Höchstens eine der Optionen `use_spectral_standard_scale`, `use_spectral_minmax_scale`, `use_spectral_centering` |
+| Spektren | Dimension reduzieren | Höchstens ein Verfahren; Optionen und Voraussetzungen siehe Tabelle unten |
+| Metadaten | AEZ und Monat kodieren | `use_meta`; Monat standardmäßig zyklisch, mit `use_cyclic_month=False` numerisch |
+| Metadaten | Kategorialen Kontext erhalten | `use_categorical_context`; ersetzt One-Hot-AEZ und Monatskodierung durch die Rohspalten |
+| Zusatzmerkmale | Mean Albedo | `use_mean_albedo`; Mittelwert nach Interpolation, ohne SNV, mit derselben Skalierung wie die Spektren |
+| Zusatzmerkmale | Vegetationsindizes | `use_vegetation_indices`; aus interpolierten Reflektanzen ohne SNV, fehlende Werte per Trainingsmedian, anschließend wie Spektren skaliert |
+| Zusatzmerkmale | PC_1 und PC_2 | `use_principal_components`; eigener Zweig mit Standardisierung und PCA |
+| Metadaten | AEZ × Monat | `use_aez_month`; benötigt `use_meta`, nicht mit kategorialem Kontext kombinierbar |
 
-<!-- pipeline-options-diagram:start -->
-```mermaid
-flowchart TD
-    X["Rohdaten (Meta + Bänder)"]
-    subgraph meta
-        n_aez_aez["AEZ one-hot [use_meta]"]
-        d_month{"Monat [use_meta]"}
-        n_month_cyclic["Monat sin/cos [use_cyclic_month]"]
-        n_month_month["Monat numerisch [use_cyclic_month = False]"]
-        n_aez_month_aez_month["AEZ × Monat one-hot [use_aez_month]"]
-    end
-    subgraph albedo
-        n_albedo_drop_empty["Leere Bänder entfernen (immer)"]
-        n_albedo_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
-        n_albedo_albedo["Mean Albedo [use_mean_albedo]"]
-        n_albedo_standard_scale["Standard (wie Spektren)"]
-        n_albedo_minmax_scale["Min-Max (wie Spektren)"]
-        n_albedo_centering["Zentrierung (wie Spektren)"]
-        n_albedo_no_scaler["keine Skalierung (wie Spektren)"]
-    end
-    subgraph indizes
-        n_indices_drop_empty["Leere Bänder entfernen (immer)"]
-        n_indices_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
-        n_indices_indices["Vegetationsindizes [use_vegetation_indices]"]
-        n_indices_select["Nur Indizes behalten"]
-        n_indices_impute["Fehlende Indizes: Median (Training)"]
-        n_indices_standard_scale["Standard [use_spectral_standard_scale]"]
-        n_indices_minmax_scale["Min-Max [use_spectral_minmax_scale]"]
-        n_indices_centering["Zentrierung [use_spectral_centering]"]
-        n_indices_no_scaler["keine Skalierung [Standard]"]
-    end
-    subgraph hauptkomponenten
-        n_principal_components_drop_empty["Leere Bänder entfernen (immer)"]
-        n_principal_components_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
-        n_principal_components_standard_scale["Standard (immer)"]
-        n_principal_components_pca["PC_1 + PC_2 [use_principal_components]"]
-    end
-    subgraph spektren
-        n_spectra_acquisition_centering["Pro Aufnahme zentrieren [use_acquisition_centering]"]
-        n_spectra_drop_empty["Leere Bänder entfernen [use_spectra, Standard]"]
-        n_spectra_interpolate["Lücken interpolieren (immer, max_interpolation_gap_nm)"]
-        n_spectra_sensor["Sentinel-2 simulieren [spectral_sensor = sentinel2]"]
-        n_spectra_savgol["Savitzky-Golay [use_savgol + savgol_window_length + savgol_polyorder]"]
-        n_spectra_snv["SNV [use_spectral_snv]"]
-        n_spectra_band_step["Jedes n-te Band [spectral_band_step]"]
-    end
-    subgraph skalierung
-        d_scaler{"Skalierung (XOR)"}
-        n_spectra_standard_scale["Standard [use_spectral_standard_scale]"]
-        n_spectra_minmax_scale["Min-Max [use_spectral_minmax_scale]"]
-        n_spectra_centering["Zentrierung [use_spectral_centering]"]
-        n_spectra_no_scaler["keine Skalierung [Standard]"]
-    end
-    subgraph reduktion
-        d_reduction{"Reduktion (max. eine)"}
-        n_spectra_pca["PCA [spectral_pca_components | braucht Standard/Center]"]
-        n_spectra_select_k["Bandauswahl [spectral_select_k + spectral_select_score | überwacht, je Fold]"]
-        n_spectra_ica["ICA [spectral_ica_components | braucht Standard/Center]"]
-        n_spectra_nmf["NMF [spectral_nmf_components | nur roh: ohne SG/SNV/Skalierer/Indizes]"]
-        n_spectra_osp["OSP [spectral_osp_components | nur roh: ohne SNV/Skalierer/Indizes]"]
-        n_spectra_lpp["LPP [spectral_lpp_components + spectral_lpp_neighbors]"]
-        n_spectra_vsrp["VSRP [spectral_vsrp_components]"]
-        n_spectra_dbn["DBN [spectral_dbn_layers | braucht Min-Max]"]
-        n_spectra_no_reduction["keine Reduktion [Standard]"]
-    end
-        d_concat["Merkmale (verkettet)"]
-    X -.-> n_aez_aez
-    X -.-> d_month
-    d_month -->|"Standard"| n_month_cyclic
-    d_month -->|"False"| n_month_month
-    X --> n_albedo_drop_empty
-    X --> n_indices_drop_empty
-    X -.-> n_spectra_acquisition_centering
-    n_spectra_acquisition_centering -.-> n_spectra_drop_empty
-    X -.-> n_aez_month_aez_month
-    n_albedo_drop_empty --> n_albedo_interpolate
-    n_albedo_interpolate -.-> n_albedo_albedo
-    n_albedo_albedo --> n_albedo_standard_scale
-    n_albedo_standard_scale --> d_concat
-    n_albedo_albedo --> n_albedo_minmax_scale
-    n_albedo_minmax_scale --> d_concat
-    n_albedo_albedo --> n_albedo_centering
-    n_albedo_centering --> d_concat
-    n_albedo_albedo --> n_albedo_no_scaler
-    n_albedo_no_scaler --> d_concat
-    n_indices_drop_empty --> n_indices_interpolate
-    n_indices_interpolate -.-> n_indices_indices
-    n_indices_indices --> n_indices_select
-    n_indices_select --> n_indices_impute
-    n_indices_impute -.-> n_indices_standard_scale
-    n_indices_standard_scale --> d_concat
-    n_indices_impute -.-> n_indices_minmax_scale
-    n_indices_minmax_scale --> d_concat
-    n_indices_impute -.-> n_indices_centering
-    n_indices_centering --> d_concat
-    n_indices_impute --> n_indices_no_scaler
-    n_indices_no_scaler --> d_concat
-    X -.-> n_principal_components_drop_empty
-    n_principal_components_drop_empty -.-> n_principal_components_interpolate
-    n_principal_components_interpolate -.-> n_principal_components_standard_scale
-    n_principal_components_standard_scale -.-> n_principal_components_pca
-    n_principal_components_pca --> d_concat
-    n_spectra_drop_empty --> n_spectra_interpolate
-    n_spectra_interpolate -.-> n_spectra_sensor
-    n_spectra_sensor -.-> n_spectra_savgol
-    n_spectra_savgol -.-> n_spectra_snv
-    n_spectra_snv -.-> n_spectra_band_step
-    n_spectra_band_step --> d_scaler
-    d_scaler --> n_spectra_standard_scale
-    n_spectra_standard_scale --> d_reduction
-    d_scaler --> n_spectra_minmax_scale
-    n_spectra_minmax_scale --> d_reduction
-    d_scaler --> n_spectra_centering
-    n_spectra_centering --> d_reduction
-    d_scaler --> n_spectra_no_scaler
-    n_spectra_no_scaler --> d_reduction
-    d_reduction --> n_spectra_pca
-    n_spectra_pca --> d_concat
-    d_reduction --> n_spectra_select_k
-    n_spectra_select_k --> d_concat
-    d_reduction --> n_spectra_ica
-    n_spectra_ica --> d_concat
-    d_reduction --> n_spectra_nmf
-    n_spectra_nmf --> d_concat
-    d_reduction --> n_spectra_osp
-    n_spectra_osp --> d_concat
-    d_reduction --> n_spectra_lpp
-    n_spectra_lpp --> d_concat
-    d_reduction --> n_spectra_vsrp
-    n_spectra_vsrp --> d_concat
-    d_reduction --> n_spectra_dbn
-    n_spectra_dbn --> d_concat
-    d_reduction --> n_spectra_no_reduction
-    n_spectra_no_reduction --> d_concat
-    n_aez_aez --> d_concat
-    n_month_cyclic --> d_concat
-    n_month_month --> d_concat
-    n_albedo_albedo --> d_concat
-    n_aez_month_aez_month --> d_concat
-    n_indices_select --> d_concat
-```
-<!-- pipeline-options-diagram:end -->
+Die veraltete Option `scale=True` skaliert zusätzlich die Monatsmerkmale und bleibt für
+bestehende Experimente erhalten. Die konkreten Schritte einer Konfiguration können mit
+`describe_preprocessor(build_preprocessor(config))` als Text ausgegeben werden.
 
 ### Dimensionsreduktion
 
@@ -235,6 +115,7 @@ Hyperspektraldaten ([Lupu et al.](https://www.researchgate.net/publication/39028
 | Methode | Feld | Skalierung | Hinweis |
 | --- | --- | --- | --- |
 | PCA | `spectral_pca_components` | Standard-Scaler oder Zentrierung (`use_spectral_centering`) | Varianz-maximierende Komponenten |
+| Bandauswahl | `spectral_select_k` + `spectral_select_score` | Beliebig | Überwacht: die k Bänder mit dem höchsten univariaten Score (`f_classif` oder `mutual_info`) gegen das kombinierte Crop-/Stage-Label, je Trainingsfold |
 | ICA | `spectral_ica_components` | Standard-Scaler oder Zentrierung | Statistisch unabhängige Komponenten (FastICA, whitened intern) |
 | NMF | `spectral_nmf_components` | Keine (rohe Reflektanzen) | Multiplikative Updates; sklearn kennt nur NNDSVD/Random-Init |
 | OSP | `spectral_osp_components` | Keine (rohe Spektren) | Automatische Zielgenerierung: iterative Endmember, Projektion darauf |

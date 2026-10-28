@@ -11,6 +11,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+EXTERNAL_DATA_DIR = DATA_DIR / "external"  # third-party reference data, downloaded, not in git
 
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -40,6 +41,8 @@ MONTH_SIN_COL = f"{MONTH_COL}_sin"
 MONTH_COS_COL = f"{MONTH_COL}_cos"
 BAND_PREFIX = "X"
 BAND_PATTERN = rf"^{BAND_PREFIX}\d+$"
+NDVI_RED_BAND = "X671"
+NDVI_NIR_BAND = "X854"
 INDEX_WAVELENGTH_TOLERANCE_NM = 5
 # Hyperion samples every ~10 nm; a larger step marks a block of deleted bands.
 BAND_GAP_NM = 20
@@ -459,6 +462,23 @@ SENTINEL2_BANDS: tuple[SensorBand, ...] = (
     SensorBand("B11", 1614, 91),
     SensorBand("B12", 2202, 175),
 )
+
+# Measured Sentinel-2 MSI spectral response functions (ESA, COPE-GSEG-EOPG-TN-15-0007).
+# SentiWiki attachment URLs carry a content hash, so a pinned URL keeps serving this version.
+SENTINEL2_SRF_VERSION = "5.0"
+SENTINEL2_SRF_URL = (
+    "https://sentiwiki.copernicus.eu/__attachments/"
+    "a_ad595cc9fa0018a4e9eb28e1e234124a751149b5933b0b8b1f6b80612eaab586/"
+    "sentinel-2-spectral-response-functions-v5.xlsx"
+)
+SENTINEL2_SRF_SHA256 = "42be3ebd8bfcbde11c37caeb2e2fdda65fefa8d2b6f8329559b7806d02cdc9e2"
+SENTINEL2_SRF_FILE = EXTERNAL_DATA_DIR / f"sentinel2_srf_v{SENTINEL2_SRF_VERSION}.xlsx"
+Sentinel2Platform = Literal["S2A", "S2B"]
+SENTINEL2A_PLATFORM, SENTINEL2B_PLATFORM = get_args(Sentinel2Platform)
+SENTINEL2_SRF_SHEET = "Spectral Responses ({platform})"
+SENTINEL2_SRF_WAVELENGTH_COL = "SR_WL"
+SENTINEL2_SRF_BAND_PATTERN = r"^S2[AB]_SR_AV_(B\w+)$"  # group 1 is the band name, e.g. "B8A"
+DOWNLOAD_TIMEOUT_S = 60
 
 ReductionFamily = Literal[
     "all_bands", "pca", "band_selection", "band_step", "sentinel2", "indices_only", "meta_only"

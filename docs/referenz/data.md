@@ -1,7 +1,7 @@
 # awp2.data
 
 Alles rund um die Daten: Artefakte laden (`load_split`, `load_folds`), Datensatz und Split
-berechnen, Rohdaten laden und prüfen. Im Alltag reicht meist `from awp2.data import load_split`.
+berechnen, Rohdaten laden und prüfen, externe Referenzdaten (Sentinel-2-SRF) laden. Im Alltag reicht meist `from awp2.data import load_split`.
 
 ::: awp2.data.artifacts
 
@@ -10,3 +10,5 @@ berechnen, Rohdaten laden und prüfen. Im Alltag reicht meist `from awp2.data im
 ::: awp2.data.load
 
 ::: awp2.data.schema
+
+::: awp2.data.external
