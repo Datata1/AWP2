@@ -61,7 +61,7 @@ Alle getunten Varianten liegen als Fabriken in `awp2.models.tuned` (z. B. `tuned
 `refit_untracked()` baut sie ohne MLflow nach und reproduziert die protokollierten
 Validierungswerte exakt; so laufen die Notebooks auch ohne den lokalen MLflow-Speicher.
 
-Notebook: `notebooks/07_jd_hierarchical.ipynb` (#87). Alle Varianten mit derselben
+Notebook: `notebooks/05_hierarchisch/01_jd_erste-klassifikatoren.ipynb` (#87). Alle Varianten mit derselben
 Vorverarbeitung: standardisierte Spektren, AEZ one-hot, Monat zyklisch
 (`PreprocessingConfig(use_spectral_standard_scale=True)`). Die Referenz `combined_svm_expanded`
 (0.866) lief noch mit numerischem Monat; als fairer Vergleich wurde die kombinierte SVM mit
@@ -109,7 +109,7 @@ derselben Vorverarbeitung und demselben Raster **nur per CV** neu getunt
 
 ### RBF-SVM → RBF-SVM, weiches Routing
 
-Notebook: `notebooks/08_jd_hierarchical_soft.ipynb` (#88). Statt der harten Kulturentscheidung
+Notebook: `notebooks/05_hierarchisch/02_jd_weiches-routing.ipynb` (#88). Statt der harten Kulturentscheidung
 gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
 (`HierarchicalClassifier(routing="soft")`); die SVMs bekommen Wahrscheinlichkeiten über
 `CalibratedClassifierCV` (Sigmoid, `ensemble=False`).
@@ -145,7 +145,7 @@ gewinnt das gültige Paar mit dem höchsten P(Kultur) · P(Stadium | Kultur)
 
 ### RBF-SVM → RBF-SVM: Tuning und Vorverarbeitung
 
-Notebook: `notebooks/09_jd_hierarchical_tuning.ipynb` (#89). Jede Entscheidung per CV; ein
+Notebook: `notebooks/05_hierarchisch/03_jd_tuning.ipynb` (#89). Jede Entscheidung per CV; ein
 Gewinn unter 0.005 gilt als Rauschen (Std der Referenz über die Folds 0.010).
 
 | Schritt | Ergebnis (CV kombiniert) | MLflow |
@@ -223,7 +223,7 @@ trotz nur 66 Zeilen perfekt. Eigene Hyperparameter je Kultur unterstützt
 
 ### LDA → LDA
 
-Notebook: `notebooks/11_jd_hierarchical_lda.ipynb` (#98). Lineare Diskriminanzanalyse mit
+Notebook: `notebooks/05_hierarchisch/04_jd_lda.ipynb` (#98). Lineare Diskriminanzanalyse mit
 Shrinkage – ein Klassiker für stark korrelierte Spektralbänder. Plain LDA nimmt die
 Klassenhäufigkeiten als Priors und bevorzugt so häufige Klassen; `BalancedLinearDiscriminantAnalysis`
 setzt gleiche Priors (wie `class_weight="balanced"`).
@@ -241,7 +241,7 @@ setzt gleiche Priors (wie `class_weight="balanced"`).
 
 ### Logistische Regression → logistische Regression
 
-Notebook: `notebooks/12_jd_hierarchical_logreg.ipynb` (#99). Multinomiale logistische Regression
+Notebook: `notebooks/05_hierarchisch/05_jd_logreg.ipynb` (#99). Multinomiale logistische Regression
 mit `class_weight="balanced"` – die einfachste lineare Referenz mit Klassengewichten.
 
 - Suche `hierarchical_logreg_search` (16 Kandidaten): Kultur `C=10`, Stadium `C=100`
@@ -255,7 +255,7 @@ mit `class_weight="balanced"` – die einfachste lineare Referenz mit Klassengew
 
 ### PLS-DA → PLS-DA
 
-Notebook: `notebooks/13_jd_hierarchical_plsda.ipynb` (#100). `PLSDAClassifier` verdichtet die
+Notebook: `notebooks/05_hierarchisch/06_jd_plsda.ipynb` (#100). `PLSDAClassifier` verdichtet die
 Bänder per PLS überwacht auf wenige Komponenten und klassifiziert sie mit einer LDA mit gleichen
 Priors – ein Standard der Spektroskopie.
 
@@ -273,7 +273,7 @@ Priors – ein Standard der Spektroskopie.
 
 ### kNN → kNN
 
-Notebook: `notebooks/14_jd_hierarchical_knn.ipynb` (#101). k-Nearest Neighbors klassifiziert über
+Notebook: `notebooks/05_hierarchisch/07_jd_knn.ipynb` (#101). k-Nearest Neighbors klassifiziert über
 die ähnlichsten Trainingsspektren; der Kosinus-Abstand misst den Winkel zwischen Spektren
 (verwandt mit dem Spectral Angle Mapper). Klassengewichte gibt es nicht, `weights="distance"`
 mildert das nur.
@@ -291,7 +291,7 @@ mildert das nur.
 
 ### MLP → MLP
 
-Notebook: `notebooks/15_jd_hierarchical_mlp.ipynb` (#102). Kleines neuronales Netz
+Notebook: `notebooks/05_hierarchisch/08_jd_mlp.ipynb` (#102). Kleines neuronales Netz
 (`MLPClassifier`) je Stufe mit frühem Stoppen und ausgeglichenen Gewichten
 (`balance_samples=True`, je Stufe umskaliert).
 
@@ -308,7 +308,7 @@ Notebook: `notebooks/15_jd_hierarchical_mlp.ipynb` (#102). Kleines neuronales Ne
 
 ### HistGradientBoosting → HistGradientBoosting
 
-Notebook: `notebooks/16_jd_hierarchical_hgb.ipynb` (#103). Gradient Boosting je Stufe mit
+Notebook: `notebooks/05_hierarchisch/09_jd_hgb.ipynb` (#103). Gradient Boosting je Stufe mit
 ausgeglichenen Gewichten (`balance_samples=True`). Ein Fit dauert rund 30 s, daher nur eine
 kleine Suche über die Lernrate je Stufe.
 
@@ -325,7 +325,7 @@ kleine Suche über die Lernrate je Stufe.
 
 ### Vergleich aller Klassifikatoren
 
-Notebook: `notebooks/17_jd_hierarchical_vergleich.ipynb` (#104). Alle Bewertungsläufe aus MLflow
+Notebook: `notebooks/05_hierarchisch/10_jd_vergleich.ipynb` (#104). Alle Bewertungsläufe aus MLflow
 geladen, nichts neu trainiert.
 
 | Klassifikator | CV | Validierung | Kultur falsch | nur Stadium falsch | Oracle-Kultur |
@@ -369,7 +369,7 @@ geladen, nichts neu trainiert.
 
 ### Ensemble: gewichtete Abstimmung
 
-Notebook: `notebooks/18_jd_hierarchical_ensemble.ipynb` (#113). `CropStageVotingClassifier` lässt
+Notebook: `notebooks/05_hierarchisch/11_jd_ensemble.ipynb` (#113). `CropStageVotingClassifier` lässt
 jedes Mitglied ein vollständiges Crop/Stage-Paar vorhersagen; das Paar mit den meisten Stimmen
 gewinnt, bei Gleichstand das Paar des frühesten Mitglieds (der SVM). Mitglieder: RBF-SVM plus jede
 Teilmenge der auf dem Trainingsteil komplementärsten Modelle (kNN, logistische Regression, Extra
@@ -416,9 +416,9 @@ Kontext erst mit dem letzten LSTM-Zustand.
 - Alle Varianten erzeugen nur gültige Paare. Der Embedding-LSTM bleibt jedoch 0,276 BAcc
   kombiniert hinter der hierarchischen SVM-Referenz (0,844); die geordnete Repräsentation löst
   die Fehlerfortpflanzung der Kulturstufe nicht.
-- Notebook: `notebooks/22_jd-hierarchical-lstm-none.ipynb`,
-  `notebooks/23_jd-hierarchical-lstm-standard.ipynb` und
-  `notebooks/24_jd-hierarchical-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
+- Notebook: `notebooks/07_sequenz/04_jd_hierarchisch-lstm-ohne-kontext.ipynb`,
+  `notebooks/07_sequenz/05_jd_hierarchisch-lstm-standardkontext.ipynb` und
+  `notebooks/07_sequenz/06_jd_hierarchisch-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
   nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
   Notebook-Outputs.
 

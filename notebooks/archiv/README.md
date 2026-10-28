@@ -5,4 +5,5 @@ dem aktuellen Code nicht zwingend durch; die Historie liegt in git.
 
 | Notebook | Ersetzt durch |
 | --- | --- |
-| `EDA.ipynb` | `01_duac1011_eda.ipynb` und [Explorative Datenanalyse](../../docs/daten/eda.md); die Lückenfüllung (`edahelper.fill_spectral_nans`) übernimmt `InterpolateBands` in `awp2.preprocessing` |
+| `EDA.ipynb` | [`01_daten/01_duac1011_eda.ipynb`](../01_daten/01_duac1011_eda.ipynb) und [Explorative Datenanalyse](../../docs/daten/eda.md); die Lückenfüllung (`edahelper.fill_spectral_nans`) übernimmt `InterpolateBands` in `awp2.preprocessing` |
+| `03_hei_pipeline_test.ipynb` | – (Test eines nicht umgesetzten Convolutional Autoencoders, ohne Ergebnis) |

@@ -68,7 +68,7 @@ Studie ändert weder Split noch Bewertungsprotokoll und folgt nicht aus dem CNN-
 
 1. Issue übernehmen und den Branch `exp/<issue-nr>-combined-<idee>` anlegen; fehlen die
     Artefakte, einmal `make data` ausführen.
-2. `notebooks/02_duac1011_combined-svm.ipynb`, diese Seite und das
+2. `notebooks/04_kombiniert/01_duac1011_svm.ipynb`, diese Seite und das
     [Experiment-Log](../experimente.md) lesen. Die aktuelle Zielmarke lautet BAcc kombiniert
     0.845, nicht nur BAcc Crop oder Stage.
 3. Eine konkrete Hypothese wählen, etwa: „Extra Trees behandelt die stark korrelierten Bänder
@@ -123,7 +123,7 @@ nachvollziehbaren Gewinn.
 
 ### Random Forest
 
-Notebook: `notebooks/02_duac1011_mlflow-test.ipynb`. Der Random Forest lernt 23 kombinierte
+Notebook: `notebooks/03_baseline/03_duac1011_random-forest.ipynb`. Der Random Forest lernt 23 kombinierte
 Klassen und gibt seine Vorhersagen anschließend wieder als `Crop` und `Stage` aus.
 
 - 300 Bäume, ausgewogene Klassengewichte und Standardvorverarbeitung mit AEZ/Month.
@@ -145,7 +145,7 @@ Klassen und gibt seine Vorhersagen anschließend wieder als `Crop` und `Stage` a
 
 ### RBF-SVM
 
-Notebook: `notebooks/02_duac1011_combined-svm.ipynb`. Die SVM lernt dieselben 23 kombinierten
+Notebook: `notebooks/04_kombiniert/01_duac1011_svm.ipynb`. Die SVM lernt dieselben 23 kombinierten
 Klassen wie der Random Forest; Spektren und Month werden dafür standardisiert.
 
 - **Warum getestet?** Der Random Forest ist eine starke, aber stückweise aufgeteilte Referenz.
@@ -179,7 +179,7 @@ Klassen wie der Random Forest; Spektren und Month werden dafür standardisiert.
 
 ### RBF-SVM: Erweiterte Suche
 
-Notebook: `notebooks/06_duac1011_combined-svm-expanded-search.ipynb`. Die Vorverarbeitung ist
+Notebook: `notebooks/04_kombiniert/07_duac1011_svm-erweiterte-suche.ipynb`. Die Vorverarbeitung ist
 identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegenden Werte von
 `C` und `gamma`.
 
@@ -210,7 +210,7 @@ identisch zur RBF-SVM-Referenz; die Suche erweitert nur die zuvor am Rand liegen
 
 ### RBF-SVM unter dem 80/20-Split
 
-Notebook: `notebooks/19_qm_split-80-20.ipynb`. Dieser Lauf prueft das neue
+Notebook: `notebooks/02_validierung/01_duac1011_split-80-20.ipynb`. Dieser Lauf prueft das neue
 Split-Protokoll, nicht eine neue Modellvariante.
 
 - Der Builder erzeugte 4.471 Trainings- und 1.118 Validierungszeilen mit
@@ -230,7 +230,7 @@ Split-Protokoll, nicht eine neue Modellvariante.
 
 ### RBF-SVM mit Standard Normal Variate
 
-Notebook: `notebooks/08_duac1011_combined-svm-snv.ipynb`. SNV normalisiert jedes interpolierte
+Notebook: `notebooks/04_kombiniert/09_duac1011_svm-snv.ipynb`. SNV normalisiert jedes interpolierte
 Spektrum auf Mittelwert null und Standardabweichung eins; AEZ und Month bleiben im separaten
 Metadatenzweig.
 
@@ -248,7 +248,7 @@ Metadatenzweig.
 ![CV-Score der RBF-SVM mit SNV](../img/combined_svm_snv_tuning.png)
 ### RBF-SVM mit Dimensionsreduktion auf Spektralbändern
 
-Notebook: `notebooks/07_duac1011_combined-svm-pca.ipynb`. Die Reduktion betrifft ausschließlich
+Notebook: `notebooks/08_datenreduktion/01_duac1011_svm-reduktionsverfahren.ipynb`. Die Reduktion betrifft ausschließlich
 die Spektralbänder; AEZ und Month werden im parallelen Metadatenzweig unverändert an die SVM
 übergeben.
 
@@ -277,7 +277,7 @@ die Spektralbänder; AEZ und Month werden im parallelen Metadatenzweig unveränd
 ![Häufigste Verwechslungen](../img/combined_svm_spectral_reduction_confusions.png)
 ### RBF-SVM: Monatskodierung
 
-Notebook: `notebooks/07_duac1011_combined-svm-month-encoding.ipynb`. Die Spektren, AEZ und die
+Notebook: `notebooks/04_kombiniert/08_duac1011_svm-monatskodierung.ipynb`. Die Spektren, AEZ und die
 RBF-SVM bleiben unverändert; ausschließlich die Darstellung von Month wird verglichen.
 
 - **Warum getestet?** Der lineare Abstand zwischen Monaten beschreibt Saisonzyklen nicht
@@ -301,7 +301,7 @@ RBF-SVM bleiben unverändert; ausschließlich die Darstellung von Month wird ver
 
 ### RBF-SVM ohne Metadaten
 
-Notebook: `notebooks/03_duac1011_combined-svm-no-meta.ipynb`. Die SVM erhält nur skalierte
+Notebook: `notebooks/04_kombiniert/05_duac1011_svm-ohne-meta.ipynb`. Die SVM erhält nur skalierte
 Spektralbänder; AEZ und Month sind gegenüber der SVM-Referenz die einzige entfernte Information.
 
 - **Warum getestet?** Die Ablation misst den eigenständigen Beitrag des räumlichen und saisonalen
@@ -326,7 +326,7 @@ Spektralbänder; AEZ und Month sind gegenüber der SVM-Referenz die einzige entf
 
 ### RBF-SVM mit Vegetationsindizes
 
-Notebook: `notebooks/04_duac1011_combined-svm-vegetation-indices.ipynb`. Die SVM erhält neben
+Notebook: `notebooks/04_kombiniert/06_duac1011_svm-vegetationsindizes.ipynb`. Die SVM erhält neben
 Spektren, AEZ und Month die vier aus Rohbändern abgeleiteten Indizes NDVI, NDRE, PRI und NDWI.
 
 - **Warum getestet?** Die Indizes verdichten für Vegetation relevante Bandverhältnisse und könnten
@@ -351,7 +351,7 @@ Spektren, AEZ und Month die vier aus Rohbändern abgeleiteten Indizes NDVI, NDRE
 
 ### 1D-CNN
 
-Notebook: `notebooks/05_duac1011_combined-cnn.ipynb`. Die CNN erhält die skalierte
+Notebook: `notebooks/04_kombiniert/04_duac1011_cnn.ipynb`. Die CNN erhält die skalierte
 Spektralfolge und die normierte Wellenlängenposition als zwei Kanäle; AEZ und Month gehen über
 einen getrennten Kontextzweig ein.
 
@@ -395,15 +395,15 @@ dadurch können nur im Training beobachtete Crop/Stage-Paare entstehen.
     (0,793 statt 0,746); die Crop-BAcc bleibt fast unverändert (0,812 statt 0,810).
 - Alle drei Dekodierungen erzeugen ausschließlich gültige Paare. Selbst die beste Variante
     bleibt mit 0,166 BAcc kombiniert deutlich hinter der kombinierten SVM-Referenz (0,866).
-- Notebook: `notebooks/19_duac1011_combined-lstm-none.ipynb`,
-    `notebooks/20_duac1011_combined-lstm-standard.ipynb` und
-    `notebooks/21_duac1011_combined-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
+- Notebook: `notebooks/07_sequenz/01_duac1011_kombiniert-lstm-ohne-kontext.ipynb`,
+    `notebooks/07_sequenz/02_duac1011_kombiniert-lstm-standardkontext.ipynb` und
+    `notebooks/07_sequenz/03_duac1011_kombiniert-lstm-embeddings.ipynb`. MLflow konnte die Läufe wegen eines
     nicht beschreibbaren Pfads `/C:` nicht erfassen; die vollständigen Ausgaben stehen in den
     Notebook-Outputs.
 
 ### Extra Trees
 
-Notebook: `notebooks/02_duac1011_combined-extra-trees.ipynb`. Extra Trees lernt 23
+Notebook: `notebooks/04_kombiniert/02_duac1011_extra-trees.ipynb`. Extra Trees lernt 23
 kombinierte Klassen mit zufälligeren Baumaufteilungen als der Random Forest.
 
 - **Warum getestet?** Die zufälligeren Aufteilungen prüfen, ob sich die stark korrelierten
@@ -428,7 +428,7 @@ kombinierte Klassen mit zufälligeren Baumaufteilungen als der Random Forest.
 
 ### HistGradientBoosting
 
-Notebook: `notebooks/02_duac1011_combined-hist-gradient-boosting.ipynb`. Der Klassifikator
+Notebook: `notebooks/04_kombiniert/03_duac1011_hist-gradient-boosting.ipynb`. Der Klassifikator
 lernt additive Splits für die 23 kombinierten Klassen und erhält ausgewogene Sample Weights.
 
 - **Warum getestet?** Additive Splits prüfen, ob wiederholtes Korrigieren von Fehlklassifikationen

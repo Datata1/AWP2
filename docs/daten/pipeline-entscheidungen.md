@@ -82,7 +82,7 @@ Balanced Accuracy als Hauptmetrik.
 ## Offen – kommt nach der EDA (#20, #30)
 
 - Glättung der Spektren (z. B. Savitzky-Golay)
-- Umgang mit Ausreißern: **keine** Entfernung. Die Regelprüfung (#196) findet keine Messfehler, und das Entfernen der markierten Zeilen nur im Trainingsfold kostet 0,034 CV-BAcc kombiniert (#197, Notebook `40_jd_ausreisser_kontext`)
+- Umgang mit Ausreißern: **keine** Entfernung. Die Regelprüfung (#196) findet keine Messfehler, und das Entfernen der markierten Zeilen nur im Trainingsfold kostet 0,034 CV-BAcc kombiniert (#197, Notebook `01_daten/04_jd_ausreisser-kontext`)
 - Bandauswahl, Vegetationsindizes als Features
 - Split-Strategie, falls räumliche Cluster gefunden werden (dann Gruppen in `cv_splits`)
 - `Month` ist zyklisch; ggf. als sin/cos kodieren

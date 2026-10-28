@@ -121,7 +121,7 @@ Diese Befunde beschreiben nur die vorliegende Stichprobe. Sie sind kein Leistung
 ### Datenqualität: Regelprüfung (#196)
 
 `awp2.quality.quality_flags()` markiert verdächtige Zeilen nach festen Regeln, ohne sie zu
-entfernen (Notebook `39_jd_datenqualitaet`):
+entfernen (Notebook `01_daten/03_jd_datenqualitaet`):
 
 - **Reflektanz-Skala:** Blau liegt im Median bei rund 16 %, weit über den 3–6 % von Vegetation
   an der Oberfläche. Die Daten enthalten offenbar einen Atmosphären- oder Kalibrieranteil.

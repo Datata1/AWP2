@@ -103,7 +103,7 @@ the relevant Markdown file under `docs/`.
 ## Editing The EDA Notebook
 
 When explicitly asked to implement, extend, or document an EDA result, you may edit
-`notebooks/01_duac1011_eda.ipynb`.
+`notebooks/01_daten/01_duac1011_eda.ipynb`.
 
 - Preserve the notebook's existing structure, naming, language, and use of project helpers.
 - Add concise German markdown that distinguishes measured results from literature-backed
