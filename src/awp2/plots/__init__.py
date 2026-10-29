@@ -1,7 +1,7 @@
 """Shared plotting helpers for EDA, model analysis and reports."""
 
 from awp2.plots.common import save_doc_figure
-from awp2.plots.data import plot_spectra
+from awp2.plots.data import plot_spectra, plot_stage_by_month
 from awp2.plots.evaluation import (
     plot_class_recall,
     plot_cv_scores,
@@ -35,6 +35,7 @@ __all__ = [
     "plot_pca_loadings",
     "plot_recall_comparison",
     "plot_spectra",
+    "plot_stage_by_month",
     "plot_top_confusions",
     "plot_tradeoff",
     "plot_tuning_candidates",
