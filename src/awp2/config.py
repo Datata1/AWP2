@@ -56,6 +56,18 @@ REIP_LAGRANGIAN_MIN_BANDS = 5
 REIP_POLYNOMIAL_WINDOW_NM = (650, 760)
 REIP_POLYNOMIAL_DEGREE = 4
 PCA_FEATURE_NAMES = ("PC_1", "PC_2")
+# Dry matter: cellulose/lignin absorb around 2100 nm. The standard CAI needs X2002, which is empty
+# here, so its shoulders move to the nearest measured bands, 60 nm on either side of the centre.
+CAI_SHOULDERS_NM = (2063, 2184)
+CAI_CENTER_NM = 2123
+NDTI_BANDS_NM = (1650, 2215)  # tillage index: crop residue vs. bare soil
+DRY_MATTER_INDEX_NAMES = ("CAI_2063_2123_2184", "NDTI_1650_2215")
+# Soil: SAVI/MSAVI damp the soil signal under sparse canopy; PVI measures the distance to a soil
+# line fitted on the barest training spectra (lowest NDVI), as there are no bare-soil labels.
+SAVI_SOIL_ADJUSTMENT = 0.5
+SOIL_LINE_NDVI_QUANTILE = 0.05
+SOIL_INDEX_NAMES = ("SAVI", "MSAVI", "PVI", "SOIL_BRIGHTNESS")
+DERIVATIVE_PREFIX = "d"  # first-derivative columns are d<band>, e.g. dX712
 
 
 @dataclass(frozen=True)
@@ -549,6 +561,48 @@ LOGISTIC_REGRESSION_MAX_ITER = 5000  # lbfgs needs more than the default 100 on 
 MLP_MAX_ITER = 500  # an upper bound only; early stopping ends training before
 # a CV gain below this is within the fold-to-fold noise of the reference (std about 0.010)
 MIN_CV_GAIN = 0.005
+# Stacking: a meta-model learns from the inner out-of-fold scores of its members when to trust which
+StackMember = Literal["svm", "extra_trees", "logreg", "knn"]
+STACKING_MEMBERS: tuple[StackMember, ...] = get_args(StackMember)
+STACKING_INNER_FOLDS = 5
+# Specialist: early maize and soybean are the most confused crop pair (fehleranalyse.md)
+SPECIALIST_CROPS: tuple[Crop, ...] = ("corn", "soybean")
+
+# AutoML: one Optuna search over model family, hyperparameters and preprocessing
+ModelFamily = Literal["svm", "extra_trees", "hist_gradient_boosting", "logreg", "mlp"]
+SVM_FAMILY, EXTRA_TREES_FAMILY, HGB_FAMILY, LOGREG_FAMILY, MLP_FAMILY = get_args(ModelFamily)
+# how crop and stage are predicted: one combined label, crop then stage per crop, or independently
+ModelStructure = Literal["combined", "hierarchical", "separate"]
+COMBINED_STRUCTURE, HIERARCHICAL_STRUCTURE, SEPARATE_STRUCTURE = get_args(ModelStructure)
+SpectralScaler = Literal["standard", "minmax"]
+STANDARD_SCALER, MINMAX_SCALER = get_args(SpectralScaler)
+AUTOML_APPROACH = "automl"
+AUTOML_STORAGE = MODELS_DIR / "automl.db"  # Optuna study store: an interrupted search resumes
+AUTOML_N_TRIALS = 300
+AUTOML_TIMEOUT_S = 3600
+# trials are compared only after this many complete ones, before that TPE samples at random
+AUTOML_STARTUP_TRIALS = 10
+# a trial is pruned only from its second fold on, a single fold is too noisy to judge it
+AUTOML_PRUNER_WARMUP_FOLDS = 1
+# (low, high) of the log-uniform ranges; they enclose the grid optima found by tune()
+AUTOML_SVM_C = (1.0, 3000.0)
+AUTOML_SVM_GAMMA = (1e-4, 0.1)
+AUTOML_LOGREG_C = (0.01, 1000.0)
+AUTOML_HGB_LEARNING_RATE = (0.01, 0.3)
+AUTOML_HGB_MAX_LEAF_NODES = (15, 127)
+AUTOML_HGB_L2 = (1e-3, 10.0)
+AUTOML_MLP_ALPHA = (1e-5, 1.0)
+AUTOML_ET_MAX_FEATURES = (0.05, 0.6)
+AUTOML_ET_MIN_SAMPLES_LEAF = (1, 5)
+# Optuna stores categorical choices as primitives, so layer tuples are chosen by name
+AUTOML_MLP_LAYERS: dict[str, tuple[int, ...]] = {
+    "128": (128,),
+    "256-128": (256, 128),
+    "512-256": (512, 256),
+}
+AUTOML_PCA_COMPONENTS = (20, 40, 80)
+AUTOML_SAVGOL_WINDOWS = (5, 7)
+AUTOML_SAVGOL_POLYORDER = 2
 
 # Data-quality flags (#196) only mark rows for review; nothing is removed by them.
 QualityFlag = Literal["haze", "dark", "ndvi_outlier", "rare_context", "class_outlier"]

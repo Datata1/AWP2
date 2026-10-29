@@ -161,6 +161,22 @@ class PreprocessingConfig(BaseModel):
         description="Compute the reproducible kickoff vegetation-index catalogue from interpolated "
         "bands in a parallel branch; ratios need physical reflectance, so SNV must not feed them.",
     )
+    use_dry_matter_indices: bool = Field(
+        default=False,
+        description="Append a CAI shifted to measured bands (2063/2123/2184 nm) and the NDTI "
+        "(1650/2215 nm) in a parallel branch: dry plant material (cellulose, lignin) vs. soil.",
+    )
+    use_soil_indices: bool = Field(
+        default=False,
+        description="Append SAVI, MSAVI, PVI (distance to a soil line fitted on the training "
+        "spectra with the lowest NDVI) and soil brightness in a parallel branch.",
+    )
+    use_spectral_derivative: bool = Field(
+        default=False,
+        description="Append the first derivative of the spectra along the wavelength (after "
+        "interpolation and Savitzky-Golay, per band segment) in a parallel branch; with "
+        "use_spectra=False it replaces the spectra.",
+    )
     use_principal_components: bool = Field(
         default=False,
         description="Append PC_1 and PC_2 from a PCA fitted on standardized interpolated bands "
@@ -231,6 +247,9 @@ class PreprocessingConfig(BaseModel):
                     self.use_mean_albedo
                     or self.use_vegetation_indices
                     or self.use_principal_components
+                    or self.use_dry_matter_indices
+                    or self.use_soil_indices
+                    or self.use_spectral_derivative
                 ):
                     raise ValueError("Spectral feature branches require nonempty spectral_regions")
         if self.use_aez_month and (not self.use_meta or self.use_categorical_context):
@@ -321,7 +340,8 @@ class PreprocessingConfig(BaseModel):
 
     def _check_without_spectra(self) -> None:
         spectral_steps = {
-            "use_savgol": self.use_savgol,
+            # smoothing also feeds the derivative branch, which needs no spectra
+            "use_savgol": self.use_savgol and not self.use_spectral_derivative,
             "use_spectral_snv": self.use_spectral_snv,
             "spectral_sensor": self.spectral_sensor != HYPERION_SENSOR,
             "spectral_band_step": self.spectral_band_step is not None,
@@ -342,5 +362,8 @@ class PreprocessingConfig(BaseModel):
             or self.use_vegetation_indices
             or self.use_mean_albedo
             or self.use_principal_components
+            or self.use_dry_matter_indices
+            or self.use_soil_indices
+            or self.use_spectral_derivative
         ):
             raise ValueError("use_spectra=False needs another feature group")

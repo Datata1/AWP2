@@ -46,7 +46,7 @@ from awp2.config import (
 from awp2.data import load_folds, load_split, valid_combinations
 from awp2.data.split import Fold
 from awp2.evaluation import METRIC_LABELS, as_target_frame, evaluate
-from awp2.experiment import TuneConfig, _pipeline, tune
+from awp2.experiment import TuneConfig, build_pipeline, tune
 from awp2.preprocessing import PreprocessingConfig, build_preprocessor
 
 STUDY_METRICS = tuple(METRIC_LABELS)
@@ -214,7 +214,7 @@ def _fold_scores(
 ) -> dict[str, float]:
     split = load_split()
     y_fit = split.y_train.iloc[fold.train]
-    pipeline = _pipeline(model, preprocessing)
+    pipeline = build_pipeline(model, preprocessing)
     pipeline.fit(split.X_train.iloc[fold.train], y_fit)
     y_val = split.y_train.iloc[fold.val]
     y_pred = as_target_frame(pipeline.predict(split.X_train.iloc[fold.val]), y_val.index)

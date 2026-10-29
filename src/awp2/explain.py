@@ -40,8 +40,8 @@ from awp2.experiment import (
     _PREPROCESS_STEP,
     RunConfig,
     TuneConfig,
-    _fit_params,
-    _pipeline,
+    build_pipeline,
+    pipeline_fit_params,
 )
 
 Predictor = Callable[[pd.DataFrame], pd.DataFrame]
@@ -246,8 +246,12 @@ def _fold_drops(
 ) -> tuple[dict[tuple[str, str], float], list[tuple[str, int, int, dict[tuple[str, str], float]]]]:
     split = load_split()
     y_fold = split.y_train.iloc[fold.train]
-    pipeline = _pipeline(model, config.preprocessing)
-    pipeline.fit(split.X_train.iloc[fold.train], y_fold, **_fit_params(config, y_fold))
+    pipeline = build_pipeline(model, config.preprocessing)
+    pipeline.fit(
+        split.X_train.iloc[fold.train],
+        y_fold,
+        **pipeline_fit_params(config.balance_samples, y_fold),
+    )
     X_val = pipeline.named_steps[_PREPROCESS_STEP].transform(split.X_train.iloc[fold.val])
     y_val = split.y_train.iloc[fold.val]
     estimator = pipeline.named_steps[_MODEL_STEP]

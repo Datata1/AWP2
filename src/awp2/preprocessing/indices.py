@@ -8,8 +8,12 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from awp2.config import (
+    CAI_CENTER_NM,
+    CAI_SHOULDERS_NM,
+    DRY_MATTER_INDEX_NAMES,
     INDEX_WAVELENGTH_TOLERANCE_NM,
     MCARI_GREEN_WEIGHT,
+    NDTI_BANDS_NM,
     NDVI_NIR_BAND,
     NDVI_RED_BAND,
     OSAVI_SOIL_ADJUSTMENT,
@@ -19,6 +23,9 @@ from awp2.config import (
     REIP_LAGRANGIAN_WINDOW_NM,
     REIP_POLYNOMIAL_DEGREE,
     REIP_POLYNOMIAL_WINDOW_NM,
+    SAVI_SOIL_ADJUSTMENT,
+    SOIL_INDEX_NAMES,
+    SOIL_LINE_NDVI_QUANTILE,
     TCARI_MULTIPLIER,
     VEGETATION_INDEX_NAMES,
     VEGETATION_INDEX_SPECS,
@@ -350,3 +357,112 @@ class SelectVegetationIndices(TransformerMixin, BaseEstimator):
             The vegetation-index catalogue names.
         """
         return np.asarray(VEGETATION_INDEX_NAMES, dtype=object)
+
+
+class DryMatterIndices(_BandTransformer):
+    """Indices of dry plant material in the SWIR 2: a shifted CAI and the NDTI.
+
+    Mature, senescent and harvested fields expose cellulose and lignin, which absorb around
+    2100 nm; bare soil does not. The SWIR 2 carries much of the crop decision but no catalogue
+    index (see the feature-importance page).
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Resolve the index wavelengths against the band columns.
+
+        Args:
+            X: Band columns after missing-value processing.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If a required wavelength has no band within the tolerance.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        columns = list(X.columns)
+        self.cai_bands_ = tuple(
+            nearest_band(nm, columns) for nm in (*CAI_SHOULDERS_NM, CAI_CENTER_NM)
+        )
+        self.ndti_bands_ = tuple(nearest_band(nm, columns) for nm in NDTI_BANDS_NM)
+        self.feature_names_out_ = list(DRY_MATTER_INDEX_NAMES)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Compute the indices from reflectance as fraction.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column per index in ``DRY_MATTER_INDEX_NAMES``.
+        """
+        reflectance = self._check(X) / REFLECTANCE_PERCENT_SCALE
+        left, right, centre = (reflectance[band] for band in self.cai_bands_)
+        swir1, swir2 = (reflectance[band] for band in self.ndti_bands_)
+        cai_name, ndti_name = DRY_MATTER_INDEX_NAMES
+        return pd.DataFrame(
+            {cai_name: (left + right) / 2 - centre, ndti_name: (swir1 - swir2) / (swir1 + swir2)},
+            index=X.index,
+        )
+
+
+class SoilIndices(_BandTransformer):
+    """Indices of the soil share under sparse canopy: SAVI, MSAVI, PVI and soil brightness.
+
+    Early maize and soybean are mostly soil between the rows, which makes their spectra alike.
+    PVI is the distance to the soil line ``NIR = slope * red + intercept``; the line is fitted
+    on the training spectra with the lowest NDVI, as there are no bare-soil labels.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Fit the soil line on the barest training spectra.
+
+        Args:
+            X: Band columns after missing-value processing.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+
+        Raises:
+            ValueError: If the red or NIR band is missing.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        columns = list(X.columns)
+        self.red_band_ = nearest_band(wavelength(NDVI_RED_BAND), columns)
+        self.nir_band_ = nearest_band(wavelength(NDVI_NIR_BAND), columns)
+        red, nir = self._red_nir(X)
+        greenness = (nir - red) / (nir + red)
+        bare = greenness <= greenness.quantile(SOIL_LINE_NDVI_QUANTILE)
+        self.soil_slope_, self.soil_intercept_ = np.polyfit(red[bare], nir[bare], deg=1)
+        self.feature_names_out_ = list(SOIL_INDEX_NAMES)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Compute the indices from reflectance as fraction.
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One column per index in ``SOIL_INDEX_NAMES``.
+        """
+        red, nir = self._red_nir(self._check(X))
+        savi = (1 + SAVI_SOIL_ADJUSTMENT) * (nir - red) / (nir + red + SAVI_SOIL_ADJUSTMENT)
+        msavi = (2 * nir + 1 - np.sqrt((2 * nir + 1) ** 2 - 8 * (nir - red))) / 2
+        pvi = (nir - self.soil_slope_ * red - self.soil_intercept_) / np.sqrt(
+            1 + self.soil_slope_**2
+        )
+        brightness = np.sqrt(red**2 + nir**2)
+        return pd.DataFrame(
+            dict(zip(SOIL_INDEX_NAMES, (savi, msavi, pvi, brightness), strict=True)),
+            index=X.index,
+        )
+
+    def _red_nir(self, X: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+        reflectance = X[[self.red_band_, self.nir_band_]] / REFLECTANCE_PERCENT_SCALE
+        return reflectance[self.red_band_], reflectance[self.nir_band_]

@@ -218,6 +218,7 @@ def log_tuning(
     train: pd.DataFrame,
     extra_metrics: Mapping[str, float] | None = None,
     system_metrics: bool = False,
+    nested_candidates: bool = True,
 ) -> str:
     """Record a hyperparameter search as one tuning run with a nested run per candidate.
 
@@ -237,6 +238,8 @@ def log_tuning(
         train: Training data the cross-validation ran on.
         extra_metrics: Further numbers of the parent run, e.g. the input size.
         system_metrics: Also record CPU/memory usage during the search.
+        nested_candidates: Log a nested run per candidate; switch off for searches with
+            hundreds of candidates, ``cv_results.csv`` still holds all of them.
 
     Returns:
         The run id of the tuning (parent) run.
@@ -264,6 +267,8 @@ def log_tuning(
             }
         )
         mlflow.log_text(candidates.to_csv(index=False), "cv_results.csv")
+        if not nested_candidates:
+            return parent.info.run_id
         for number, candidate in candidates.iterrows():
             with mlflow.start_run(
                 run_name=f"{name}-{number:02d}",

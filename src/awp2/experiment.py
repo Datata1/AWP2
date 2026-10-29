@@ -205,16 +205,38 @@ def cv_folds(grouping: FoldGrouping = RANDOM_FOLDS) -> list[Fold]:
     return list(cv_splits(X, split.y_train, groups=groups))
 
 
-def _pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
+def build_pipeline(model: BaseEstimator, preprocessing: PreprocessingConfig) -> Pipeline:
+    """Standard preprocessing followed by a copy of ``model``, as fitted by :func:`run`.
+
+    Args:
+        model: Unfitted estimator that predicts ``Crop`` and ``Stage``; it is cloned.
+        preprocessing: Options of the preprocessing step.
+
+    Returns:
+        Unfitted pipeline with the steps ``preprocess`` and ``model``.
+    """
     return Pipeline(
         [(_PREPROCESS_STEP, build_preprocessor(preprocessing)), (_MODEL_STEP, clone(model))]
     )
 
 
-def _fit_params(config: _ExperimentConfig, y_train: pd.DataFrame) -> dict[str, np.ndarray]:
-    if not config.balance_samples:
+def pipeline_fit_params(balance_samples: bool, y_train: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Keyword arguments for ``build_pipeline(...).fit`` that pass balanced sample weights.
+
+    Args:
+        balance_samples: Whether the model gets balanced sample weights.
+        y_train: Targets the pipeline is fitted on.
+
+    Returns:
+        ``{"model__sample_weight": ...}`` if ``balance_samples``, otherwise an empty dict.
+    """
+    if not balance_samples:
         return {}
     return {f"{_MODEL_STEP}__sample_weight": balanced_sample_weight(y_train)}
+
+
+def _fit_params(config: _ExperimentConfig, y_train: pd.DataFrame) -> dict[str, np.ndarray]:
+    return pipeline_fit_params(config.balance_samples, y_train)
 
 
 def _pipeline_summary(config: _ExperimentConfig, pipeline: Pipeline | None = None) -> str:
@@ -276,7 +298,7 @@ def tune(model: BaseEstimator, config: TuneConfig) -> TuneResult:
 
     split = load_split()
     search = GridSearchCV(
-        _pipeline(model, config.preprocessing),
+        build_pipeline(model, config.preprocessing),
         {f"{_MODEL_STEP}__{key}": values for key, values in config.param_grid.items()},
         scoring=scorer(config.metric),
         cv=cv_folds(config.folds),
@@ -341,7 +363,7 @@ def run(model: BaseEstimator, config: RunConfig) -> RunResult:
         ```
     """
     split = load_split()
-    pipeline = _pipeline(model, config.preprocessing)
+    pipeline = build_pipeline(model, config.preprocessing)
     pipeline.fit(split.X_train, split.y_train, **_fit_params(config, split.y_train))
     y_pred = as_target_frame(pipeline.predict(split.X_val), split.y_val.index)
     metrics = evaluate(split.y_val, y_pred, valid_combinations(split.y_train))
@@ -432,7 +454,7 @@ def timed_out_of_fold_predictions(
         if train_filter is not None:
             keep = ~train_filter(X_fold, y_fold)
             X_fold, y_fold = X_fold[keep], y_fold[keep]
-        pipeline = _pipeline(model, config.preprocessing)
+        pipeline = build_pipeline(model, config.preprocessing)
         start = time.perf_counter()
         pipeline.fit(X_fold, y_fold, **_fit_params(config, y_fold))
         fitted = time.perf_counter()

@@ -53,6 +53,10 @@ def _describe_step(name: str, step: BaseEstimator | str) -> str:
         "month": "Standardize month",
         "scale": "Standardize month",
         "aez_month": "One-hot encode AEZ x month combinations",
+        "dry_matter": "Dry-matter indices (shifted CAI, NDTI)",
+        "soil": "Soil indices (SAVI, MSAVI, PVI to a fitted soil line, soil brightness)",
+        "derivative": "First derivative along the wavelength (per band segment)",
+        "impute": "Fill missing index values with the training median",
     }
     if name in known:
         return known[name]
@@ -100,6 +104,9 @@ _BRANCH_LETTERS: dict[str, str] = {
     "spectra": "E",
     "aez_month": "F",
     "principal_components": "G",
+    "dry_matter": "H",
+    "soil": "I",
+    "derivative": "J",
 }
 
 
@@ -108,7 +115,8 @@ def describe_preprocessor(preprocessor: ColumnTransformer) -> list[str]:
 
     Reads the built transformer, so optional steps appear only when enabled. Each
     branch has a fixed letter (A: AEZ, B: Month, C: Albedo, D: Indices, E: Spectra,
-    F: AEZ x month, G: PC_1 and PC_2)
+    F: AEZ x month, G: PC_1 and PC_2, H: dry-matter indices, I: soil indices,
+    J: first derivative)
     and steps are numbered per branch from 1, so the labels stay comparable across
     runs. Print the lines in the notebook to log which preprocessing a run used.
 

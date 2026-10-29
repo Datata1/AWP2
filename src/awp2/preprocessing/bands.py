@@ -13,6 +13,7 @@ from sklearn.utils.validation import check_is_fitted
 from awp2.config import (
     BAND_PATTERN,
     BAND_PREFIX,
+    DERIVATIVE_PREFIX,
     F_CLASSIF_SCORE,
     MEAN_ALBEDO_COL,
     SAVGOL_SPLIT_GAP_NM,
@@ -256,6 +257,51 @@ class SavitzkyGolaySmoothing(_BandTransformer):
                     mode="interp",
                 )
         return pd.DataFrame(values, index=X.index, columns=X.columns)
+
+
+class FirstDerivative(_BandTransformer):
+    """First derivative of each spectrum along the wavelength, one band segment at a time.
+
+    The slope keeps the shape of the curve (e.g. the steep red-edge rise) but drops an offset
+    shared by all bands, such as a bright soil background. Differences across a gap of deleted
+    bands would mix distant measurements, so each contiguous segment is differentiated alone; a
+    segment of a single band has slope 0.
+    """
+
+    def fit(self, X: pd.DataFrame, y: object = None) -> Self:
+        """Record the wavelengths and segments of the band columns.
+
+        Args:
+            X: Band columns of the training part.
+            y: Ignored; accepted for sklearn compatibility.
+
+        Returns:
+            The fitted transformer.
+        """
+        X = self._check(X)
+        self._set_input(X)
+        self.wavelengths_ = np.asarray(wavelengths(X), dtype=float)
+        self.segments_ = _contiguous_segments(self.wavelengths_)
+        self.feature_names_out_ = [f"{DERIVATIVE_PREFIX}{column}" for column in X.columns]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Differentiate every segment (reflectance change per nm).
+
+        Args:
+            X: Band columns with the same columns as in ``fit``.
+
+        Returns:
+            One ``d<band>`` column per input band.
+        """
+        values = self._check(X).to_numpy(dtype=float)
+        slopes = np.zeros_like(values)
+        for start, end in self.segments_:
+            if end - start > 1:
+                slopes[:, start:end] = np.gradient(
+                    values[:, start:end], self.wavelengths_[start:end], axis=1
+                )
+        return pd.DataFrame(slopes, index=X.index, columns=self.feature_names_out_)
 
 
 class StandardNormalVariate(_BandTransformer):

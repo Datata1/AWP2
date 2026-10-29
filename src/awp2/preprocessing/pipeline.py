@@ -25,6 +25,7 @@ from awp2.config import (
 from awp2.data import wavelength
 from awp2.preprocessing.bands import (
     DropEmptyBands,
+    FirstDerivative,
     InterpolateBands,
     KeepEveryNthBand,
     MeanAlbedo,
@@ -40,7 +41,12 @@ from awp2.preprocessing.decomposition import (
     PrincipalComponentFeatures,
     VerySparseRandomProjection,
 )
-from awp2.preprocessing.indices import AddVegetationIndices, SelectVegetationIndices
+from awp2.preprocessing.indices import (
+    AddVegetationIndices,
+    DryMatterIndices,
+    SelectVegetationIndices,
+    SoilIndices,
+)
 from awp2.preprocessing.metadata import AcquisitionCentering, AezMonthEncoder, CyclicMonthEncoder
 from awp2.preprocessing.options import PreprocessingConfig
 
@@ -95,11 +101,7 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
         spectra.insert(0, ("acquisition_centering", AcquisitionCentering()))
     if config.spectral_sensor == SENTINEL2_SENSOR:
         spectra.append(("sensor", SimulateSensor(SENTINEL2_BANDS)))
-    if config.use_savgol:
-        assert config.savgol_window_length is not None and config.savgol_polyorder is not None
-        spectra.append(
-            ("savgol", SavitzkyGolaySmoothing(config.savgol_window_length, config.savgol_polyorder))
-        )
+    spectra.extend(_smoothing(config))
     if config.use_spectral_snv:
         spectra.append(("snv", StandardNormalVariate()))
     if config.spectral_band_step is not None:
@@ -183,6 +185,28 @@ def build_preprocessor(config: PreprocessingConfig | None = None) -> ColumnTrans
                 band_selector,
             )
         )
+    for enabled, name, indices in (
+        (config.use_dry_matter_indices, "dry_matter", DryMatterIndices()),
+        (config.use_soil_indices, "soil", SoilIndices()),
+    ):
+        if enabled:
+            index_branch = [
+                *_clean_band_steps(config),
+                (name, indices),
+                ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
+                *_spectral_scaler(config),
+            ]
+            transformers.append((name, Pipeline(index_branch), band_selector))
+    if config.use_spectral_derivative:
+        derivative_branch = [*_clean_band_steps(config), *_smoothing(config)]
+        derivative_branch.append(("derivative", FirstDerivative()))
+        transformers.append(
+            (
+                "derivative",
+                Pipeline([*derivative_branch, *_spectral_scaler(config)]),
+                band_selector,
+            )
+        )
     if config.use_principal_components:
         transformers.append(
             (
@@ -232,3 +256,12 @@ def _spectral_scaler(config: PreprocessingConfig) -> list[tuple[str, BaseEstimat
     if config.use_spectral_centering:
         return [("centering", StandardScaler(with_mean=True, with_std=False))]
     return []
+
+
+def _smoothing(config: PreprocessingConfig) -> list[tuple[str, BaseEstimator]]:
+    if not config.use_savgol:
+        return []
+    assert config.savgol_window_length is not None and config.savgol_polyorder is not None
+    return [
+        ("savgol", SavitzkyGolaySmoothing(config.savgol_window_length, config.savgol_polyorder))
+    ]
