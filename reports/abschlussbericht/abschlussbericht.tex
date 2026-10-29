@@ -119,19 +119,126 @@ Eine \"Ubertragbarkeit auf andere Regionen, Jahre oder Sensoren und die
 Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
 
 \section{Daten und explorative Analyse}
+\label{sec:daten}
 
 \subsection{Datengrundlage und Zielgr\"o\ss en}
-% Herkunft, Umfang, Spektralbereich und Bandanzahl anhand der Daten belegen.
-% AEZ, Month, Crop und Stage erkl\"aren; bekannte Herkunftsl\"ucken offenlegen.
-% Gelabelte Entwicklungsdaten und ungelabelte Abgabedaten klar unterscheiden.
-% Beobachtete Kombinationen nicht mit fachlich m\"oglichen gleichsetzen.
+
+Die Daten entsprechen in Aufbau und Labels der hyperspektralen Bibliothek
+GHISACONUS f\"ur die USA~\cite{thenkabail2019,aneece2018}: f\"unf Kulturarten,
+sechs Entwicklungsstadien und sieben agro\"okologische Zonen aus
+Hyperion-Aufnahmen der Jahre 2008 bis 2015. Je Feld wurde dort ein Pixel
+abseits des Feldrandes ausgew\"ahlt, mit einem Atmosph\"arenmodell (SMARTS) in
+Bodenreflektanz umgerechnet und \"uber drei benachbarte B\"ander gegl\"attet
+\cite{aneece2018}. Welche Aufnahmen die Challenge daraus ausgew\"ahlt hat und
+wie die Codes von \texttt{AEZ} genau definiert sind, ist nicht dokumentiert.
+
+Eine Zeile beschreibt ein Spektrum: 198 Reflektanzwerte in Prozent zwischen
+427 und 2.395\,nm sowie die Kontextmerkmale \texttt{AEZ} (Zonen 2 und 5--10)
+und \texttt{Month} (Mai bis Oktober). Die gelabelte Datei \texttt{train.csv}
+umfasst 5.591 Beobachtungen und dient der gesamten Entwicklung; die
+ungelabelte Datei \texttt{test.csv} mit 1.397 Beobachtungen wird nur f\"ur die
+finale Vorhersage verwendet, ihre Labelverteilung ist unbekannt.
+Tabelle~\ref{tab:eda-paare} zeigt die Zielgr\"o\ss en. Von 30 denkbaren
+Kombinationen aus Kultur und Stadium kommen 23 vor. Fehlende Paare sind ein
+Befund der Stichprobe, keine fachliche Unm\"oglichkeit; Vorhersagen werden
+dennoch auf die beobachteten Paare beschr\"ankt.
+
+\begin{table}[htbp]
+\centering
+\caption{Beobachtungen je Kultur und Stadium in \texttt{train.csv}
+	(vor der Duplikatbereinigung).}
+\label{tab:eda-paare}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}
+	\toprule
+	Kultur & \texttt{Emerge\_VEarly} & \texttt{Early\_Mid} & \texttt{Critical} & \texttt{Late} & \texttt{Mature\_Senesc} & \texttt{Harvest} & Summe \\
+	\midrule
+	\texttt{corn} & 152 & 212 & 675 & 557 & 399 & 102 & 2.097 \\
+	\texttt{soybean} & 106 & 465 & 652 & 233 & 146 & 67 & 1.669 \\
+	\texttt{winter\_wheat} & 608 & -- & 56 & 30 & 379 & -- & 1.073 \\
+	\texttt{cotton} & 172 & 253 & 158 & -- & 65 & 11 & 659 \\
+	\texttt{rice} & -- & 52 & -- & 41 & -- & -- & 93 \\
+	\midrule
+	Summe & 1.038 & 982 & 1.541 & 861 & 989 & 180 & 5.591 \\
+	\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Zentrale Befunde und Konsequenzen}
-% Klassenverteilung und seltene Crop-Stage-Paare mit Fallzahlen zeigen.
-% Fehlende Werte, leere B\"ander, Duplikate und auff\"allige Spektren beschreiben.
-% Spektrale \"Uberlappungen, Bandkorrelationen sowie Zusammenh\"ange mit AEZ und
-% Month auf die Befunde beschr\"anken, die Modellentscheidungen begr\"unden.
-% Wenige aussagekr\"aftige Abbildungen ausw\"ahlen und im Text interpretieren.
+
+\paragraph{Starkes Klassenungleichgewicht.}
+Mais und Sojabohne stellen zwei Drittel der Daten, Reis nur 93 Beobachtungen.
+Das seltenste Paar \texttt{cotton|Harvest} hat 11 Beobachtungen. Deshalb wird
+nach \texttt{Crop|Stage} stratifiziert, Balanced Accuracy und Macro-F1 ersetzen
+die einfache Accuracy, und die Modelle gewichten Klassen ausgeglichen
+(Abschnitt~\ref{sec:evaluation}). Werte f\"ur seltene Paare bleiben unsicher.
+
+\paragraph{Datenqualit\"at.}
+In beiden Dateien sind dieselben 67 Bandspalten vollst\"andig leer, vor allem
+in den Wasserabsorptionsbereichen um 950, 1.130, 1.400 und 1.900\,nm und an den
+R\"andern. Es bleiben 131 B\"ander in f\"unf zusammenh\"angenden Abschnitten
+(437--923, 983--1.094, 1.175--1.316, 1.518--1.760 und 2.063--2.345\,nm).
+Einzelne Werte fehlen nur in 44 Trainings- und 11 Testzeilen, ohne H\"aufung in
+einer Gruppe. Zwei Paare von Trainingszeilen sind exakt identisch; zwischen
+Training und Test gibt es keine identischen Eingaben. Daraus folgen das
+Entfernen leerer B\"ander und der Duplikate sowie die Interpolation entlang der
+Wellenl\"ange (Abschnitt~\ref{sec:aufbereitung}).
+Das Reflexionsniveau ist im Blauen mit einem Median von etwa 16\,\% deutlich
+h\"oher als f\"ur Vegetation an der Oberfl\"ache \"ublich; die Werte enthalten
+offenbar noch einen Atmosph\"aren- oder Kalibrieranteil. Eine Regelpr\"ufung
+mit relativen Schwellen markiert 5,5\,\% der Zeilen als spektrale Ausrei\ss{}er
+ihrer Klasse. Sie b\"undeln sich in einzelnen kleinen Aufnahmen mit hellen,
+bodenartigen Spektren und sind damit eher echte Beobachtungen als Messfehler;
+sie werden nicht entfernt.
+
+\paragraph{Spektren unterscheiden sich, \"uberlappen aber.}
+Abbildung~\ref{fig:eda-spektren} zeigt die erwartete Vegetationsform mit
+Chlorophyllabsorption um 670\,nm, steilem Anstieg an der Red Edge und hohem
+NIR-Plateau. Die Kulturen unterscheiden sich vor allem im NIR (Reis am
+hellsten, Baumwolle und Winterweizen am dunkelsten) und im SWIR, wo Baumwolle
+und Winterweizen mit mehr Boden- oder Trockenmasseanteil heller sind.
+Innerhalb einer Kultur verschieben sich die Stadien besonders im NIR und SWIR.
+Die Streubereiche \"uberlappen jedoch stark, sodass kein einzelnes Band und
+keine einzelne Kurve eine Klasse festlegt. Das Helligkeitsniveau selbst
+tr\"agt Information; eine Normalisierung jedes Spektrums (SNV) verschlechtert
+die Klassifikation entsprechend.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{spektren_nach_kultur.png}
+\caption{Mittlere Spektren je Kultur ($\pm$ eine Standardabweichung).
+	L\"ucken markieren vollst\"andig leere Bandbereiche.}
+\label{fig:eda-spektren}
+\end{figure}
+
+\paragraph{Benachbarte B\"ander sind redundant.}
+Benachbarte nutzbare B\"ander korrelieren im Median mit 0,999. Zwei
+Hauptkomponenten erkl\"aren bereits mehr als 90\,\% der spektralen Varianz,
+trennen die Klassen aber nicht. Die gr\"o\ss{}ten Unterschiede zwischen Kulturen
+liegen zwischen 600 und 700\,nm, zwischen Stadien am \"Ubergang zum NIR
+(760--875\,nm) und im SWIR. Das begr\"undet die Untersuchung von
+Dimensionsreduktion und Bandauswahl (Abschnitt~\ref{sec:datenreduktion}); jede
+solche Auswahl wird nur im Trainingsfold gelernt.
+
+\paragraph{Kontext strukturiert die Labels stark.}
+Die Zonen enthalten sehr unterschiedliche Kulturen: In AEZ~2 kommt nur
+Baumwolle, in AEZ~8 nur Mais und Reis nur in AEZ~7 vor. Innerhalb einer Kultur
+h\"angt das Stadium eng am Monat (Abbildung~\ref{fig:eda-stadien-monat}):
+Mais im August ist ausschlie\ss{}lich \texttt{Critical}, Winterweizen l\"auft im
+September und Oktober auf. Die 1.397 Testzeilen liegen in denselben 32
+Kombinationen aus Zone und Monat wie das Training. \texttt{AEZ} und
+\texttt{Month} sind deshalb starke, zul\"assige Merkmale, k\"onnen aber
+Aufnahme- und Regionseffekte statt spektraler Unterschiede abbilden. Wie stark
+die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
+(Abschnitt~\ref{sec:evaluation}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{stadien_monat_crop.png}
+\caption{Beobachtungen je Monat und Stadium innerhalb jeder Kultur.}
+\label{fig:eda-stadien-monat}
+\end{figure}
 
 \section{Methodik und Validierung}
 
@@ -164,6 +271,7 @@ und Holdout-Bewertung zusammen.
 \end{figure}
 
 \subsection{Datenaufbereitung und Merkmalsbildung}
+\label{sec:aufbereitung}
 
 Alle Ans\"atze nutzen die gemeinsame Pipeline des Pakets \texttt{awp2}.
 Die Rohdaten werden auf Format, Wertebereiche und zul\"assige Labels gepr\"uft.
@@ -190,6 +298,7 @@ zusammen mit dem Modell nur auf den jeweiligen Trainingsdaten angepasst,
 nicht auf den zur Bewertung zur\"uckgehaltenen Beobachtungen.
 
 \subsection{Evaluationsprotokoll und Reproduzierbarkeit}
+\label{sec:evaluation}
 
 \paragraph{Aufteilung und Modellauswahl.}
 Tabelle~\ref{tab:methodik-split} zeigt das aktuelle Standardprotokoll.
@@ -275,6 +384,7 @@ nichtdeterministische Berechnungen bleiben Einschr\"ankungen.
 % Komplexit\"at, Rechenaufwand und Robustheit gegeneinander abw\"agen.
 
 \section{Datenreduktion}
+\label{sec:datenreduktion}
 % Vollst\"andigen Input und ausgew\"ahlte reduzierte Varianten vergleichen.
 % Anzahl der Eingabeb\"ander, abgeleiteten Features und PCA-Komponenten klar
 % unterscheiden: weniger Komponenten bedeuten nicht weniger ben\"otigte B\"ander.
@@ -355,6 +465,21 @@ Key advances and remaining knowledge gaps.
 NASA (2025).
 \emph{Earth Observing-1.} NASA Earth Observatory.
 \url{https://science.nasa.gov/earth/earth-observatory/earth-observing-1}.
+
+\bibitem{aneece2018}
+Aneece, I. \& Thenkabail, P. (2018).
+Accuracies achieved in classifying five leading world crop types and their
+growth stages using optimal Earth Observing-1 Hyperion hyperspectral
+narrowbands on Google Earth Engine.
+\emph{Remote Sensing}, 10(12), 2027.
+\url{https://doi.org/10.3390/rs10122027}.
+
+\bibitem{thenkabail2019}
+Thenkabail, P. \& Aneece, I. (2019).
+\emph{Global Hyperspectral Imaging Spectral-library of Agricultural crops for
+Conterminous United States V001} [Datensatz].
+NASA Land Processes Distributed Active Archive Center.
+\url{https://doi.org/10.5067/COMMUNITY/GHISA/GHISACONUS.001}.
 
 \end{thebibliography}
 
