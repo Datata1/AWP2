@@ -373,5 +373,6 @@ sieben getrennten Modellen, die jeweils nur eine Region ohne Metadaten sehen.
   NIR-/SWIR-1-Bändern ist ein naheliegender CV-Test.
 - Permutation Importance ohne Metadaten (`combined_svm_no_meta`) und für ein Modell mit Indizes
   (Gruppen „Spektrum“ gegen „Indizes“).
-- Hypothese einer angepassten CAI-Variante für das SWIR 2 als eigenes Experiment
-  ([Ansatz entwickeln](ansatz-entwickeln.md)).
+- ~~Hypothese einer angepassten CAI-Variante für das SWIR 2~~ – geprüft (Notebook
+  `04_kombiniert/15_jd_trockenmasse-indizes`): CAI auf 2063/2123/2184 nm plus NDTI bringen
+  keinen Gewinn (CV 0.861 statt 0.864), siehe [Fehleranalyse](fehleranalyse.md#gezielte-gegenmassnahmen).

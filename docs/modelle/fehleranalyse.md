@@ -217,6 +217,31 @@ Die ergänzende Analyse des PCA-20-Multi-Task-MLP steht in
   überlappende Übergangsspektren. Ob geteilte MLP-Schichten besser als zwei getrennte MLPs sind,
   bleibt eine CV-Hypothese.
 
+## Gezielte Gegenmaßnahmen
+
+Fünf Hypothesen gegen die Verwechslungen oben, je ein Notebook in `notebooks/04_kombiniert/`
+(15–19). Alle gegen die Referenz `combined_svm_aez_month` (CV 0.864) mit demselben Raster,
+entschieden nur per CV; validiert hätte nur ein Gewinn ≥ 0.005. Zielfehler gezählt out-of-fold
+auf dem Trainingsteil.
+
+| Hypothese | Zielfehler | CV | Zielfehler Referenz → Variante |
+| --- | --- | --- | --- |
+| Trockenmasse-Indizes: CAI auf 2063/2123/2184 nm, NDTI (15) | Weizen → Baumwolle, Critical → Mature_Senesc | 0.861 | 60 → 61, 38 → 40 |
+| Boden: SAVI, MSAVI, PVI, Bodenhelligkeit (16) | früher Mais ↔ Soja | 0.864 | 64 → 63 |
+| Ableitungsspektren, zusätzlich oder statt Spektren (17) | helle Felder, früher Mais ↔ Soja | 0.804 (bestes) | Weizen → Baumwolle 60 → 42, Mais ↔ Soja 64 → 73 |
+| Stacking statt Abstimmung (18) | Fehler, die ein anderes Modell trifft | 0.860 | alle Fehler 462 → 535 |
+| Mais/Soja-Spezialist (19) | früher Mais ↔ Soja | 0.865 | 64 → 64 |
+
+- **Keine Hypothese trägt.** Die besten Varianten bleiben im Rauschen (±0.001) oder verlieren.
+- **Ableitungen bestätigen den Helligkeitsbefund:** Ohne Helligkeitsversatz fallen 18 der 60
+  Weizen → Baumwolle-Fehler weg – die hellen Weizenfelder sind tatsächlich ein Niveau-Problem.
+  Insgesamt kosten die 131 zusätzlichen, verrauschten Ableitungsspalten aber 0.06 CV.
+- **Früher Mais ↔ Soja ist in den Spektren nicht trennbar:** Ein perfekter Spezialist brächte
+  +0.024 BAcc kombiniert (out-of-fold), ein echter korrigiert keine einzige Zeile; auch
+  Boden-Indizes ändern nichts. Die Information fehlt in diesem Stadium, nicht das Modell.
+- **Stacking** verschiebt Entscheidungen zu seltenen Klassen und verliert bei den häufigen
+  (gepaart 130 : 57 Zeilen zugunsten der Referenz).
+
 ## Folgerungen
 
 Alle Punkte sind Hypothesen für weitere Experimente; ob sie helfen, entscheidet die CV.

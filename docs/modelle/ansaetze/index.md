@@ -20,6 +20,7 @@ Begriffe: [ML-Aufgabe](../../domaene/ml-aufgabe.md#problemformulierung).
 | [Multi-Task](multi-task.md) | verglichen | Tabellarisches MLP, LSTM | `multi_task_mlp_pca20` (BAcc kombiniert 0.765) | LSTM mit Embeddings erreicht 0.417 und wird nicht weiter verfolgt; die anderen Kontextvarianten bleiben unbewertet |
 | [Kombinierte Klasse](kombiniert.md) | verglichen | Random Forest, RBF-SVM, LSTM | `combined_svm_aez_month` (BAcc kombiniert 0.869, 80/20) | Überarbeitetes GRU erreicht 0.832; Kontext ist entscheidend, die SVM bleibt klar führend. 10 Sentinel-2-Bänder halten die Qualität ([Datenreduktion](../datenreduktion.md)) |
 | [Hierarchisch](hierarchisch.md) | verglichen | RBF-SVM (bester), Extra Trees, HistGradientBoosting, MLP, logistische Regression, kNN, PLS-DA, LSTM | `hierarchical_svm` (BAcc kombiniert 0.844) | LSTM-Embeddings erreichen 0.568; hinter der SVM. Bei unbekannten Aufnahmen robuster als kombiniert ([Datenreduktion](../datenreduktion.md#grenzen-unbekannte-aufnahmen)) |
+| [AutoML](automl.md) | verglichen | Optuna-Suche über Aufbau, RBF-SVM, Extra Trees, HistGradientBoosting, logistische Regression, MLP und Vorverarbeitung | `automl_optuna_best` (BAcc kombiniert 0.879, CV 0.867) | Kein Gewinn über das Rauschen: CV +0.003 gegenüber der Referenz-SVM, out-of-fold liegt die Referenz vorn. Bestätigt kombinierte Klasse + SVM; Vorverarbeitung ausgereizt |
 
 Status: *offen* → *geplant* → *in Arbeit* → *verglichen* → *gewählt* / *verworfen*.
 

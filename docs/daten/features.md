@@ -43,6 +43,9 @@ belegt deshalb keine robuste spektrale Klassifikation.
 | Rohspektren + One-Hot-`AEZ` + numerischer `Month` | CV Balanced Accuracy kombiniert: 0,750. | Bisher stärkster beobachteter Zugewinn, aber mit Risiko einer Orts- oder Kalenderabhängigkeit; Monatskodierung wird separat verglichen. |
 | Rohspektren + NDVI, NDRE, PRI, NDWI | CV Balanced Accuracy kombiniert: 0,590. | Für diesen Random Forest kein klarer Zusatznutzen gegenüber Rohspektren. Nicht blind übernehmen; für andere Modelle oder eine kompakte Merkmalsmenge separat prüfen. |
 | SNV-Spektren + `AEZ` + zyklischer `Month` | Für die kombinierte RBF-SVM: CV BAcc kombiniert 0,823 bei `C=100.0`, `gamma=0.003`. | Unter Rohspektren (0,847); der Holdout blieb deshalb unberührt und SNV wird nicht übernommen. |
+| Trockenmasse-Indizes (CAI auf 2063/2123/2184 nm, NDTI) | Kombinierte RBF-SVM: CV 0,861 statt 0,864 (`use_dry_matter_indices`). | Nicht übernommen; senkt Weizen → Baumwolle nicht. |
+| Boden-Indizes (SAVI, MSAVI, PVI, Bodenhelligkeit) | CV 0,864, gleichauf (`use_soil_indices`). | Nicht übernommen; frühe Mais ↔ Soja-Fehler bleiben. |
+| Erste Ableitung der Spektren | Zusätzlich 0,791 (geglättet 0,804), statt Spektren mit Albedo 0,765 (`use_spectral_derivative`). | Nicht übernommen; senkt zwar Weizen → Baumwolle (60 → 42), kostet insgesamt aber 0,06. |
 | PCA-Spektren + `AEZ` + `Month` | Die kombinierte RBF-SVM wählt per CV 20 PCA-Komponenten (BAcc 0,853). | Die einmalige Validierungs-BAcc von 0,863 liegt unter Rohspektren (0,866); PCA wird nicht übernommen. |
 
 Die ersten drei Werte sind in der [Random-Forest-Baseline](../modelle/ansaetze/baseline.md)
