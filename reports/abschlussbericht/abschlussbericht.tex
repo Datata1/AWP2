@@ -468,22 +468,18 @@ Holdout +0,003).
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.85\linewidth]{modellfamilien_cv.png}
-	\caption{Beste CV-BAcc je Modellkonfiguration der breiten Suche (80/20, je
-		48 Kandidaten; Balken: Standardabweichung \"uber die f\"unf Folds). Das
-		Maximum \"uber 48 Kandidaten macht alle Werte optimistisch.}
-	\label{fig:modellfamilien}
+	\includegraphics[width=0.85\linewidth]{modellvergleich.png}
+	\caption{CV- und Holdout-BAcc kombiniert der wichtigsten Kandidaten (Split
+		70/30, nach Holdout sortiert). Die Suchbudgets unterscheiden sich je Modell.}
+	\label{fig:modellvergleich}
 \end{figure}
 
-Abbildung~\ref{fig:modellfamilien} pr\"uft, ob die Rangfolge von der
-Hyperparameterwahl abh\"angt. Die SVM erreicht die h\"ochste CV-BAcc (0,867),
-gefolgt von Extra Trees (0,861) und SVM $\to$ Extra Trees (0,860). Die
-Abst\"ande liegen innerhalb der Fold-Streuung von 0,013 bis 0,020; eine
-verl\"assliche Reihenfolge der Spitzengruppe und ein Vorteil von kombiniert oder
-hierarchisch sind damit nicht belegt. Am schw\"achsten sind
-HistGradientBoosting (0,827) und Extra Trees $\to$ HGB (0,839); beide brauchen
-je Kandidat (f\"unf CV-Anpassungen) im Median rund 107 beziehungsweise 175\,s
-statt 4\,s f\"ur die SVM.
+Abbildung~\ref{fig:modellvergleich} zeigt, ob die CV die Holdout-Rangfolge
+vorhersagt. Die ersten drei Pl\"atze (RBF-SVM, hierarchische SVM, Extra Trees)
+sind in beiden Ma\ss en gleich. Holdout und CV weichen um h\"ochstens 0,04
+voneinander ab, die gr\"o\ss te Abweichung zeigt das Multi-Task-MLP. Zwischen
+Random Forest und HistGradientBoosting (0,779 und 0,777 auf dem Holdout) ist
+keine Reihenfolge belegt.
 
 \textbf{Modellwahl.} Entscheidend war die CV-BAcc kombiniert; der Holdout dient
 nur als einmalige Best\"atigung. Zus\"atzlich z\"ahlen g\"ultige Paare, geringer
