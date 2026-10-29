@@ -402,7 +402,11 @@ braucht standardisierte Eingaben. Baumverfahren sind unempfindlich gegen die
 Skalierung und dienen als Gegenprobe. Die Suchr\"aume blieben klein (meist unter
 30 Kandidaten, f\"ur die zweistufige SVM 144). Eine sp\"atere breite Suche
 pr\"ufte zus\"atzlich 384 Kandidaten (acht Modellkonfigurationen, sechs
-Vorverarbeitungen, acht Einstellungen). Die vollst\"andige Laufhistorie steht im
+Vorverarbeitungen, acht Einstellungen). Erg\"anzend wurde eine fokussierte
+AutoML-Suche erprobt, um weitere Kombinationen aus Vorverarbeitung, Modell und
+Hyperparametern automatisiert per CV zu vergleichen und m\"ogliche Verbesserungen
+gegen\"uber den manuell entwickelten Ans\"atzen zu pr\"ufen.
+Die vollst\"andige Laufhistorie steht im
 Experimentprotokoll der Projektdokumentation und in MLflow.
 
 \subsection{Vergleich und finales Modell}
@@ -423,7 +427,7 @@ Mittelwerte der f\"unf Trainingsfolds, Holdout-Werte einmalige Bewertungen.
 		\midrule
 		\multicolumn{6}{@{}l}{\emph{Split 80/20}} \\
 		Kombiniert, RBF-SVM mit AEZ\,$\times$\,Monat & 0,864 & 0,923 & 0,922 & 0,869 & 0,859 \\
-		Kombiniert, RBF-SVM (breite Suche) & 0,867 & 0,932 & 0,920 & 0,883 & 0,858 \\
+		Kombiniert, RBF-SVM (AutoML) & 0,867 & 0,932 & 0,920 & 0,883 & 0,858 \\
 		Hierarchisch, SVM $\to$ SVM & 0,846 & 0,918 & 0,905 & 0,845 & 0,827 \\
 		Kombiniert, GRU (10 Sentinel-2-B\"ander) & 0,794 & 0,908 & 0,890 & 0,832 & 0,773 \\
 		\midrule
@@ -482,16 +486,22 @@ Random Forest und HistGradientBoosting (0,779 und 0,777 auf dem Holdout) ist
 keine Reihenfolge belegt.
 
 \textbf{Modellwahl.} Entscheidend war die CV-BAcc kombiniert; der Holdout dient
-nur als einmalige Best\"atigung. Zus\"atzlich z\"ahlen g\"ultige Paare, geringer
+als erg\"anzende Bewertung, wegen mehrfacher Betrachtung aber nicht als
+unabh\"angiger Abschlusstest. Zus\"atzlich z\"ahlen g\"ultige Paare, geringer
 Rechenaufwand und Robustheit. Bei unbekannten Aufnahmen ist die hierarchische
 SVM etwas besser (0,42 statt 0,38), beide Modelle fallen jedoch stark ab
 (Kapitel~6). Gew\"ahlt wird daher die einfachere kombinierte RBF-SVM auf allen
 131 B\"andern mit AEZ-Monat-Indikatoren ($C=300$, $\gamma=0{,}003$): 0,869
-BAcc kombiniert auf dem Holdout. Die breite Suche landet in derselben
-Modellfamilie und findet mit gegl\"atteten Spektren, Albedo und Indizes eine
-Variante mit 0,883. Der Abstand liegt innerhalb der CV-Streuung und wurde auf
-einem mehrfach genutzten Holdout gemessen; er best\"atigt die Modellfamilie,
-belegt aber keine gesicherte Verbesserung.
+BAcc kombiniert auf dem Holdout.
+
+Die fokussierte AutoML-Suche findet in derselben Modellfamilie mit gegl\"atteten
+Spektren, Albedo und Indizes eine Variante mit h\"oherer Holdout-BAcc. Ein
+erneuter Trainingslauf mit identischen Daten und Splits reproduziert
+CV~0,86682 und Holdout~0,8832; alle 1.118 Holdout-Vorhersagen stimmen exakt
+\"uberein. Der CV-Gewinn gegen\"uber der Referenz betr\"agt jedoch nur etwa
+0,003 und unterschreitet die festgelegte Mindestschwelle von 0,005.
+Das Ergebnis wird deshalb als reproduzierbares Zusatzexperiment berichtet,
+nicht als unabh\"angig belegte Verbesserung oder neues Abgabemodell.
 % ENTSCHEIDUNG: Abgabemodell laut Doku auf main ist combined_svm_aez_month (Run 17dc9e16);
 % der AutoML-Gewinner (Run c99e3915, 0,883) ist als zweites Modell eingefroren.
 
