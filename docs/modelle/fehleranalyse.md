@@ -36,8 +36,14 @@ für Kapitel 6 des Abschlussberichts.
 - Schwächste Klassen: `soybean|Emerge_VEarly` (Recall 0,48, 21 Fälle), `cotton|Mature_Senesc`
   (0,62, 13), `corn|Emerge_VEarly` (0,77, 30). Klassen mit < 20 Fällen sind im Mittel nicht
   schlechter (0,91 gegenüber 0,85).
-- McNemar: Endmodell vs. Baseline 108 : 30 (p < 10⁻¹⁰), vs. hierarchisch 47 : 26 (p = 0,02,
-  nur Hinweis – der Holdout wurde mehrfach betrachtet). Oracle-Kultur hierarchisch 0,941.
+- Bootstrap (1.000 Ziehungen der Holdout-Zeilen, 95-%-Intervall der kombinierten BAcc):
+  Vorsprung auf die Baseline 0,07 bis 0,16, auf die hierarchische SVM 0,00 bis 0,05 (in 97 % der
+  Ziehungen positiv). Nur eines der Modelle trifft: 108 : 30 bzw. 47 : 26 Zeilen. Nur Hinweis –
+  der Holdout wurde mehrfach betrachtet. Oracle-Kultur hierarchisch 0,941.
+
+![Recall je Klasse gegen Fallzahl](img/endmodell_recall_faelle.png)
+
+![Bootstrap-Intervalle der kombinierten BAcc](img/endmodell_bootstrap.png)
 
 ## Verglichene Modelle
 

@@ -555,19 +555,51 @@ erreicht eine BAcc von 0,923 f\"ur die Kulturart, 0,922 f\"ur das Stadium
 und 0,869 f\"ur das Paar. Gegen\"uber der Baseline gewinnt es 0,118
 kombinierte BAcc und 0,166 Macro-F1. Bei den Einzelzielen steigt das
 Stadium (+0,052) st\"arker als die Kulturart (+0,025). Das Endmodell sagt nur g\"ultige Paare voraus,
-die Baseline zu 0,3\,\% unm\"ogliche. Ein exakter McNemar-Test auf die
-kombinierten Treffer best\"atigt den Abstand: 108 Zeilen trifft nur das
-Endmodell, 30 nur die Baseline ($p < 10^{-10}$). Gegen\"uber der
-hierarchischen SVM ist der Unterschied kleiner (47 gegen 26 Zeilen,
-$p = 0{,}02$). Da der Holdout schon mehrfach betrachtet wurde, ist das nur
-ein Hinweis, kein unabh\"angiger Test.
+die Baseline zu 0,3\,\% unm\"ogliche.
+
+\paragraph{Wie sicher ist der Vorsprung?}
+Der Holdout umfasst nur 1.118 Zeilen, und seltene Klassen gehen mit wenigen
+F\"allen in die BAcc ein. Ein anderer Holdout h\"atte also leicht andere
+Werte ergeben. Um diese Unsicherheit zu zeigen, haben wir 1.000-mal
+Holdout-Zeilen mit Zur\"ucklegen gezogen (Bootstrap). F\"ur jede Ziehung
+wurde die kombinierte BAcc aller drei Modelle berechnet.
+Abbildung~\ref{fig:ergebnisse-bootstrap} zeigt die Bereiche, in denen 95\,\%
+der Ziehungen liegen. Der Vorsprung auf die Baseline betr\"agt 0,07 bis 0,16
+und ist in jeder Ziehung positiv. Er ist also kein Zufall der
+Zeilenauswahl. Auch zeilenweise ist das Bild klar: 108 Zeilen trifft nur das
+Endmodell, 30 nur die Baseline. Der Vorsprung auf die hierarchische SVM
+liegt dagegen zwischen 0,00 und 0,05 (47 gegen 26 Zeilen). Er ist in 97\,\%
+der Ziehungen positiv, aber klein. Beide Ans\"atze sind deshalb nahezu
+gleichwertig. F\"ur das kombinierte Modell sprechen der kleine Vorsprung
+und der einfachere Aufbau. Der Holdout wurde bei der Modellwahl schon
+mehrfach betrachtet, die Intervalle sind deshalb eher zu optimistisch.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{endmodell_bootstrap.png}
+\caption{Kombinierte BAcc auf dem Holdout (links) und Vorsprung des
+Endmodells (rechts). Punkt: Median, Balken: 95\,\% der 1.000
+Bootstrap-Ziehungen. Liegt ein Balken rechts der Nulllinie, ist das
+Endmodell in fast allen Ziehungen besser.}
+\label{fig:ergebnisse-bootstrap}
+\end{figure}
 
 \paragraph{Wo die Fehler entstehen.}
 Das Endmodell sagt 89,1\,\% der Zeilen vollst\"andig richtig voraus. Bei
 8,0\,\% ist die Kulturart falsch, bei 2,9\,\% nur das Stadium. Rund drei
-Viertel der Fehler sind also Kulturfehler. Stimmt die Kulturart, liegt die
-Stadium-BAcc bei 0,965. Abbildung~\ref{fig:ergebnisse-konfusion} zeigt die
-Verwechslungen. Am h\"aufigsten wird Soja f\"ur Mais gehalten (22 Zeilen).
+Viertel der Fehler sind also Kulturfehler (Abbildung~\ref{fig:ergebnisse-zerlegung}).
+Bei der Baseline sind es knapp zwei Drittel, sie verfehlt deutlich mehr Stadien.
+Stimmt die Kulturart, liegt die Stadium-BAcc des Endmodells bei 0,965.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{endmodell_zerlegung.png}
+\caption{Anteil der Holdout-Zeilen, die vollst\"andig richtig sind, nur ein
+falsches Stadium oder eine falsche Kulturart haben.}
+\label{fig:ergebnisse-zerlegung}
+\end{figure}
+
+Abbildung~\ref{fig:ergebnisse-konfusion} zeigt die Verwechslungen. Am h\"aufigsten wird Soja f\"ur Mais gehalten (22 Zeilen).
 Es folgen Winterweizen als Baumwolle (17) und Mais als Soja (12).
 Winterweizen hat mit 0,874 den niedrigsten Kultur-Recall, \texttt{Mature\_Senesc}
 mit 0,859 den niedrigsten Stadium-Recall. Reine Stadiumfehler betreffen
@@ -584,32 +616,24 @@ je Klasse.}
 \end{figure}
 
 \paragraph{Schwache und seltene Klassen.}
-Tabelle~\ref{tab:ergebnisse-klassen} zeigt die kombinierten Klassen mit dem
-niedrigsten Recall. Es sind fr\"uhe Stadien und die Seneszenz, also Klassen
-am Rand der Saison. Seltenheit allein erkl\"art die Schw\"achen nicht: Die
-sieben Klassen mit weniger als 20 Holdout-F\"allen erreichen im Mittel
-einen Recall von 0,907, die \"ubrigen 0,852. Bei 2 bis 13 F\"allen schwanken
-die Werte aber stark. So beruht der Recall von 1,00 f\"ur
-\texttt{cotton|Harvest} auf nur zwei Zeilen.
+Abbildung~\ref{fig:ergebnisse-klassen} stellt den Recall jeder kombinierten
+Klasse ihrer Fallzahl gegen\"uber. Am schw\"achsten sind fr\"uhe Stadien und
+die Seneszenz, also Klassen am Rand der Saison. Fr\"uhe Soja erkennt das
+Modell nur in knapp der H\"alfte der F\"alle (Recall 0,476, Precision
+0,625), abgereifte Baumwolle in 0,615. Seltenheit allein erkl\"art die
+Schw\"achen nicht. Die sieben Klassen mit weniger als 20 Holdout-F\"allen
+erreichen im Mittel einen Recall von 0,907, die \"ubrigen 0,852. Bei 2 bis
+13 F\"allen schwanken die Werte aber stark. So beruht der Recall von 1,00
+f\"ur \texttt{cotton|Harvest} auf nur zwei Zeilen.
 
-\begin{table}[htbp]
+\begin{figure}[htbp]
 \centering
-\caption{Kombinierte Klassen mit dem niedrigsten Recall (Endmodell, Holdout).}
-\label{tab:ergebnisse-klassen}
-\small
-\begin{tabular}{@{}lrrrr@{}}
-	\toprule
-	Klasse & Precision & Recall & F1 & F\"alle \\
-	\midrule
-	\texttt{soybean|Emerge\_VEarly} & 0,625 & 0,476 & 0,541 & 21 \\
-	\texttt{cotton|Mature\_Senesc} & 0,727 & 0,615 & 0,667 & 13 \\
-	\texttt{corn|Emerge\_VEarly} & 0,657 & 0,767 & 0,708 & 30 \\
-	\texttt{soybean|Mature\_Senesc} & 0,719 & 0,793 & 0,754 & 29 \\
-	\texttt{corn|Harvest} & 0,889 & 0,800 & 0,842 & 20 \\
-	\texttt{winter\_wheat|Mature\_Senesc} & 0,924 & 0,803 & 0,859 & 76 \\
-	\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=0.8\linewidth]{endmodell_recall_faelle.png}
+\caption{Recall je kombinierter Klasse gegen ihre Fallzahl im Holdout
+(Endmodell). Beschriftet sind die sechs Klassen mit dem niedrigsten
+Recall.}
+\label{fig:ergebnisse-klassen}
+\end{figure}
 
 \paragraph{Saisonr\"ander und Regionen.}
 Abbildung~\ref{fig:ergebnisse-kontext} zeigt, dass sich die Kulturfehler
@@ -644,10 +668,20 @@ kombinierte BAcc von 0,845 auf 0,941. Die Kulturfehler kosten also rund
 \paragraph{\"Ubertragbarkeit.}
 Alle Werte gelten f\"ur bekannte Kombinationen aus AEZ und Monat. Die
 Testdaten liegen in denselben 32 Zellen wie das Training. In einer
-Gruppen-CV, die ganze Zellen zur\"uckh\"alt, f\"allt die kombinierte SVM auf
-0,378. F\"ur einen unbekannten Monat erreicht sie 0,421, f\"ur eine
-unbekannte Region 0,284. Das Modell ist deshalb nicht ohne neue Labels auf
-andere Regionen oder Zeitpunkte \"ubertragbar.
+Gruppen-CV, die ganze Zellen zur\"uckh\"alt, f\"allt die kombinierte SVM von
+0,859 auf 0,378 (Abbildung~\ref{fig:ergebnisse-uebertragbarkeit}). F\"ur
+einen unbekannten Monat erreicht sie 0,421, f\"ur eine unbekannte Region
+0,284. Das Modell ist deshalb nicht ohne neue Labels auf andere Regionen
+oder Zeitpunkte \"ubertragbar.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\linewidth]{uebertragbarkeit.png}
+\caption{Kombinierte CV-BAcc der SVM mit allen B\"andern bei zuf\"alligen
+Folds (blau) und bei Folds, die ganze Aufnahmen, Monate oder Regionen
+zur\"uckhalten (rot).}
+\label{fig:ergebnisse-uebertragbarkeit}
+\end{figure}
 
 \subsection{Fachliche Einordnung und Erkl\"arbarkeit}
 
@@ -683,12 +717,22 @@ Monat (Abfall jeweils etwa 0,41). Je Kulturart unterscheiden sich die
 wichtigsten Bereiche: F\"ur Mais und Baumwolle ist es das SWIR~2, f\"ur Reis,
 Soja und Winterweizen das NIR.
 
-Einzelne B\"ander sind kaum wichtig. Der gr\"o\ss te Einzelwert betr\"agt nur
-0,038 (722\,nm), w\"ahrend ganze Regionen bis zu 0,47 kosten. Benachbarte
+Einzelne B\"ander sind kaum wichtig (Abbildung~\ref{fig:ergebnisse-baender}).
+Der gr\"o\ss te Einzelwert betr\"agt nur 0,038 (722\,nm), w\"ahrend ganze
+Regionen bis zu 0,47 kosten. Benachbarte
 B\"ander ersetzen sich gegenseitig, deshalb untersch\"atzen Einzelwerte die
 Bedeutung einer Region. Die einzige zusammenh\"angende Spitze liegt im Red
 Edge bei 712--742\,nm, also beim steilen Anstieg der Vegetationsreflexion.
 Nur dort zeigen mehrere benachbarte B\"ander zugleich erh\"ohte Werte.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{feature_importance_baender.png}
+\caption{Permutation Importance einzelner B\"ander f\"ur die kombinierte
+BAcc (Referenz-SVM, Band: Standardabweichung). Graue Fl\"achen markieren
+die Spektralregionen, L\"ucken sind entfernte B\"ander.}
+\label{fig:ergebnisse-baender}
+\end{figure}
 Umgekehrt h\"angt die Gr\"o\ss e einer Region mit ihrer Wichtigkeit zusammen.
 Das NIR umfasst 44 B\"ander, das Red Edge nur sieben. Neu trainierte Modelle
 trennen beide Effekte. Mit AEZ und Monat erreicht das Red Edge allein 0,792,
