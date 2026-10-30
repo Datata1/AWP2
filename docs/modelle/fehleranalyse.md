@@ -11,6 +11,40 @@ Bausteine: `error_breakdown()`, `recall_by_class()`, `compare_predictions()`
     `tune()` geprüft. Die Muster nach Monat und AEZ sind zusätzlich auf Out-of-fold-Vorhersagen
     des Trainingsteils gegengeprüft.
 
+## Endmodell (80/20)
+
+Prüfung der Befunde unten für das Endmodell `combined_svm_aez_month` (`17dc9e16`) auf dem
+80/20-Holdout, Notebook `notebooks/09_analyse/05_jd_fehleranalyse-endmodell.ipynb`; Grundlage
+für Kapitel 6 des Abschlussberichts.
+
+| | Baseline (RF, neu trainiert) | Hierarchisch (SVM) | Endmodell |
+| --- | --- | --- | --- |
+| BAcc Kultur / Stadium / kombiniert | 0,898 / 0,870 / 0,751 | 0,918 / 0,905 / 0,845 | **0,923 / 0,922 / 0,869** |
+| Macro-F1 kombiniert / Samples-F1 | 0,693 / 0,879 | 0,827 / 0,906 | **0,859 / 0,920** |
+| beides richtig / Kultur falsch / nur Stadium falsch | 0,821 / 0,112 / 0,067 | 0,872 / 0,087 / 0,041 | 0,891 / 0,080 / 0,029 |
+
+![Fehlerzerlegung Endmodell](img/endmodell_zerlegung.png)
+
+![Confusion Matrices des Endmodells](img/endmodell_konfusion.png)
+
+![Kulturfehler nach Monat und AEZ](img/endmodell_kulturfehler_kontext.png)
+
+- **Die Befunde der 70/30-Analyse gelten weiter:** Rund drei Viertel der Fehler sind
+  Kulturfehler; sie häufen sich im Mai (21 %), Juni (16 %) und Oktober (13 %) sowie in AEZ 9 und 7
+  (je 14 %), out-of-fold auf dem Trainingsteil ebenso.
+- Häufigste Kulturverwechslungen: Soja → Mais (22), Winterweizen → Baumwolle (17), Mais → Soja (12).
+- Schwächste Klassen: `soybean|Emerge_VEarly` (Recall 0,48, 21 Fälle), `cotton|Mature_Senesc`
+  (0,62, 13), `corn|Emerge_VEarly` (0,77, 30). Klassen mit < 20 Fällen sind im Mittel nicht
+  schlechter (0,91 gegenüber 0,85).
+- Bootstrap (1.000 Ziehungen der Holdout-Zeilen, 95-%-Intervall der kombinierten BAcc):
+  Vorsprung auf die Baseline 0,07 bis 0,16, auf die hierarchische SVM 0,00 bis 0,05 (in 97 % der
+  Ziehungen positiv). Nur eines der Modelle trifft: 108 : 30 bzw. 47 : 26 Zeilen. Nur Hinweis –
+  der Holdout wurde mehrfach betrachtet. Oracle-Kultur hierarchisch 0,941.
+
+![Recall je Klasse gegen Fallzahl](img/endmodell_recall_faelle.png)
+
+![Bootstrap-Intervalle der kombinierten BAcc](img/endmodell_bootstrap.png)
+
 ## Verglichene Modelle
 
 Je Ansatz das beste bewertete Modell, mit den protokollierten Einstellungen neu trainiert und auf
