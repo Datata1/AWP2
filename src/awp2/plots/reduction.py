@@ -16,6 +16,7 @@ from awp2.config import (
     REDUCTION_FAMILY_COL,
     REDUCTION_FAMILY_LABELS,
     REDUCTION_MAX_CV_LOSS,
+    REDUCTION_REFERENCE_FAMILY,
     STD_SUFFIX,
 )
 from awp2.data import wavelength
@@ -43,7 +44,9 @@ def plot_tradeoff(
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 5))
-    for family, rows in curve.groupby(REDUCTION_FAMILY_COL, sort=False):
+    is_reference = curve[REDUCTION_FAMILY_COL] == REDUCTION_REFERENCE_FAMILY
+    # the reference shares its band count with every PCA variant, so it goes on top
+    for family, rows in curve[~is_reference].groupby(REDUCTION_FAMILY_COL, sort=False):
         rows = rows.sort_values(x)
         ax.errorbar(
             rows[x],
@@ -51,9 +54,22 @@ def plot_tradeoff(
             yerr=rows[f"{metric}{STD_SUFFIX}"],
             marker="o",
             capsize=3,
+            alpha=0.8,
             label=REDUCTION_FAMILY_LABELS.get(str(family), str(family)),
         )
-    reference = curve.loc[curve[REDUCTION_FAMILY_COL] == "all_bands", metric]
+    reference_rows = curve[is_reference]
+    ax.errorbar(
+        reference_rows[x],
+        reference_rows[metric],
+        yerr=reference_rows[f"{metric}{STD_SUFFIX}"],
+        marker="D",
+        markersize=8,
+        color="black",
+        capsize=3,
+        zorder=5,
+        label=REDUCTION_FAMILY_LABELS[REDUCTION_REFERENCE_FAMILY],
+    )
+    reference = reference_rows[metric]
     if not reference.empty:
         ax.axhline(reference.iloc[0], color="grey", linestyle="--", linewidth=1)
     # metadata-only has zero bands, which a plain log axis cannot show

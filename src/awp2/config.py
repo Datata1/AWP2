@@ -484,6 +484,7 @@ DOWNLOAD_TIMEOUT_S = 60
 ReductionFamily = Literal[
     "all_bands", "pca", "band_selection", "band_step", "sentinel2", "indices_only", "meta_only"
 ]
+REDUCTION_REFERENCE_FAMILY: ReductionFamily = "all_bands"
 REDUCTION_FAMILY_LABELS: dict[str, str] = {
     "all_bands": "Alle Bänder",
     "pca": "PCA",

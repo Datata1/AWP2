@@ -229,6 +229,41 @@ Split-Protokoll, nicht eine neue Modellvariante.
     andere Zeilen enthalten. Sie zeigt, dass die bewaehrte SVM-Repraesentation auch mit dem
     neuen Protokoll stabil bleibt.
 
+### RBF-SVM: Verifikation des AutoML-Gewinners
+
+Notebook: `notebooks/09_analyse/04_qmowo_automl-verifikation.ipynb`, ausgeführt am 29.10.2026.
+Dies ist eine **Reproduktion der eingefrorenen Konfiguration**, keine weitere Suche oder
+Modellwahl. Grundlage ist das lokale Sicherungspaket des ursprünglichen Runs `c99e3915`.
+
+- RBF-SVM mit `C=100`, `gamma="scale"`, `class_weight="balanced"`, `SEED`.
+- Spektren: Interpolationsgrenze 10 nm, Savitzky-Golay 11/3, MinMax-Skalierung;
+    zusätzlich Albedo und Vegetationsindizes; AEZ×Monat und zyklischer Monat; keine PCA/SNV.
+- SHA-256 von bereinigtem Datensatz, Split und Split-Konfiguration sowie sämtliche
+    Holdout-Features, Labels und IDs stimmen mit dem Archiv überein: 4.471 Trainingszeilen,
+    1.118 Holdout-Zeilen. Die fünf gemeinsamen Trainingsfolds werden unverändert verwendet.
+- Singleton-`tune()` reproduziert **CV-BAcc 0.86682** (`fb3b2035`), der frische `run()`
+    **Holdout-BAcc Crop 0.9325 / Stage 0.9204 / kombiniert 0.8832** (`18f708b4`).
+    Macro-F1 beträgt 0.9170 / 0.9107 / 0.8576, Samples-F1 0.9217; keine ungültigen Paare.
+    **Alle 1.118 Vorhersagen** und acht Metriken stimmen exakt, trotz 15 abweichender oder
+    fehlender Quelldateien gegenüber dem Paket. Auch reine Inferenz mit dem Paket-Code besteht.
+
+Konfusionsmatrizen und Paarklassenrecalls stehen im Verifikationsnotebook. Frühe Sojabohnen
+bleiben die schwächste Paarklasse (Recall 0.5714 bei 21 Zeilen). Perfekte Recalls mancher
+Kleinstklassen beruhen auf nur zwei bis acht Beispielen.
+
+**Einordnung gegenüber Optuna:** Der Stand `origin/exp/automl-optuna@1e589b1` berichtet für
+Suche 1 **CV 0.867 / Holdout 0.879**, für Suche 2 **0.861 / 0.870**, für Suche 3 **0.866 /
+kein Holdout**. Ein Vergleich von 0.86 CV mit 0.8832 Holdout vermischt Metrikprotokolle.
+Die erste Optuna-SVM verwendet zudem Standardisierung und PCA 80 statt dieser Vorverarbeitung.
+Ihre exakten Studienartefakte und Zeilenprognosen liegen für einen gepaarten Vergleich nicht vor;
+die Teamwerte wurden aus der Branch-Dokumentation gelesen, nicht hier neu reproduziert.
+
+Der rund 0.0042 höhere Holdout-Wert beweist daher **keine Überlegenheit**. Beide Suchen waren
+adaptiv, der Holdout wurde mehrfach betrachtet, und 32 AEZ×Monat-Kontexte kommen in Training
+und Holdout vor. Die Prüfung bestätigt Wiederholbarkeit auf denselben Zeilen, nicht Leistung
+auf neuen Aufnahmen oder einem unabhängigen Abschlusstest. Es werden keine weiteren
+Parameteranpassungen aus dieser Prüfung abgeleitet.
+
 ### RBF-SVM mit Standard Normal Variate
 
 Notebook: `notebooks/04_kombiniert/09_duac1011_svm-snv.ipynb`. SNV normalisiert jedes interpolierte
