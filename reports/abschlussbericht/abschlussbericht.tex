@@ -12,6 +12,8 @@
 	justification=raggedright,singlelinecheck=true,skip=8pt}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
@@ -209,10 +211,10 @@ die Klassifikation entsprechend.
 
 \paragraph{Benachbarte B\"ander sind redundant.}
 Benachbarte nutzbare B\"ander korrelieren im Median mit 0,999. Univariat liegen die
-gr\"o\ss{}ten Unterschiede zwischen Kulturen
-liegen zwischen 600 und 700\,nm, zwischen Stadien am \"Ubergang zum NIR
-(760--875\,nm) und im SWIR. Das begr\"undet die Untersuchung von
-Dimensionsreduktion und Bandauswahl (Abschnitt~\ref{sec:datenreduktion}); jede
+gr\"o\ss{}ten Unterschiede zwischen Kulturen zwischen 600 und 700\,nm, zwischen
+Stadien am \"Ubergang zum NIR (760--875\,nm) und im SWIR. Das begr\"undet die
+Untersuchung von Dimensionsreduktion und Bandauswahl
+(Abschnitt~\ref{sec:datenreduktion}); jede
 solche Auswahl wird nur im Trainingsfold gelernt.
 
 \paragraph{Kontext strukturiert die Labels stark.}
@@ -235,6 +237,34 @@ die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
 \end{figure}
 
 \section{Methodik und Validierung}
+
+Abbildung~\ref{fig:methodik-pipeline} fasst die Trennung von Modellauswahl
+und Holdout-Bewertung zusammen.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+	>={Stealth[length=2mm]},
+	box/.style={draw, rounded corners=2pt, align=center, font=\small,
+		text width=4cm, minimum height=10mm, inner sep=2mm},
+	arrow/.style={->, thick}
+]
+	\node[box] (clean) at (-5,0) {Daten pr\"ufen\\und bereinigen};
+	\node[box] (split) at (0,0) {Stratifizierter\\80/20-Split};
+	\node[box] (train) at (5,0) {Training\\CV und Modellauswahl};
+	\node[box] (holdout) at (0,-1.45) {Holdout\\bleibt zur\"uckgehalten};
+	\node[box] (fit) at (5,-2.9) {Finales Training\\auf allen Trainingsdaten};
+	\node[box] (evaluate) at (0,-2.9) {Bewertung\\auf dem Holdout};
+	\draw[arrow] (clean) -- (split);
+	\draw[arrow] (split) -- (train);
+	\draw[arrow] (split) -- (holdout);
+	\draw[arrow] (train) -- (fit);
+	\draw[arrow] (fit) -- (evaluate);
+	\draw[arrow] (holdout) -- (evaluate);
+\end{tikzpicture}
+\caption{Kompakter Ablauf mit getrennter Trainings-CV und Holdout-Bewertung.}
+\label{fig:methodik-pipeline}
+\end{figure}
 
 \subsection{Datenaufbereitung und Merkmalsbildung}
 \label{sec:aufbereitung}
@@ -462,8 +492,7 @@ CV~0,86682 und Holdout~0,8832; alle 1.118 Holdout-Vorhersagen stimmen exakt
 0,003 und unterschreitet die festgelegte Mindestschwelle von 0,005.
 Das Ergebnis wird deshalb als reproduzierbares Zusatzexperiment berichtet,
 nicht als unabh\"angig belegte Verbesserung oder neues Abgabemodell. Die
-AutoML-Suche selbst wurde nicht sauber evaluiert, etwa ohne unabh\"angigen
-Vergleich der Suchstrategie.
+AutoML-Suche selbst wurde nicht sauber evaluiert.
 
 \section{Datenreduktion}
 \label{sec:datenreduktion}
