@@ -516,23 +516,204 @@ nicht als unabh\"angig belegte Verbesserung oder neues Abgabemodell.
 % vertretbar? Schlussfolgerungen auf die tats\"achlich gepr\"uften Varianten begrenzen.
 
 \section{Ergebnisse und Interpretation}
+\label{sec:ergebnisse}
 
 \subsection{Vorhersageleistung und Fehleranalyse}
-% Finale Kennzahlen f\"ur Crop und Stage sowie gemeinsame Samples-F1 berichten.
-% Verbesserungen zur Baseline quantifizieren; Datenbasis jeder Kennzahl nennen.
-% Confusion Matrices sowie Precision, Recall und Fallzahlen je Klasse zeigen.
-% H\"aufige Verwechslungen und Schw\"achen bei seltenen Klassen diskutieren.
-% Bei hierarchischen Modellen m\"ogliche Fehlerfortpflanzung betrachten.
-% F\"ur ungelabelte Abgabedaten keine selbst berechneten G\"utema\ss e behaupten;
-% externe Bewertung nur bei tats\"achlich vorliegender R\"uckmeldung aufnehmen.
+
+\paragraph{Datenbasis.}
+Alle Kennzahlen in diesem Abschnitt stammen vom internen Holdout
+(1.118 Beobachtungen, Abschnitt~\ref{sec:evaluation}). Das Endmodell wurde
+daf\"ur mit seinen festen Einstellungen nur auf den 4.471 Trainingszeilen
+angepasst. Das Abgabemodell nutzt zus\"atzlich den Holdout. F\"ur
+\texttt{test.csv} gibt es keine Labels, deshalb nennen wir dort keine
+G\"utema\ss e. Zum Vergleich wurden die Random-Forest-Baseline und die
+hierarchische SVM mit ihren protokollierten Einstellungen auf demselben
+80/20-Split neu trainiert.
+
+\begin{table}[htbp]
+\centering
+\caption{Holdout-Ergebnisse des Endmodells und der Vergleichsmodelle (Split 80/20).}
+\label{tab:ergebnisse}
+\small
+\begin{tabular}{@{}lccccc@{}}
+	\toprule
+	& \multicolumn{3}{c}{BAcc} & Macro-F1 & Samples-F1 \\
+	\cmidrule(lr){2-4}
+	Modell & Crop & Stage & komb. & komb. & \\
+	\midrule
+	Baseline: Random Forest & 0,898 & 0,870 & 0,751 & 0,693 & 0,879 \\
+	Hierarchisch, SVM $\to$ SVM & 0,918 & 0,905 & 0,845 & 0,827 & 0,906 \\
+	\textbf{Endmodell: kombinierte RBF-SVM} & \textbf{0,923} & \textbf{0,922} &
+		\textbf{0,869} & \textbf{0,859} & \textbf{0,920} \\
+	\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Leistung und Abstand zur Baseline.}
+Tabelle~\ref{tab:ergebnisse} fasst die Ergebnisse zusammen. Das Endmodell
+erreicht eine BAcc von 0,923 f\"ur die Kulturart, 0,922 f\"ur das Stadium
+und 0,869 f\"ur das Paar. Gegen\"uber der Baseline gewinnt es 0,118
+kombinierte BAcc und 0,166 Macro-F1. Bei den Einzelzielen steigt das
+Stadium (+0,052) st\"arker als die Kulturart (+0,025). Das Endmodell sagt nur g\"ultige Paare voraus,
+die Baseline zu 0,3\,\% unm\"ogliche. Ein exakter McNemar-Test auf die
+kombinierten Treffer best\"atigt den Abstand: 108 Zeilen trifft nur das
+Endmodell, 30 nur die Baseline ($p < 10^{-10}$). Gegen\"uber der
+hierarchischen SVM ist der Unterschied kleiner (47 gegen 26 Zeilen,
+$p = 0{,}02$). Da der Holdout schon mehrfach betrachtet wurde, ist das nur
+ein Hinweis, kein unabh\"angiger Test.
+
+\paragraph{Wo die Fehler entstehen.}
+Das Endmodell sagt 89,1\,\% der Zeilen vollst\"andig richtig voraus. Bei
+8,0\,\% ist die Kulturart falsch, bei 2,9\,\% nur das Stadium. Rund drei
+Viertel der Fehler sind also Kulturfehler. Stimmt die Kulturart, liegt die
+Stadium-BAcc bei 0,965. Abbildung~\ref{fig:ergebnisse-konfusion} zeigt die
+Verwechslungen. Am h\"aufigsten wird Soja f\"ur Mais gehalten (22 Zeilen).
+Es folgen Winterweizen als Baumwolle (17) und Mais als Soja (12).
+Winterweizen hat mit 0,874 den niedrigsten Kultur-Recall, \texttt{Mature\_Senesc}
+mit 0,859 den niedrigsten Stadium-Recall. Reine Stadiumfehler betreffen
+fast nur benachbarte Stadien, etwa Soja \texttt{Critical} als
+\texttt{Mature\_Senesc} (6 Zeilen).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{endmodell_konfusion.png}
+\caption{Zeilennormierte Confusion Matrices des Endmodells f\"ur Kulturart
+(links) und Stadium (rechts) auf dem Holdout. Die Diagonale ist der Recall
+je Klasse.}
+\label{fig:ergebnisse-konfusion}
+\end{figure}
+
+\paragraph{Schwache und seltene Klassen.}
+Tabelle~\ref{tab:ergebnisse-klassen} zeigt die kombinierten Klassen mit dem
+niedrigsten Recall. Es sind fr\"uhe Stadien und die Seneszenz, also Klassen
+am Rand der Saison. Seltenheit allein erkl\"art die Schw\"achen nicht: Die
+sieben Klassen mit weniger als 20 Holdout-F\"allen erreichen im Mittel
+einen Recall von 0,907, die \"ubrigen 0,852. Bei 2 bis 13 F\"allen schwanken
+die Werte aber stark. So beruht der Recall von 1,00 f\"ur
+\texttt{cotton|Harvest} auf nur zwei Zeilen.
+
+\begin{table}[htbp]
+\centering
+\caption{Kombinierte Klassen mit dem niedrigsten Recall (Endmodell, Holdout).}
+\label{tab:ergebnisse-klassen}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+	\toprule
+	Klasse & Precision & Recall & F1 & F\"alle \\
+	\midrule
+	\texttt{soybean|Emerge\_VEarly} & 0,625 & 0,476 & 0,541 & 21 \\
+	\texttt{cotton|Mature\_Senesc} & 0,727 & 0,615 & 0,667 & 13 \\
+	\texttt{corn|Emerge\_VEarly} & 0,657 & 0,767 & 0,708 & 30 \\
+	\texttt{soybean|Mature\_Senesc} & 0,719 & 0,793 & 0,754 & 29 \\
+	\texttt{corn|Harvest} & 0,889 & 0,800 & 0,842 & 20 \\
+	\texttt{winter\_wheat|Mature\_Senesc} & 0,924 & 0,803 & 0,859 & 76 \\
+	\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Saisonr\"ander und Regionen.}
+Abbildung~\ref{fig:ergebnisse-kontext} zeigt, dass sich die Kulturfehler
+zeitlich und r\"aumlich h\"aufen. Im Mai ist bei 21\,\% der Zeilen die
+Kulturart falsch, im Juni bei 16\,\% und im Oktober bei 13\,\%. Von Juli bis
+September sind es nur 3,5 bis 5,3\,\%. In AEZ~9 liegt der Anteil bei
+14\,\% (285 Zeilen), in AEZ~7 ebenfalls, dort aber bei nur 28 Zeilen. In
+AEZ~8 und AEZ~10 bleibt er unter 4\,\%. Out-of-fold-Vorhersagen auf dem
+Trainingsanteil zeigen dasselbe Muster (Mai 21\,\%, Oktober 15\,\%, AEZ~9
+12\,\%). Es ist also kein Zufall des Holdouts. Eine plausible, aber nicht
+gepr\"ufte Erkl\"arung: Am Saisonanfang bedeckt der Bestand wenig Boden, am
+Ende ist er abgereift oder geerntet. Das Signal wird dann vom Boden gepr\"agt,
+und die Spektren der Kulturen gleichen sich an. Dazu passt eine fr\"uhere
+Analyse mit Vorg\"angermodellen: Fr\"uher Mais und fr\"uhe Soja \"uberlappen
+spektral stark, und die als Baumwolle erkannten Weizenspektren sind
+auff\"allig hell.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{endmodell_kulturfehler_kontext.png}
+\caption{Anteil der Holdout-Zeilen mit falscher Kulturart nach Monat (links)
+und AEZ (rechts) f\"ur Baseline, Endmodell und hierarchische SVM.}
+\label{fig:ergebnisse-kontext}
+\end{figure}
+
+\paragraph{Fehlerfortpflanzung im hierarchischen Ansatz.}
+Bei der hierarchischen SVM wird jeder Kulturfehler zum Paarfehler. Steuert
+man ihre Stadium-Modelle mit der wahren Kulturart an, steigt die
+kombinierte BAcc von 0,845 auf 0,941. Die Kulturfehler kosten also rund
+0,10. Der Engpass ist in beiden Ans\"atzen dieselbe Kulturstufe.
+
+\paragraph{\"Ubertragbarkeit.}
+Alle Werte gelten f\"ur bekannte Kombinationen aus AEZ und Monat. Die
+Testdaten liegen in denselben 32 Zellen wie das Training. In einer
+Gruppen-CV, die ganze Zellen zur\"uckh\"alt, f\"allt die kombinierte SVM auf
+0,378. F\"ur einen unbekannten Monat erreicht sie 0,421, f\"ur eine
+unbekannte Region 0,284. Das Modell ist deshalb nicht ohne neue Labels auf
+andere Regionen oder Zeitpunkte \"ubertragbar.
 
 \subsection{Fachliche Einordnung und Erkl\"arbarkeit}
-% Ergebnisse mit spektralen Mustern und Dom\"anenwissen in Beziehung setzen.
-% Gemessene Befunde von plausiblen, aber ungepr\"uften Erkl\"arungen trennen.
-% Falls untersucht: Feature Importance, relevante Wellenl\"angen und Nutzen
-% von AEZ/Month erl\"autern; Verfahren und Grenzen der Erkl\"arung nennen.
-% Korrelation nicht als Kausalit\"at auslegen; bei korrelierten B\"andern die
-% eingeschr\"ankte Interpretierbarkeit einzelner Wichtigkeiten diskutieren.
+
+\paragraph{Verfahren.}
+Welche Eingaben das Modell nutzt, wurde mit Permutation Importance
+untersucht. Dazu wird je CV-Fold eine Merkmalsgruppe im Testfold zuf\"allig
+vertauscht. Gemessen wird der Abfall der BAcc. Die Gruppen sind sieben
+Spektralregionen sowie AEZ und Monat. Zus\"atzlich wurde jedes Band einzeln
+vertauscht. Die Analyse nutzt nur den Trainingsanteil, der Holdout bleibt
+unber\"uhrt. Gegenstand ist die kombinierte RBF-SVM ohne
+AEZ-Monat-Indikatoren. Sie geh\"ort zur selben Modellfamilie wie das
+Endmodell, ist aber nicht identisch mit ihm. Als zweite Methode erkl\"art
+KernelSHAP die Entscheidungsfunktion derselben SVM f\"ur dieselben neun
+Gruppen. Die Rangfolge der Gruppen stimmt nahezu \"uberein
+(Spearman-Korrelation 0,95).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\linewidth]{feature_importance_regionen.png}
+\caption{Permutation Importance je Gruppe: Abfall der CV-BAcc f\"ur
+Kulturart, Stadium und Paar, wenn die Gruppe vertauscht wird
+(Fehlerbalken: Standardabweichung \"uber 25 Wiederholungen).}
+\label{fig:ergebnisse-importance}
+\end{figure}
+
+\paragraph{Gemessene Befunde.}
+Abbildung~\ref{fig:ergebnisse-importance} zeigt die Wichtigkeit je Gruppe.
+Am wichtigsten sind das NIR (Abfall 0,473) und der Monat (0,439). Es folgen
+SWIR~1 und SWIR~2 (je etwa 0,33). Die \"ubrigen Gruppen liegen zwischen 0,17
+und 0,22. Kulturart und Stadium nutzen dabei verschiedene Information. F\"ur
+die Kulturart z\"ahlen vor allem NIR und SWIR, f\"ur das Stadium NIR und
+Monat (Abfall jeweils etwa 0,41). Je Kulturart unterscheiden sich die
+wichtigsten Bereiche: F\"ur Mais und Baumwolle ist es das SWIR~2, f\"ur Reis,
+Soja und Winterweizen das NIR.
+
+Einzelne B\"ander sind kaum wichtig. Der gr\"o\ss te Einzelwert betr\"agt nur
+0,038 (722\,nm), w\"ahrend ganze Regionen bis zu 0,47 kosten. Benachbarte
+B\"ander ersetzen sich gegenseitig, deshalb untersch\"atzen Einzelwerte die
+Bedeutung einer Region. Die einzige zusammenh\"angende Spitze liegt im Red
+Edge bei 712--742\,nm, also beim steilen Anstieg der Vegetationsreflexion.
+Nur dort zeigen mehrere benachbarte B\"ander zugleich erh\"ohte Werte.
+Umgekehrt h\"angt die Gr\"o\ss e einer Region mit ihrer Wichtigkeit zusammen.
+Das NIR umfasst 44 B\"ander, das Red Edge nur sieben. Neu trainierte Modelle
+trennen beide Effekte. Mit AEZ und Monat erreicht das Red Edge allein 0,792,
+das NIR allein 0,811. Ohne eine einzelne Region \"andert sich die Leistung
+nur um $-0{,}007$ bis $+0{,}003$. Keine Region ist also allein
+unverzichtbar, was zur breiten Abdeckung aus Kapitel~5 passt.
+
+\paragraph{Fachliche Deutung.}
+Die Befunde passen zu bekannten Wirkungen auf die Reflexion, sind aber nicht
+kausal belegt. NIR und Red Edge h\"angen mit Blattstruktur, Biomasse und
+Chlorophyll zusammen und damit mit dem Entwicklungsstand. Das SWIR~2 reagiert
+auf Wasser, Lignin und Cellulose, also auf Trocknung und Reife. Das passt zu
+seiner Rolle bei Mais und Baumwolle. Gezielt gepr\"uft ist dieser
+Zusammenhang nicht. Gegen die Erwartung liefern die sichtbaren B\"ander, in denen
+Chlorophyll absorbiert, nur einen mittleren Beitrag. Die Hypothese, Chlorophyll
+trenne gr\"unen Bestand von Seneszenz, wird damit nicht deutlich gest\"utzt.
+
+\paragraph{Grenzen der Erkl\"arung.}
+Vertauschte Zeilen sind keine realistischen Spektren. Die Werte zeigen
+deshalb, was das Modell nutzt, aber keinen Kausalzusammenhang. Der Monat ist
+ein Kontextmerkmal. Seine hohe Wichtigkeit f\"ur das Stadium spiegelt den
+Saisonverlauf wider und kann als Abk\"urzung wirken. Das zeigt sich am Abfall
+in der Gruppen-CV bei unbekannten Monaten. Die Aussagen gelten f\"ur die
+untersuchte SVM. Reis und seltene Stadien beruhen auf wenigen Zeilen und
+schwanken st\"arker.
 
 \section{Modellkarte}
 % Als kompakten Steckbrief des tats\"achlich finalen Modells ausarbeiten.
