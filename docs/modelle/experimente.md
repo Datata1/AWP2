@@ -57,6 +57,7 @@ Run-ID ([Experimente & MLflow](../entwicklung/tracking.md)).
 | Datum | ID | Autor | Ansatz | BAcc Crop | BAcc Stage | BAcc kombiniert | Macro-F1 kombiniert | Samples-F1 | MLflow-Run | Notiz |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-15 | combined_svm_split_80_20 | QMoWo | Kombinierte Klasse | 0.920 | 0.913 | 0.866 | 0.859 | 0.917 | 8fa9aeed | 80/20-Split, Tuning `combined_svm_split_80_20_search` (CV 0.859, MLflow `08fdabe4`); keine ungültigen Paare. Nicht direkt mit den 70/30-Läufen oben vergleichen. |
+| 2026-10-29 | automl_reproduce_c99e3915 | Achim Duong | Kombinierte Klasse | 0.9325 | 0.9204 | 0.8832 | 0.8576 | 0.9217 | 18f708b4 | **Reproduktion, keine neue Modellwahl.** Archivierter AutoML-Gewinner `c99e3915`: feste RBF-SVM und Vorverarbeitung, identische SHA-256-Daten-/Split-Artefakte, alle 1.118 Holdout-Vorhersagen exakt reproduziert. Singleton-CV 0.86682 (`fb3b2035`), keine ungültigen Paare. Notebook `09_analyse/04_qmowo_automl-verifikation`; Optuna berichtet 0.867 CV / 0.879 Holdout, kein Überlegenheitsnachweis. |
 
 ## CV-only Analysen
 
