@@ -970,29 +970,77 @@ in der Gruppen-CV bei unbekannten Monaten. Die Aussagen gelten f\"ur die
 untersuchte SVM. Reis und seltene Stadien beruhen auf wenigen Zeilen und
 schwanken st\"arker.
 
+\newpage
 \section{Modellkarte}
-% Als kompakten Steckbrief des tats\"achlich finalen Modells ausarbeiten.
-% Falls eine separate Modellkarte verlangt wird, diesen Inhalt auslagern.
+\label{sec:modellkarte}
 
-\subsection{Identit\"at und vorgesehene Nutzung}
-% Modellname, Version, Code-Commit, MLflow-Run-ID und Modellartefakt nennen.
-% Zielgruppe, Verwendungszweck und nicht abgedeckte Anwendungen festhalten.
+Die Modellkarte fasst das offizielle Modell der Abgabe zusammen.
 
-\subsection{Ein- und Ausgaben, Daten und Leistung}
-% Ben\"otigte Spektralb\"ander, Einheiten, Metadaten und Vorverarbeitung angeben.
-% Ausgabelabels und den Umgang mit Crop-Stage-Kombinationen beschreiben.
-% Trainingsbasis, Evaluationsverfahren und zentrale Kennzahlen zusammenfassen
-% oder eindeutig auf die entsprechenden Tabellen im Bericht verweisen.
-
-\subsection{Annahmen, Grenzen und Risiken}
-% Annahmen zu Sensor, Bandbelegung, Messbedingungen und Datenverteilung nennen.
-% Grenzen f\"ur seltene Klassen, unbekannte Kombinationen, fehlende Eingaben und
-% abweichende Regionen, Aufnahmezeitpunkte oder Sensoren dokumentieren.
-% M\"ogliche r\"aumliche/zeitliche Abh\"angigkeiten und deren Pr\"ufbarkeit benennen;
-% ein zuf\"alliger Split belegt keine \"Ubertragbarkeit auf neue Regionen.
-% Abh\"angigkeit von AEZ/Month und m\"ogliche Verteilungsverschiebungen diskutieren.
-% Nicht vorhandene Absicherungen wie Kalibrierung, Ablehnung unbekannter Daten
-% oder Praxistests ausdr\"ucklich als nicht gepr\"uft kennzeichnen.
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.1cm}X@{}}
+	\toprule
+	\multicolumn{2}{@{}l}{\textbf{Modelldetails}} \\
+	\midrule
+	Modell & Kombinierte RBF-SVM: Kulturart und Stadium werden als eine von 23 Klassen
+		(\texttt{Crop|Stage}) vorhergesagt; $C=300$, $\gamma=0{,}003$, ausgeglichene
+		Klassengewichte. \\
+	Entwickelt von & Team AE-ROOT, Dom\"anenprojekt 2 (WS 2026/27), Oktober 2026. \\
+	Version & MLflow-Run \texttt{17dc9e16}, Code-Stand Commit \texttt{4ed4181}.
+		Es gibt kein gespeichertes Modell. \\
+	Nutzung & \texttt{make predict} trainiert das deterministische Modell neu und schreibt
+		die Vorhersage-CSV f\"ur \texttt{test.csv}. \\
+	\midrule
+	\multicolumn{2}{@{}l}{\textbf{Verwendung}} \\
+	\midrule
+	Vorgesehen & Vorhersage von Kulturart und Stadium aus Hyperion-Spektren in den Zonen und
+		Monaten der Trainingsdaten. \\
+	Nicht vorgesehen & Operativer Einsatz sowie andere Sensoren, Regionen oder Jahre. \\
+	\midrule
+	\multicolumn{2}{@{}l}{\textbf{Daten und Training}} \\
+	\midrule
+	Eingabe & 198 Bandspalten (Reflexion in \%, 427--2.395\,nm), davon 131 nutzbar, sowie
+		\texttt{AEZ} (2, 5--10) und \texttt{Month} (Mai bis Oktober). \\
+	Verarbeitung & Interpolation einzelner L\"ucken, Standardisierung der B\"ander, AEZ one-hot,
+		Monat als Sinus/Kosinus, ein Indikator je beobachteter AEZ-Monat-Zelle (32):
+		172 Merkmale, alle im Training angepasst. \\
+	Training & Alle 5.589 bereinigten Zeilen aus \texttt{train.csv}. Die Hyperparameter
+		stammen aus der 5-fach-CV im Trainingsanteil. \\
+	Ausgabe & Eines der 23 beobachteten Crop-Stage-Paare, nie ein ung\"ultiges Paar; keine
+		Wahrscheinlichkeit oder Unsicherheitsangabe. \\
+	\midrule
+	\multicolumn{2}{@{}l}{\textbf{Evaluation}} \\
+	\midrule
+	Daten & Holdout mit 1.118 Zeilen (20\,\%, stratifiziert, Seed 42), Modell nur auf den
+		restlichen 4.471 Zeilen trainiert. \\
+	Ergebnis & BAcc Crop 0,923, Stage 0,922, kombiniert 0,869; Macro-F1 kombiniert 0,859;
+		Samples-F1 0,920. CV: BAcc kombiniert 0,864.
+		AEZ-Monat-Indikatoren verbessern nur wenig (CV $+0{,}005$, Holdout $+0{,}003$). \\
+	Erwartung & Auf \texttt{test.csv}: BAcc kombiniert etwa 0,86--0,87, Crop und Stage je etwa
+		0,92. Grundlage: CV und Holdout liegen eng beieinander, die Testzeilen liegen in
+		denselben 32 AEZ-Monat-Zellen wie das Training, und das Endmodell lernt zus\"atzlich
+		vom Holdout. Die Fold-Streuung betr\"agt etwa $\pm 0{,}02$; da der Holdout an
+		Modellvergleichen beteiligt war, ist die Erwartung eher optimistisch. Gemessen ist
+		sie nicht, denn \texttt{test.csv} hat keine Labels. \\
+	\midrule
+	\multicolumn{2}{@{}l}{\textbf{Grenzen und Risiken}} \\
+	\midrule
+	Evaluation & Mehrere Ans\"atze wurden auf demselben Holdout verglichen; er ist keine
+		unabh\"angige Abschlusspr\"ufung. \\
+	Kontext & Ohne \texttt{AEZ} und \texttt{Month} sinkt die CV-BAcc von 0,859 auf 0,787.
+		Bei Gruppen-CV f\"allt die Referenz-SVM (ohne AEZ-Monat-Indikatoren) von 0,859 auf
+		0,378 (neue AEZ-Monat-Zelle), 0,421 (neuer Monat) und 0,284 (neue Region).
+		\texttt{test.csv} liegt in bekannten Zellen; f\"ur neue Regionen oder Zeitpunkte
+		ist das Modell nicht abgesichert. \\
+	Fehler & Meist Kulturfehler, vor allem Winterweizen zu Baumwolle und Sojabohne zu Mais,
+		besonders in fr\"uhen Stadien. Seltene Klassen sind unsicher:
+		\texttt{cotton|Harvest} hat 11 Trainingszeilen, Reis 93. \\
+	Nicht gepr\"uft & Kalibrierung, Ablehnung unbekannter Eingaben, Praxistests und echte
+		Sentinel-2-Daten. Nicht beobachtete Paare werden nie vorhergesagt. \\
+	\bottomrule
+\end{tabularx}
+\endgroup
 
 \section{Fazit und Ausblick}
 % Untersuchungsfragen beantworten: bestes begr\"undet gew\"ahltes Modell,
