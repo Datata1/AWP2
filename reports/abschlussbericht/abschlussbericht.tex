@@ -790,9 +790,14 @@ Die Modellkarte fasst das offizielle Modell der Abgabe zusammen.
 	Daten & Holdout mit 1.118 Zeilen (20\,\%, stratifiziert, Seed 42), Modell nur auf den
 		restlichen 4.471 Zeilen trainiert. \\
 	Ergebnis & BAcc Crop 0,923, Stage 0,922, kombiniert 0,869; Macro-F1 kombiniert 0,859;
-		Samples-F1 0,920. CV: BAcc kombiniert 0,864. Das Endmodell nutzt zus\"atzlich den
-		Holdout; seine Leistung auf \texttt{test.csv} ist ohne Labels nicht messbar.
+		Samples-F1 0,920. CV: BAcc kombiniert 0,864.
 		AEZ-Monat-Indikatoren verbessern nur wenig (CV $+0{,}005$, Holdout $+0{,}003$). \\
+	Erwartung & Auf \texttt{test.csv}: BAcc kombiniert etwa 0,86--0,87, Crop und Stage je etwa
+		0,92. Grundlage: CV und Holdout liegen eng beieinander, die Testzeilen liegen in
+		denselben 32 AEZ-Monat-Zellen wie das Training, und das Endmodell lernt zus\"atzlich
+		vom Holdout. Die Fold-Streuung betr\"agt etwa $\pm 0{,}02$; da der Holdout an
+		Modellvergleichen beteiligt war, ist die Erwartung eher optimistisch. Gemessen ist
+		sie nicht, denn \texttt{test.csv} hat keine Labels. \\
 	\midrule
 	\multicolumn{2}{@{}l}{\textbf{Grenzen und Risiken}} \\
 	\midrule
