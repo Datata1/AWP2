@@ -12,8 +12,6 @@
 	justification=raggedright,singlelinecheck=true,skip=8pt}
 \usepackage{booktabs}
 \usepackage{tabularx}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
@@ -25,15 +23,14 @@
 \graphicspath{{img/}{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
 
 \title{Abschlussbericht\\Kulturpflanzen- und Entwicklungsstadiumsklassifikation}
-\author{Dom\"anenprojekt 2\\Team: AE-ROOT}
+\author{Jan-David Wiederstein \qquad Achim Duong\\[1ex]
+	Dom\"anenprojekt 2\\Team: AE-ROOT}
 \date{Stand: \today}
 
 \begin{document}
 \maketitle
-% Teammitglieder, Abgabedatum und den ausgewerteten Code-Stand erg\"anzen.
-% Ergebnisse mit MLflow-Run-IDs und reproduzierbaren Artefakten belegen.
-% Haupttext knapp halten; Detailtabellen und zus\"atzliche Plots in den Anhang.
 
+\setcounter{tocdepth}{1}
 \tableofcontents
 \clearpage
 
@@ -47,7 +44,7 @@ Die Aufgabe wird als Challenge bearbeitet, in der alle Teams dieselbe
 Klassifikationsaufgabe untersuchen. Neben der Vorhersageleistung verlangt die
 Aufgabenstellung einen begr\"undeten Vergleich verschiedener Modellierungsstrategien
 und eine Untersuchung des Zielkonflikts zwischen Datenreduktion und
-Klassifikationsleistung~\cite{projekt2026}.
+Klassifikationsleistung.
 
 Die Kulturart beschreibt, was auf einer Fl\"ache w\"achst; das Entwicklungsstadium
 ordnet die Beobachtung in den saisonalen Verlauf ein. Solche Informationen k\"onnen
@@ -90,7 +87,7 @@ best\"atigte Zuordnung zu standardisierten ph\"anologischen Skalen.
 Zus\"atzlich stehen die agro\"okologische Zone (\texttt{AEZ}) und der
 Aufnahmemonat (\texttt{Month}) als Kontextmerkmale zur Verf\"ugung.
 Agro\"okologische Zonen gruppieren Gebiete nach nat\"urlichen Anbaubedingungen
-wie Klima, B\"oden und Vegetationsperiode~\cite{projekt2026}.
+wie Klima, B\"oden und Vegetationsperiode.
 
 \subsection{Untersuchungsziele und Abgrenzung}
 
@@ -110,10 +107,8 @@ fachlich unm\"oglich sind. Vor diesem Hintergrund leiten drei Fragen die Untersu
 		Verlust an Klassifikationsleistung entsteht dabei?
 \end{enumerate}
 
-Die prim\"are Bewertungsmetrik ist die Balanced Accuracy, die den Recall
-gleichgewichtet \"uber die Klassen mittelt. Erg\"anzend werden Macro-F1 und
-Samples-F1 betrachtet. Kulturart und Stadium werden jeweils separat
-ausgewertet; die gemeinsame Vorhersage wird zus\"atzlich untersucht~\cite{projekt2026}.
+Bewertet wird mit Balanced Accuracy, Macro-F1 und Samples-F1, jeweils f\"ur
+Kulturart, Stadium und das Paar (Abschnitt~\ref{sec:evaluation}).
 Die Ergebnisse gelten zun\"achst f\"ur die untersuchte Datenbasis.
 Eine \"Ubertragbarkeit auf andere Regionen, Jahre oder Sensoren und die
 Eignung f\"ur einen operativen Einsatz sind damit nicht belegt.
@@ -188,7 +183,7 @@ Das Reflexionsniveau ist im Blauen mit einem Median von etwa 16\,\% deutlich
 h\"oher als f\"ur Vegetation an der Oberfl\"ache \"ublich; die Werte enthalten
 offenbar noch einen Atmosph\"aren- oder Kalibrieranteil. Eine Regelpr\"ufung
 mit relativen Schwellen markiert 5,5\,\% der Zeilen als spektrale Ausrei\ss{}er
-ihrer Klasse. Sie b\"undeln sich in einzelnen kleinen Aufnahmen mit hellen,
+ihrer Klasse. Sie b\"undeln sich in einzelnen kleinen AEZ-Monat-Zellen mit hellen,
 bodenartigen Spektren und sind damit eher echte Beobachtungen als Messfehler;
 sie werden nicht entfernt.
 
@@ -213,9 +208,8 @@ die Klassifikation entsprechend.
 \end{figure}
 
 \paragraph{Benachbarte B\"ander sind redundant.}
-Benachbarte nutzbare B\"ander korrelieren im Median mit 0,999. Zwei
-Hauptkomponenten erkl\"aren bereits mehr als 90\,\% der spektralen Varianz,
-trennen die Klassen aber nicht. Die gr\"o\ss{}ten Unterschiede zwischen Kulturen
+Benachbarte nutzbare B\"ander korrelieren im Median mit 0,999. Univariat liegen die
+gr\"o\ss{}ten Unterschiede zwischen Kulturen
 liegen zwischen 600 und 700\,nm, zwischen Stadien am \"Ubergang zum NIR
 (760--875\,nm) und im SWIR. Das begr\"undet die Untersuchung von
 Dimensionsreduktion und Bandauswahl (Abschnitt~\ref{sec:datenreduktion}); jede
@@ -231,7 +225,7 @@ Kombinationen aus Zone und Monat wie das Training. \texttt{AEZ} und
 \texttt{Month} sind deshalb starke, zul\"assige Merkmale, k\"onnen aber
 Aufnahme- und Regionseffekte statt spektraler Unterschiede abbilden. Wie stark
 die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
-(Abschnitt~\ref{sec:evaluation}).
+(Abschnitt~\ref{sec:ergebnisse}).
 
 \begin{figure}[htbp]
 \centering
@@ -242,46 +236,16 @@ die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
 
 \section{Methodik und Validierung}
 
-Abbildung~\ref{fig:methodik-pipeline} fasst die Trennung von Modellauswahl
-und Holdout-Bewertung zusammen.
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-	>={Stealth[length=2mm]},
-	box/.style={draw, rounded corners=2pt, align=center, font=\small,
-		text width=4cm, minimum height=10mm, inner sep=2mm},
-	arrow/.style={->, thick}
-]
-	\node[box] (clean) at (-5,0) {Daten pr\"ufen\\und bereinigen};
-	\node[box] (split) at (0,0) {Stratifizierter\\80/20-Split};
-	\node[box] (train) at (5,0) {Training\\CV und Modellauswahl};
-	\node[box] (holdout) at (0,-1.45) {Holdout\\bleibt zur\"uckgehalten};
-	\node[box] (fit) at (5,-2.9) {Finales Training\\auf allen Trainingsdaten};
-	\node[box] (evaluate) at (0,-2.9) {Bewertung\\auf dem Holdout};
-	\draw[arrow] (clean) -- (split);
-	\draw[arrow] (split) -- (train);
-	\draw[arrow] (split) -- (holdout);
-	\draw[arrow] (train) -- (fit);
-	\draw[arrow] (fit) -- (evaluate);
-	\draw[arrow] (holdout) -- (evaluate);
-\end{tikzpicture}
-\caption{Kompakter Ablauf mit getrennter Trainings-CV und Holdout-Bewertung.}
-\label{fig:methodik-pipeline}
-\end{figure}
-
 \subsection{Datenaufbereitung und Merkmalsbildung}
 \label{sec:aufbereitung}
 
 Alle Ans\"atze nutzen die gemeinsame Pipeline des Pakets \texttt{awp2}.
 Die Rohdaten werden auf Format, Wertebereiche und zul\"assige Labels gepr\"uft.
-Nach dem Entfernen zweier exakter Duplikate verbleiben 5.589 Beobachtungen.
-Ausrei\ss{}er werden nicht pauschal entfernt, da kein ausreichender Nachweis
-f\"ur Messfehler vorliegt. Die Kennung \texttt{id} und die Zielspalten sind
-keine Eingabemerkmale.
+Nach dem Entfernen zweier exakter Duplikate verbleiben 5.589 Beobachtungen;
+Ausrei\ss{}er bleiben erhalten (Abschnitt~\ref{sec:daten}). Die Kennung
+\texttt{id} und die Zielspalten sind keine Eingabemerkmale.
 
-Von 198 Bandspalten bleiben nach Ausschluss vollst\"andig leerer B\"ander
-131 nutzbar. Fehlende Werte werden entlang der Wellenl\"ange linear
+In den 131 nutzbaren B\"andern werden fehlende Werte entlang der Wellenl\"ange linear
 interpoliert, wenn die St\"utzb\"ander h\"ochstens 15\,nm auseinanderliegen;
 sonst wird der n\"achste Messwert verwendet. Bei vollst\"andig fehlenden
 Spektren dienen Trainingsmediane als Ersatz. Die Skalierung ist
@@ -346,7 +310,9 @@ f\"ur die $K$ ber\"ucksichtigten Klassen:
 	F1_{\mathrm{macro}} = \frac{1}{K}\sum_{k=1}^{K} F1_k.
 \]
 Beide Metriken werden f\"ur Kulturart, Stadium und das kombinierte Paar
-berechnet. Das Klassenungleichgewicht wird je nach Modell durch
+berechnet. \textbf{Samples-F1} behandelt Kulturart und Stadium je Beobachtung
+als zwei Labels und mittelt den F1-Wert \"uber die Beobachtungen; ein halb
+richtiges Paar z\"ahlt damit teilweise. Das Klassenungleichgewicht wird je nach Modell durch
 Klassen- oder Stichprobengewichte beziehungsweise gleiche Klassenprioren
 ber\"ucksichtigt. Confusion Matrices und der Anteil vorhergesagter Paare,
 die im Training nicht vorkamen, erg\"anzen die Fehleranalyse.
@@ -355,7 +321,7 @@ die im Training nicht vorkamen, erg\"anzen die Fehleranalyse.
 Da mehrere Ans\"atze auf demselben Holdout bewertet wurden, ist dieser keine
 vollst\"andig unabh\"angige Abschlusspr\"ufung der Modellwahl. Zus\"atzliche
 Gruppen-CV nach AEZ, Monat oder deren Kombination zeigt deutlich geringere
-Leistungen bei unbekannten Kontextgruppen. Gute zuf\"allige CV-Ergebnisse
+Leistungen bei unbekannten Kontextgruppen (Abschnitt~\ref{sec:ergebnisse}). Gute zuf\"allige CV-Ergebnisse
 belegen daher keine \"Ubertragbarkeit auf neue Regionen oder Zeitpunkte.
 Ohne Aufnahme- oder Feldkennungen l\"asst sich auch keine sichere Trennung
 tats\"achlicher Aufnahmen oder Felder nachweisen.
@@ -369,10 +335,6 @@ nichtdeterministische Berechnungen bleiben Einschr\"ankungen.
 
 \subsection{Baseline und untersuchte Strategien}
 
-Alle Modelle durchlaufen dasselbe Verfahren: Hyperparameter werden per
-f\"unffacher Kreuzvalidierung (CV) auf dem Trainingsanteil gesucht, der
-CV-Gewinner wird genau einmal auf dem Holdout bewertet. Das
-Klassenungleichgewicht wird \"uber ausgeglichene Klassengewichte ber\"ucksichtigt.
 Als Untergrenze dient ein Dummy-Klassifikator, der immer die h\"aufigste Klasse
 vorhersagt (BAcc kombiniert 0,044). Die eigentliche Baseline ist ein Random
 Forest, der Kulturart und Stadium gemeinsam vorhersagt (0,743); er liefert
@@ -399,14 +361,12 @@ untersucht. Als Klassifikatoren dienten RBF-SVM, Baum-Ensembles (Random Forest,
 Extra Trees, HistGradientBoosting), lineare Modelle, kNN und MLP. Die SVM passt zu
 stark korrelierten B\"andern, weil sie glatte nichtlineare Grenzen lernt; sie
 braucht standardisierte Eingaben. Baumverfahren sind unempfindlich gegen die
-Skalierung und dienen als Gegenprobe. Die Suchr\"aume blieben klein (meist unter
-30 Kandidaten, f\"ur die zweistufige SVM 144). Eine sp\"atere breite Suche
-pr\"ufte zus\"atzlich 384 Kandidaten (acht Modellkonfigurationen, sechs
-Vorverarbeitungen, acht Einstellungen). Erg\"anzend wurde eine fokussierte
-AutoML-Suche erprobt, um weitere Kombinationen aus Vorverarbeitung, Modell und
-Hyperparametern automatisiert per CV zu vergleichen und m\"ogliche Verbesserungen
-gegen\"uber den manuell entwickelten Ans\"atzen zu pr\"ufen.
-Die vollst\"andige Laufhistorie steht im
+Skalierung und dienen als Gegenprobe. Kurzfristig wurde zus\"atzlich ein
+einfaches AutoML umgesetzt, das die bisherigen Klassifikatoren,
+Merkmale und Hyperparameter automatisiert per CV kombiniert (384 Kandidaten aus
+acht Modellkonfigurationen, sechs Vorverarbeitungen und acht Einstellungen).
+Es wurde aus Zeit- und Ressourcengr\"unden nicht systematisch untersucht und
+ist nicht in den Hauptcode \"ubernommen. Die vollst\"andige Laufhistorie steht im
 Experimentprotokoll der Projektdokumentation und in MLflow.
 
 \subsection{Vergleich und finales Modell}
@@ -444,7 +404,8 @@ Mittelwerte der f\"unf Trainingsfolds, Holdout-Werte einmalige Bewertungen.
 		\bottomrule
 	\end{tabular}
 	\caption{Wichtigste Kandidaten. Alle Modelle au\ss er der Random-Forest-Baseline
-		sagen nur g\"ultige Crop-Stage-Paare vorher. BAcc: Balanced Accuracy;
+		sagen nur g\"ultige Crop-Stage-Paare vorher. AutoML: kurzfristiges, nicht
+		sauber evaluiertes Zusatzexperiment. BAcc: Balanced Accuracy;
 		komb.: gemeinsame Crop-Stage-Klasse.}
 	\label{tab:vergleich}
 \end{table}
@@ -464,11 +425,10 @@ zehn Sentinel-2-B\"andern ist mit 0,832 das beste davon. Bei rund 4.500
 Trainingszeilen bringen die neuronalen Netze keinen Vorteil.
 
 Zur zweiten Untersuchungsfrage: AEZ und Monat tragen am meisten. Ohne sie f\"allt
-die SVM von 0,845 auf 0,779 (70/30). Vegetationsindizes helfen der SVM nicht
-(0,842), verbessern aber Baumverfahren und logistische Regression in der CV um
-0,015 bis 0,029. SNV, PCA-20 und andere Monatskodierungen brachten keinen
-Gewinn; nur AEZ-Monat-Indikatoren verbesserten die SVM geringf\"ugig (CV +0,005,
-Holdout +0,003).
+die SVM in der CV von 0,859 auf 0,787 (Split 80/20). Vegetationsindizes, SNV,
+PCA und andere Monatskodierungen bringen der SVM keinen Gewinn
+(Abschnitt~\ref{sec:datenreduktion}); nur AEZ-Monat-Indikatoren verbessern sie
+geringf\"ugig (CV +0,005, Holdout +0,003).
 
 \begin{figure}[htbp]
 	\centering
@@ -488,22 +448,22 @@ keine Reihenfolge belegt.
 \textbf{Modellwahl.} Entscheidend war die CV-BAcc kombiniert; der Holdout dient
 als erg\"anzende Bewertung, wegen mehrfacher Betrachtung aber nicht als
 unabh\"angiger Abschlusstest. Zus\"atzlich z\"ahlen g\"ultige Paare, geringer
-Rechenaufwand und Robustheit. Bei unbekannten Aufnahmen ist die hierarchische
-SVM etwas besser (0,42 statt 0,38), beide Modelle fallen jedoch stark ab
-(Kapitel~6). Gew\"ahlt wird daher die einfachere kombinierte RBF-SVM auf allen
+Rechenaufwand und Robustheit. Bei unbekannten AEZ-Monat-Zellen ist die
+hierarchische SVM etwas besser (0,420 statt 0,378), beide Modelle fallen jedoch
+stark ab (Abschnitt~\ref{sec:ergebnisse}). Gew\"ahlt wird daher die einfachere kombinierte RBF-SVM auf allen
 131 B\"andern mit AEZ-Monat-Indikatoren ($C=300$, $\gamma=0{,}003$): 0,869
 BAcc kombiniert auf dem Holdout.
 
-Die fokussierte AutoML-Suche findet in derselben Modellfamilie mit gegl\"atteten
+Das AutoML findet in derselben Modellfamilie mit gegl\"atteten
 Spektren, Albedo und Indizes eine Variante mit h\"oherer Holdout-BAcc. Ein
 erneuter Trainingslauf mit identischen Daten und Splits reproduziert
 CV~0,86682 und Holdout~0,8832; alle 1.118 Holdout-Vorhersagen stimmen exakt
 \"uberein. Der CV-Gewinn gegen\"uber der Referenz betr\"agt jedoch nur etwa
 0,003 und unterschreitet die festgelegte Mindestschwelle von 0,005.
 Das Ergebnis wird deshalb als reproduzierbares Zusatzexperiment berichtet,
-nicht als unabh\"angig belegte Verbesserung oder neues Abgabemodell.
-% ENTSCHEIDUNG: Abgabemodell laut Doku auf main ist combined_svm_aez_month (Run 17dc9e16);
-% der AutoML-Gewinner (Run c99e3915, 0,883) ist als zweites Modell eingefroren.
+nicht als unabh\"angig belegte Verbesserung oder neues Abgabemodell. Die
+AutoML-Suche selbst wurde nicht sauber evaluiert, etwa ohne unabh\"angigen
+Vergleich der Suchstrategie.
 
 \section{Datenreduktion}
 \label{sec:datenreduktion}
@@ -589,18 +549,13 @@ mit 80 B\"andern nur 0,841. Sie bewertet jedes Band einzeln. Deshalb w\"ahlt
 sie benachbarte, nahezu identische B\"ander aus derselben Region und l\"asst
 andere Bereiche aus. Eine Bandauswahl getrennt je Ebene des hierarchischen
 Modells hilft nicht: Bei zehn B\"andern je Ebene umfasst die Vereinigung
-schon 52 B\"ander, und die BAcc bleibt bei etwa 0,69.
-Fachlich ist das plausibel, denn jede Ebene greift auf eine andere Region
-zur\"uck. Die Kulturebene nutzt die Chlorophyllabsorption im Rot, das
-Stadium von Mais und Baumwolle das NIR-Plateau und das von Soja und
-Winterweizen das SWIR2, wo Trocknung und Lignin bei der Reife sichtbar
-werden. Ein Sensor mit Messungen von VIS bis SWIR2 deckt alle diese Regionen
-ab.
+schon 52 B\"ander, und die BAcc bleibt bei etwa 0,69. Die Ebenen st\"utzen
+sich auf verschiedene Spektralregionen; ein Sensor muss daher den Bereich von
+VIS bis SWIR2 abdecken.
 
 \paragraph{Kontext und Indizes.}
-AEZ und Monat allein erreichen nur 0,537 und ersetzen die Spektren nicht.
-Ohne sie f\"allt die SVM aber auf 0,787, sie sind also unverzichtbar.
-Mittlere Albedo oder vorab berechnete Hauptkomponenten bringen nichts
+AEZ und Monat allein erreichen nur 0,537 und ersetzen die Spektren nicht,
+sind aber unverzichtbar (Abschnitt~\ref{sec:modellvergleich}). Mittlere Albedo oder vorab berechnete Hauptkomponenten bringen nichts
 zus\"atzlich. Die 29 Indizes allein erreichen 0,840.
 Wie n\"utzlich sie sind, h\"angt vom Modell ab. Die SVM gewinnt durch
 zus\"atzliche Indizes nichts (0,848 statt 0,859). Extra Trees,
@@ -692,39 +647,20 @@ Das Endmodell nutzt deshalb weiterhin alle B\"ander.
 Gezeigt ist nur, dass die spektrale Information an den
 Sentinel-2-Positionen auf Hyperion-Daten ausreicht. Ob ein auf Hyperion
 trainiertes Modell auf echten Sentinel-2-Aufnahmen funktioniert, ist nicht
-gepr\"uft. Daf\"ur unterscheiden sich die Daten in mehreren Punkten:
-\begin{itemize}
-	\item \textbf{Bandform:} Die Simulation n\"ahert die gemessenen
-	Empfindlichkeitskurven von Sentinel-2 durch Rechtecke an.
-	\item \textbf{R\"aumliche Aufl\"osung:} Hyperion misst mit 30\,m,
-	Sentinel-2 mit 10 bzw.\ 20\,m.
-	\item \textbf{Rauschen:} Das Signal-Rausch-Verh\"altnis von Hyperion
-	liegt bei 2125\,nm bei etwa 40 und das von Sentinel-2 im SWIR bei etwa
-	100~\cite{pearlman2001,esa_s2}. Die simulierten B\"ander erben das
-	Hyperion-Rauschen, mitteln es aber.
-	\item \textbf{Prozessierung:} Die Daten wurden mit einer anderen
-	Atmosph\"arenkorrektur prozessiert und zus\"atzlich gegl\"attet
-	\cite{aneece2018}.
-	\item \textbf{Zeitraum:} Die zugrunde liegende Bibliothek GHISACONUS
-	(Abschnitt~\ref{sec:daten}) enth\"alt Aufnahmen aus den Jahren 2008 bis
-	2015 \cite{aneece2018}. Sie \"uberschneiden sich zeitlich kaum mit
-	Sentinel-2, gelabelte Paare gibt es daher nicht.
-\end{itemize}
-Kontrollexperimente sind geplant, aber nicht ausgewertet. Sie sollen
-pr\"ufen, ob das Ergebnis an der Lage, der Breite oder nur an der Abdeckung
-der B\"ander liegt (echte Empfindlichkeitskurven, n\"achste Einzelb\"ander,
-zuf\"allige und gleichm\"a\ss{}ige B\"ander, Verschiebung und Rauschen).
+gepr\"uft. Die Simulation n\"ahert die Empfindlichkeitskurven durch Rechtecke
+an; au\ss{}erdem unterscheiden sich r\"aumliche Aufl\"osung (30\,m gegen\"uber
+10 bzw.\ 20\,m), Rauschen (Signal-Rausch-Verh\"altnis bei 2.125\,nm etwa 40
+gegen\"uber etwa 100 im SWIR~\cite{pearlman2001,esa_s2}) und Prozessierung
+\cite{aneece2018}. Da die Aufnahmen aus den Jahren 2008 bis 2015 stammen, gibt
+es zudem keine gelabelten Sentinel-2-Paare.
 
-\paragraph{Unbekannte Aufnahmen.}
-Alle Werte gelten f\"ur bekannte Kontextgruppen. In der Gruppen-CV
-(Abschnitt~\ref{sec:evaluation}) erreicht die kombinierte SVM f\"ur eine
-unbekannte AEZ-Monat-Zelle 0,378, f\"ur einen unbekannten Monat 0,421 und
-f\"ur eine unbekannte Region 0,284. Mit Sentinel-2 sind die Werte
-gleichauf (0,389, 0,419, 0,274). Die hierarchische SVM mit Sentinel-2 ist
-dort am robustesten (0,426, 0,424, 0,294). Die Reduktion verschlechtert die
-\"Ubertragbarkeit also nicht, l\"ost das Problem aber auch nicht. Ein anderer
-Sensor ist eine mindestens ebenso gro\ss e Verschiebung wie eine neue
-Aufnahme.
+\paragraph{Unbekannte AEZ-Monat-Zellen.}
+In der Gruppen-CV (Abschnitt~\ref{sec:ergebnisse}) liegt die kombinierte SVM
+mit Sentinel-2 gleichauf mit allen B\"andern (0,389 statt 0,378 f\"ur eine
+unbekannte Zelle, 0,419 statt 0,421 f\"ur einen unbekannten Monat, 0,274 statt
+0,284 f\"ur eine unbekannte Region); am robustesten ist die hierarchische SVM mit
+Sentinel-2 (0,426, 0,424, 0,294). Die Reduktion verschlechtert die
+\"Ubertragbarkeit also nicht, l\"ost das Problem aber auch nicht.
 
 \section{Ergebnisse und Interpretation}
 \label{sec:ergebnisse}
@@ -798,17 +734,10 @@ Endmodell in fast allen Ziehungen besser.}
 \paragraph{Wo die Fehler entstehen.}
 Das Endmodell sagt 89,1\,\% der Zeilen vollst\"andig richtig voraus. Bei
 8,0\,\% ist die Kulturart falsch, bei 2,9\,\% nur das Stadium. Rund drei
-Viertel der Fehler sind also Kulturfehler (Abbildung~\ref{fig:ergebnisse-zerlegung}).
-Bei der Baseline sind es knapp zwei Drittel, sie verfehlt deutlich mehr Stadien.
-Stimmt die Kulturart, liegt die Stadium-BAcc des Endmodells bei 0,965.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\linewidth]{endmodell_zerlegung.png}
-\caption{Anteil der Holdout-Zeilen, die vollst\"andig richtig sind, nur ein
-falsches Stadium oder eine falsche Kulturart haben.}
-\label{fig:ergebnisse-zerlegung}
-\end{figure}
+Viertel der Fehler sind also Kulturfehler. Bei der Baseline sind es knapp zwei
+Drittel, sie verfehlt deutlich mehr Stadien. Stimmt die Kulturart, liegt die
+Stadium-BAcc des Endmodells bei 0,965. Wie bei der hierarchischen SVM
+(Abschnitt~\ref{sec:modellvergleich}) ist die Kulturstufe der Engpass.
 
 Abbildung~\ref{fig:ergebnisse-konfusion} zeigt die Verwechslungen. Am h\"aufigsten wird Soja f\"ur Mais gehalten (22 Zeilen).
 Es folgen Winterweizen als Baumwolle (17) und Mais als Soja (12).
@@ -819,7 +748,7 @@ fast nur benachbarte Stadien, etwa Soja \texttt{Critical} als
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\linewidth]{endmodell_konfusion.png}
+\includegraphics[width=0.85\linewidth]{endmodell_konfusion.png}
 \caption{Zeilennormierte Confusion Matrices des Endmodells f\"ur Kulturart
 (links) und Stadium (rechts) auf dem Holdout. Die Diagonale ist der Recall
 je Klasse.}
@@ -839,7 +768,7 @@ f\"ur \texttt{cotton|Harvest} auf nur zwei Zeilen.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.8\linewidth]{endmodell_recall_faelle.png}
+\includegraphics[width=0.65\linewidth]{endmodell_recall_faelle.png}
 \caption{Recall je kombinierter Klasse gegen ihre Fallzahl im Holdout
 (Endmodell). Beschriftet sind die sechs Klassen mit dem niedrigsten
 Recall.}
@@ -857,39 +786,30 @@ Trainingsanteil zeigen dasselbe Muster (Mai 21\,\%, Oktober 15\,\%, AEZ~9
 12\,\%). Es ist also kein Zufall des Holdouts. Eine plausible, aber nicht
 gepr\"ufte Erkl\"arung: Am Saisonanfang bedeckt der Bestand wenig Boden, am
 Ende ist er abgereift oder geerntet. Das Signal wird dann vom Boden gepr\"agt,
-und die Spektren der Kulturen gleichen sich an. Dazu passt eine fr\"uhere
-Analyse mit Vorg\"angermodellen: Fr\"uher Mais und fr\"uhe Soja \"uberlappen
-spektral stark, und die als Baumwolle erkannten Weizenspektren sind
-auff\"allig hell.
+und die Spektren der Kulturen gleichen sich an.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\linewidth]{endmodell_kulturfehler_kontext.png}
+\includegraphics[width=0.9\linewidth]{endmodell_kulturfehler_kontext.png}
 \caption{Anteil der Holdout-Zeilen mit falscher Kulturart nach Monat (links)
 und AEZ (rechts) f\"ur Baseline, Endmodell und hierarchische SVM.}
 \label{fig:ergebnisse-kontext}
 \end{figure}
 
-\paragraph{Fehlerfortpflanzung im hierarchischen Ansatz.}
-Bei der hierarchischen SVM wird jeder Kulturfehler zum Paarfehler. Steuert
-man ihre Stadium-Modelle mit der wahren Kulturart an, steigt die
-kombinierte BAcc von 0,845 auf 0,941. Die Kulturfehler kosten also rund
-0,10. Der Engpass ist in beiden Ans\"atzen dieselbe Kulturstufe.
-
 \paragraph{\"Ubertragbarkeit.}
 Alle Werte gelten f\"ur bekannte Kombinationen aus AEZ und Monat. Die
 Testdaten liegen in denselben 32 Zellen wie das Training. In einer
-Gruppen-CV, die ganze Zellen zur\"uckh\"alt, f\"allt die kombinierte SVM von
-0,859 auf 0,378 (Abbildung~\ref{fig:ergebnisse-uebertragbarkeit}). F\"ur
+Gruppen-CV, die ganze Zellen zur\"uckh\"alt, f\"allt die kombinierte SVM (ohne
+AEZ-Monat-Indikatoren) von 0,859 auf 0,378 (Abbildung~\ref{fig:ergebnisse-uebertragbarkeit}). F\"ur
 einen unbekannten Monat erreicht sie 0,421, f\"ur eine unbekannte Region
 0,284. Das Modell ist deshalb nicht ohne neue Labels auf andere Regionen
 oder Zeitpunkte \"ubertragbar.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.75\linewidth]{uebertragbarkeit.png}
+\includegraphics[width=0.65\linewidth]{uebertragbarkeit.png}
 \caption{Kombinierte CV-BAcc der SVM mit allen B\"andern bei zuf\"alligen
-Folds (blau) und bei Folds, die ganze Aufnahmen, Monate oder Regionen
+Folds (blau) und bei Folds, die ganze AEZ-Monat-Zellen, Monate oder Regionen
 zur\"uckhalten (rot).}
 \label{fig:ergebnisse-uebertragbarkeit}
 \end{figure}
@@ -911,7 +831,7 @@ Gruppen. Die Rangfolge der Gruppen stimmt nahezu \"uberein
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\linewidth]{feature_importance_regionen.png}
+\includegraphics[width=0.8\linewidth]{feature_importance_regionen.png}
 \caption{Permutation Importance je Gruppe: Abfall der CV-BAcc f\"ur
 Kulturart, Stadium und Paar, wenn die Gruppe vertauscht wird
 (Fehlerbalken: Standardabweichung \"uber 25 Wiederholungen).}
@@ -928,28 +848,19 @@ Monat (Abfall jeweils etwa 0,41). Je Kulturart unterscheiden sich die
 wichtigsten Bereiche: F\"ur Mais und Baumwolle ist es das SWIR~2, f\"ur Reis,
 Soja und Winterweizen das NIR.
 
-Einzelne B\"ander sind kaum wichtig (Abbildung~\ref{fig:ergebnisse-baender}).
-Der gr\"o\ss te Einzelwert betr\"agt nur 0,038 (722\,nm), w\"ahrend ganze
+Einzelne B\"ander sind kaum wichtig. Der gr\"o\ss te Einzelwert betr\"agt nur 0,038 (722\,nm), w\"ahrend ganze
 Regionen bis zu 0,47 kosten. Benachbarte
 B\"ander ersetzen sich gegenseitig, deshalb untersch\"atzen Einzelwerte die
 Bedeutung einer Region. Die einzige zusammenh\"angende Spitze liegt im Red
 Edge bei 712--742\,nm, also beim steilen Anstieg der Vegetationsreflexion.
 Nur dort zeigen mehrere benachbarte B\"ander zugleich erh\"ohte Werte.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\linewidth]{feature_importance_baender.png}
-\caption{Permutation Importance einzelner B\"ander f\"ur die kombinierte
-BAcc (Referenz-SVM, Band: Standardabweichung). Graue Fl\"achen markieren
-die Spektralregionen, L\"ucken sind entfernte B\"ander.}
-\label{fig:ergebnisse-baender}
-\end{figure}
 Umgekehrt h\"angt die Gr\"o\ss e einer Region mit ihrer Wichtigkeit zusammen.
 Das NIR umfasst 44 B\"ander, das Red Edge nur sieben. Neu trainierte Modelle
 trennen beide Effekte. Mit AEZ und Monat erreicht das Red Edge allein 0,792,
 das NIR allein 0,811. Ohne eine einzelne Region \"andert sich die Leistung
 nur um $-0{,}007$ bis $+0{,}003$. Keine Region ist also allein
-unverzichtbar, was zur breiten Abdeckung aus Kapitel~5 passt.
+unverzichtbar, was zur breiten Abdeckung aus
+Abschnitt~\ref{sec:datenreduktion} passt.
 
 \paragraph{Fachliche Deutung.}
 Die Befunde passen zu bekannten Wirkungen auf die Reflexion, sind aber nicht
@@ -958,17 +869,15 @@ Chlorophyll zusammen und damit mit dem Entwicklungsstand. Das SWIR~2 reagiert
 auf Wasser, Lignin und Cellulose, also auf Trocknung und Reife. Das passt zu
 seiner Rolle bei Mais und Baumwolle. Gezielt gepr\"uft ist dieser
 Zusammenhang nicht. Gegen die Erwartung liefern die sichtbaren B\"ander, in denen
-Chlorophyll absorbiert, nur einen mittleren Beitrag. Die Hypothese, Chlorophyll
-trenne gr\"unen Bestand von Seneszenz, wird damit nicht deutlich gest\"utzt.
+Chlorophyll absorbiert, nur einen mittleren Beitrag.
 
 \paragraph{Grenzen der Erkl\"arung.}
 Vertauschte Zeilen sind keine realistischen Spektren. Die Werte zeigen
 deshalb, was das Modell nutzt, aber keinen Kausalzusammenhang. Der Monat ist
 ein Kontextmerkmal. Seine hohe Wichtigkeit f\"ur das Stadium spiegelt den
 Saisonverlauf wider und kann als Abk\"urzung wirken. Das zeigt sich am Abfall
-in der Gruppen-CV bei unbekannten Monaten. Die Aussagen gelten f\"ur die
-untersuchte SVM. Reis und seltene Stadien beruhen auf wenigen Zeilen und
-schwanken st\"arker.
+in der Gruppen-CV bei unbekannten Monaten. Reis und seltene Stadien beruhen
+auf wenigen Zeilen und schwanken st\"arker.
 
 \newpage
 \section{Modellkarte}
@@ -988,7 +897,8 @@ Die Modellkarte fasst das offizielle Modell der Abgabe zusammen.
 		Klassengewichte. \\
 	Entwickelt von & Team AE-ROOT, Dom\"anenprojekt 2 (WS 2026/27), Oktober 2026. \\
 	Version & MLflow-Run \texttt{17dc9e16}, Code-Stand Commit \texttt{4ed4181}.
-		Es gibt kein gespeichertes Modell. \\
+		Es gibt kein gespeichertes Modell; die AutoML-Variante (Run \texttt{c99e3915})
+		ist nur als Zusatzexperiment archiviert. \\
 	Nutzung & \texttt{make predict} trainiert das deterministische Modell neu und schreibt
 		die Vorhersage-CSV f\"ur \texttt{test.csv}. \\
 	\midrule
@@ -1015,26 +925,19 @@ Die Modellkarte fasst das offizielle Modell der Abgabe zusammen.
 	Daten & Holdout mit 1.118 Zeilen (20\,\%, stratifiziert, Seed 42), Modell nur auf den
 		restlichen 4.471 Zeilen trainiert. \\
 	Ergebnis & BAcc Crop 0,923, Stage 0,922, kombiniert 0,869; Macro-F1 kombiniert 0,859;
-		Samples-F1 0,920. CV: BAcc kombiniert 0,864.
-		AEZ-Monat-Indikatoren verbessern nur wenig (CV $+0{,}005$, Holdout $+0{,}003$). \\
-	Erwartung & Auf \texttt{test.csv}: BAcc kombiniert etwa 0,86--0,87, Crop und Stage je etwa
-		0,92. Grundlage: CV und Holdout liegen eng beieinander, die Testzeilen liegen in
-		denselben 32 AEZ-Monat-Zellen wie das Training, und das Endmodell lernt zus\"atzlich
-		vom Holdout. Die Fold-Streuung betr\"agt etwa $\pm 0{,}02$; da der Holdout an
-		Modellvergleichen beteiligt war, ist die Erwartung eher optimistisch. Gemessen ist
-		sie nicht, denn \texttt{test.csv} hat keine Labels. \\
+		Samples-F1 0,920. CV: BAcc kombiniert 0,864. \\
+	Erwartung & Auf \texttt{test.csv}: BAcc kombiniert etwa 0,87 (grob 0,83--0,90), Crop und
+		Stage je etwa 0,92; nicht gemessen, Begr\"undung in Abschnitt~\ref{sec:fazit}. \\
 	\midrule
 	\multicolumn{2}{@{}l}{\textbf{Grenzen und Risiken}} \\
 	\midrule
 	Evaluation & Mehrere Ans\"atze wurden auf demselben Holdout verglichen; er ist keine
 		unabh\"angige Abschlusspr\"ufung. \\
 	Kontext & Ohne \texttt{AEZ} und \texttt{Month} sinkt die CV-BAcc von 0,859 auf 0,787.
-		Bei Gruppen-CV f\"allt die Referenz-SVM (ohne AEZ-Monat-Indikatoren) von 0,859 auf
-		0,378 (neue AEZ-Monat-Zelle), 0,421 (neuer Monat) und 0,284 (neue Region).
-		\texttt{test.csv} liegt in bekannten Zellen; f\"ur neue Regionen oder Zeitpunkte
-		ist das Modell nicht abgesichert. \\
+		F\"ur neue AEZ-Monat-Zellen, Monate oder Regionen f\"allt sie auf 0,28--0,42
+		(Abschnitt~\ref{sec:ergebnisse}); \texttt{test.csv} liegt in bekannten Zellen. \\
 	Fehler & Meist Kulturfehler, vor allem Winterweizen zu Baumwolle und Sojabohne zu Mais,
-		besonders in fr\"uhen Stadien. Seltene Klassen sind unsicher:
+		besonders am Saisonrand (Mai, Juni, Oktober). Seltene Klassen sind unsicher:
 		\texttt{cotton|Harvest} hat 11 Trainingszeilen, Reis 93. \\
 	Nicht gepr\"uft & Kalibrierung, Ablehnung unbekannter Eingaben, Praxistests und echte
 		Sentinel-2-Daten. Nicht beobachtete Paare werden nie vorhergesagt. \\
@@ -1055,7 +958,8 @@ auf 0,787. Abgeleitete Merkmale wie Indizes, SNV oder PCA helfen ihr dagegen
 nicht. Der Eingabeumfang l\"asst sich stark verringern: Zehn breite B\"ander an
 Sentinel-2-Positionen kosten rund 0,01 BAcc bei 92\,\% weniger gemessenen
 B\"andern. Entscheidend ist also die Abdeckung von VIS bis SWIR2, nicht die
-spektrale Aufl\"osung. Das AutoML-Modell erreicht auf dem Holdout 0,883, gewinnt
+spektrale Aufl\"osung. Das AutoML-Modell des kurzfristigen Zusatzexperiments
+erreicht auf dem Holdout 0,883, gewinnt
 in der CV aber nur 0,003 und bleibt damit unter der vorab festgelegten Schwelle;
 Abgabemodell ist daher die kombinierte SVM.
 
@@ -1075,20 +979,14 @@ und eher optimistisch, weil der Holdout an Modellvergleichen beteiligt war.
 Die meisten Fehler erwarten wir wie im Holdout bei Winterweizen gegen Baumwolle
 und Soja gegen Mais am Saisonrand.
 
-Die wichtigste Grenze ist die \"Ubertragbarkeit: F\"ur unbekannte Aufnahmen,
-Monate oder Regionen f\"allt die BAcc auf 0,28 bis 0,42, und Sentinel-2 ist nur
-simuliert. Das Modell gibt zudem keine Unsicherheit aus.
+Die wichtigste Grenze ist die \"Ubertragbarkeit: F\"ur unbekannte
+AEZ-Monat-Zellen, Monate oder Regionen f\"allt die BAcc auf 0,28 bis 0,42, und
+Sentinel-2 ist nur simuliert. Das Modell gibt zudem keine Unsicherheit aus.
+N\"achste Schritte w\"aren Kontrollexperimente zur Sentinel-2-Simulation (echte
+Empfindlichkeitskurven, Verschiebung und Rauschen) und eine Pr\"ufung auf echten
+Sentinel-2-Aufnahmen.
 
 \begin{thebibliography}{9}
-% Verwendete Fachliteratur, Datensatz- und Methodenquellen mit \bibitem aufnehmen
-% und an den passenden Stellen mit \cite referenzieren.
-% Beispielstruktur: \bibitem{schluessel} Autor. Titel. Jahr. DOI oder URL.
-
-\bibitem{projekt2026}
-Dom\"anenprojekt 2 (2026).
-\emph{Beschreibung Dom\"anenprojekt 2, Vorabversion 2026/27;
-Kickoff-Folien zur Aufgabenbeschreibung.}
-Bereitgestellte Projektunterlagen.
 
 \bibitem{mulla2013}
 Mulla, D. J. (2013).
@@ -1129,13 +1027,5 @@ NASA Land Processes Distributed Active Archive Center.
 \url{https://doi.org/10.5067/COMMUNITY/GHISA/GHISACONUS.001}.
 
 \end{thebibliography}
-
-\appendix
-\section{Erg\"anzende Ergebnisse und Reproduktion}
-% Nur bei Bedarf: vollst\"andige Klassentabellen, weitere Confusion Matrices,
-% Suchr\"aume, Bandlisten und ausf\"uhrliche Reproduktionsbefehle aufnehmen.
-% Jede zus\"atzliche Tabelle oder Abbildung aus dem Haupttext referenzieren.
-% Separate Abgabebestandteile nicht vergessen: Vorhersage-CSV,
-% Arbeitszeitnachweise und je Teammitglied 0,5--1 Seite eigener Beitrag.
 
 \end{document}
