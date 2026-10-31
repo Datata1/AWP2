@@ -21,6 +21,8 @@ uv run mkdocs serve           # Starts a local development server at http://127.
 ```
 
 Die Rohdaten liegen bereits in `data/raw/` (siehe [data/README.md](data/README.md)).
+Für Notebooks und Experimente einmalig `make data` ausführen (ohne `make`:
+`uv run python -m awp2.data.artifacts`); `make predict` braucht das nicht.
 Ausführliche Anleitung: [docs/entwicklung/index.md](docs/entwicklung/index.md) bzw. `make docs`.
 
 ## Vorhersage für `test.csv`
