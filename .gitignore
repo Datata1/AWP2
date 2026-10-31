@@ -8,11 +8,13 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# Daten & Modelle (nur Ordnerstruktur wird versioniert)
+# Daten & Modelle (nur Ordnerstruktur und Rohdaten werden versioniert)
 data/**/*
 !data/**/
 !data/**/.gitkeep
 !data/README.md
+!data/raw/train.csv
+!data/raw/test.csv
 models/*
 !models/.gitkeep
 reports/figures/*

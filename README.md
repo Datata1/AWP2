@@ -20,7 +20,9 @@ uv run jupyter lab            # Launches the JupyterLab interactive notebook wor
 uv run mkdocs serve           # Starts a local development server at http://127.0.0.1:8000 to preview documentation in real time
 ```
 
-Rohdaten nach `data/raw/` kopieren (siehe [data/README.md](data/README.md)).
+Die Rohdaten liegen bereits in `data/raw/` (siehe [data/README.md](data/README.md)).
+Für Notebooks und Experimente einmalig `make data` ausführen (ohne `make`:
+`uv run python -m awp2.data.artifacts`); `make predict` braucht das nicht.
 Ausführliche Anleitung: [docs/entwicklung/index.md](docs/entwicklung/index.md) bzw. `make docs`.
 
 ## Vorhersage für `test.csv`
