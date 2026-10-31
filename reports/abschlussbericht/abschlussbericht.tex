@@ -1,4 +1,4 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[11pt,a4paper,titlepage]{article}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -22,19 +22,29 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.55em}
 \setlength{\emergencystretch}{2em}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
 \graphicspath{{img/}{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
 
 \title{Abschlussbericht\\Kulturpflanzen- und Entwicklungsstadiumsklassifikation}
-\author{Jan-David Wiederstein \qquad Achim Duong\\[1ex]
+\author{Jan-David Wiederstein (wija1025)\\
+	Achim Duong (duac1011)\\
+	Pascal Heinzelmann (hepa1037)\\[1ex]
 	Dom\"anenprojekt 2\\Team: AE-ROOT}
 \date{Stand: \today}
 
 \begin{document}
+\pagenumbering{roman}
+\hypersetup{pageanchor=false}
 \maketitle
+\hypersetup{pageanchor=true}
 
 \setcounter{tocdepth}{1}
 \tableofcontents
 \clearpage
+\pagenumbering{arabic}
 
 \section{Ziel und Dom\"ane}
 
