@@ -842,7 +842,7 @@ oder Zeitpunkte \"ubertragbar.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.65\linewidth]{uebertragbarkeit.png}
+\includegraphics[width=0.6\linewidth]{uebertragbarkeit.png}
 \caption{Kombinierte CV-BAcc der SVM mit allen B\"andern bei zuf\"alligen
 Folds (blau) und bei Folds, die ganze AEZ-Monat-Zellen, Monate oder Regionen
 zur\"uckhalten (rot).}
@@ -866,7 +866,7 @@ Gruppen. Die Rangfolge der Gruppen stimmt nahezu \"uberein
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\linewidth]{feature_importance_regionen.png}
+\includegraphics[width=0.72\linewidth]{feature_importance_regionen.png}
 \caption{Permutation Importance je Gruppe: Abfall der CV-BAcc f\"ur
 Kulturart, Stadium und Paar, wenn die Gruppe vertauscht wird
 (Fehlerbalken: Standardabweichung \"uber 25 Wiederholungen).}
@@ -913,6 +913,47 @@ ein Kontextmerkmal. Seine hohe Wichtigkeit f\"ur das Stadium spiegelt den
 Saisonverlauf wider und kann als Abk\"urzung wirken. Das zeigt sich am Abfall
 in der Gruppen-CV bei unbekannten Monaten. Reis und seltene Stadien beruhen
 auf wenigen Zeilen und schwanken st\"arker.
+
+\section{Fazit und Ausblick}
+\label{sec:fazit}
+
+Die kombinierte RBF-SVM sagt Kulturart und Stadium unter vergleichbaren
+Bedingungen am zuverl\"assigsten vorher. Auf dem Holdout erreicht sie eine BAcc
+von 0,923 f\"ur die Kulturart, 0,922 f\"ur das Stadium und 0,869 f\"ur das Paar.
+Das sind 0,118 mehr als die Baseline und 0,024 mehr als die hierarchische SVM;
+neuronale Netze bringen bei rund 4.500 Trainingszeilen keinen Vorteil. Den
+gr\"o\ss{}ten Zusatznutzen liefern AEZ und Monat, ohne sie f\"allt die SVM von 0,859
+auf 0,787. Abgeleitete Merkmale wie Indizes, SNV oder PCA helfen ihr dagegen
+nicht. Der Eingabeumfang l\"asst sich stark verringern: Zehn breite B\"ander an
+Sentinel-2-Positionen kosten rund 0,01 BAcc bei 92\,\% weniger gemessenen
+B\"andern. Entscheidend ist also die Abdeckung von VIS bis SWIR~2, nicht die
+spektrale Aufl\"osung. Das AutoML-Modell des kurzfristigen Zusatzexperiments
+erreicht auf dem Holdout 0,883, bleibt
+in der CV aber unter der Mindestschwelle;
+Abgabemodell ist daher die kombinierte SVM.
+
+F\"ur \texttt{test.csv} erwarten wir eine kombinierte BAcc von etwa 0,87
+(grob 0,83 bis 0,90) und je etwa 0,92 f\"ur Kulturart und Stadium. Gemessen ist
+das nicht, denn die Testdaten haben keine Labels. Mit 1.397 von 6.988 Zeilen
+(20,0\,\%) ist \texttt{test.csv} offenbar ein zuf\"alliger Split derselben Daten:
+Alle Testzeilen liegen in den 32 bekannten AEZ-Monat-Zellen, die Reflexion ist
+\"ahnlich verteilt, und die vorhergesagten Kulturanteile weichen um h\"ochstens
+1,2 Prozentpunkte vom Training ab. Damit gilt die Situation von CV (0,864) und
+Holdout (0,869), nicht der Einbruch der Gruppen-CV. Zudem lernt das
+Abgabemodell auf 5.589 statt 4.471 Zeilen, und die AutoML-Variante sagt f\"ur
+93,1\,\% der Testzeilen dasselbe Paar vorher. Die Vorhersage h\"angt also kaum an
+der Konfiguration. Das Intervall ist trotzdem breit, weil seltene Klassen wie
+\texttt{cotton|Harvest} (drei vorhergesagte Testzeilen) die BAcc stark bewegen,
+und eher optimistisch, weil der Holdout an Modellvergleichen beteiligt war.
+Die meisten Fehler erwarten wir wie im Holdout bei Winterweizen gegen Baumwolle
+und Soja gegen Mais am Saisonrand.
+
+Die wichtigste Grenze ist die \"Ubertragbarkeit: F\"ur unbekannte
+AEZ-Monat-Zellen, Monate oder Regionen f\"allt die BAcc auf 0,28 bis 0,42, und
+Sentinel-2 ist nur simuliert. Das Modell gibt zudem keine Unsicherheit aus.
+N\"achste Schritte w\"aren Kontrollexperimente zur Sentinel-2-Simulation (echte
+Empfindlichkeitskurven, Verschiebung und Rauschen) und eine Pr\"ufung auf echten
+Sentinel-2-Aufnahmen.
 
 \newpage
 \section{Modellkarte}
@@ -982,47 +1023,6 @@ Die Modellkarte fasst das offizielle Modell der Abgabe zusammen.
 	\bottomrule
 \end{tabularx}
 \endgroup
-
-\section{Fazit und Ausblick}
-\label{sec:fazit}
-
-Die kombinierte RBF-SVM sagt Kulturart und Stadium unter vergleichbaren
-Bedingungen am zuverl\"assigsten vorher. Auf dem Holdout erreicht sie eine BAcc
-von 0,923 f\"ur die Kulturart, 0,922 f\"ur das Stadium und 0,869 f\"ur das Paar.
-Das sind 0,118 mehr als die Baseline und 0,024 mehr als die hierarchische SVM;
-neuronale Netze bringen bei rund 4.500 Trainingszeilen keinen Vorteil. Den
-gr\"o\ss{}ten Zusatznutzen liefern AEZ und Monat, ohne sie f\"allt die SVM von 0,859
-auf 0,787. Abgeleitete Merkmale wie Indizes, SNV oder PCA helfen ihr dagegen
-nicht. Der Eingabeumfang l\"asst sich stark verringern: Zehn breite B\"ander an
-Sentinel-2-Positionen kosten rund 0,01 BAcc bei 92\,\% weniger gemessenen
-B\"andern. Entscheidend ist also die Abdeckung von VIS bis SWIR~2, nicht die
-spektrale Aufl\"osung. Das AutoML-Modell des kurzfristigen Zusatzexperiments
-erreicht auf dem Holdout 0,883, bleibt
-in der CV aber unter der Mindestschwelle;
-Abgabemodell ist daher die kombinierte SVM.
-
-F\"ur \texttt{test.csv} erwarten wir eine kombinierte BAcc von etwa 0,87
-(grob 0,83 bis 0,90) und je etwa 0,92 f\"ur Kulturart und Stadium. Gemessen ist
-das nicht, denn die Testdaten haben keine Labels. Mit 1.397 von 6.988 Zeilen
-(20,0\,\%) ist \texttt{test.csv} offenbar ein zuf\"alliger Split derselben Daten:
-Alle Testzeilen liegen in den 32 bekannten AEZ-Monat-Zellen, die Reflexion ist
-\"ahnlich verteilt, und die vorhergesagten Kulturanteile weichen um h\"ochstens
-1,2 Prozentpunkte vom Training ab. Damit gilt die Situation von CV (0,864) und
-Holdout (0,869), nicht der Einbruch der Gruppen-CV. Zudem lernt das
-Abgabemodell auf 5.589 statt 4.471 Zeilen, und die AutoML-Variante sagt f\"ur
-93,1\,\% der Testzeilen dasselbe Paar vorher. Die Vorhersage h\"angt also kaum an
-der Konfiguration. Das Intervall ist trotzdem breit, weil seltene Klassen wie
-\texttt{cotton|Harvest} (drei vorhergesagte Testzeilen) die BAcc stark bewegen,
-und eher optimistisch, weil der Holdout an Modellvergleichen beteiligt war.
-Die meisten Fehler erwarten wir wie im Holdout bei Winterweizen gegen Baumwolle
-und Soja gegen Mais am Saisonrand.
-
-Die wichtigste Grenze ist die \"Ubertragbarkeit: F\"ur unbekannte
-AEZ-Monat-Zellen, Monate oder Regionen f\"allt die BAcc auf 0,28 bis 0,42, und
-Sentinel-2 ist nur simuliert. Das Modell gibt zudem keine Unsicherheit aus.
-N\"achste Schritte w\"aren Kontrollexperimente zur Sentinel-2-Simulation (echte
-Empfindlichkeitskurven, Verschiebung und Rauschen) und eine Pr\"ufung auf echten
-Sentinel-2-Aufnahmen.
 
 {\small
 \begin{thebibliography}{9}
