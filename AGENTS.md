@@ -134,7 +134,8 @@ LABEL_SEP = "|"
   or pull requests.
 - Link work to issues: branch `<type>/<issue-nr>-<name>`, PR body `Closes #<nr>`.
 - Notebook outputs are stripped on commit by nbstripout (installed via `make setup`).
-- Never commit data files, models or secrets. The repository is **public**.
+- Never commit data files, models or secrets; the only exception are the raw files
+  `data/raw/train.csv` and `data/raw/test.csv`. The repository is **public**.
 
 ## GitHub (issues, PRs, project board)
 

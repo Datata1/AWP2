@@ -1,13 +1,13 @@
 # data/
 
-Dateien in diesem Ordner werden **nicht** in git versioniert – nur die Ordnerstruktur.
+In git versioniert sind nur die Ordnerstruktur und die Rohdaten in `raw/`.
 
 Rohdaten im Code immer über `from awp2.data import load_train, load_test` laden – die Funktionen
 prüfen das Format (pandera-Schema in `src/awp2/data/schema.py`). Pfade aus `awp2.config`, nie hardcoden.
 
 | Ordner | Was gehört rein? | Wer schreibt? |
 | --- | --- | --- |
-| `raw/` | Originaldaten, genau so wie geliefert. **Nie verändern.** | Du, per Hand kopiert |
+| `raw/` | Originaldaten, genau so wie geliefert. **Nie verändern.** | Niemand, liegen im Repo |
 | `interim/` | Bereinigter Datensatz (`train_clean.parquet`) | `make data` |
 | `processed/` | Split-Zuordnung für alle (`split.csv`: train/val, CV-Fold) | `make data` |
 | `external/` | Fremde Referenzdaten, z. B. Sentinel-2-SRF der ESA (Version per Prüfsumme fixiert) | `make external` |

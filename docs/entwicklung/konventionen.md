@@ -4,7 +4,7 @@
 
 | Pfad | Inhalt |
 | --- | --- |
-| `data/` | Daten (nicht in git) – siehe `data/README.md` |
+| `data/` | Daten (nur `data/raw/` in git) – siehe `data/README.md` |
 | `notebooks/` | Jupyter-Notebooks (Exploration, Experimente) |
 | `src/awp2/` | Wiederverwendbarer Python-Code (Pipelines, Features, Modelle) |
 | `models/` | Trainierte Modelldateien (nicht in git) |
