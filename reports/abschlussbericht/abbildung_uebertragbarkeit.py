@@ -24,7 +24,7 @@ class FoldScheme(NamedTuple):
 # Runs c0417d33, 482cd374, cb600d5c and 1f6323a2 (experiment split-leakage, #170).
 SCHEMES = (
     FoldScheme("zufällige Folds", 0.859, False),
-    FoldScheme("neue Aufnahme\n(AEZ × Monat)", 0.378, True),
+    FoldScheme("neue Zelle\n(AEZ × Monat)", 0.378, True),
     FoldScheme("neuer Monat", 0.421, True),
     FoldScheme("neue Region (AEZ)", 0.284, True),
 )
