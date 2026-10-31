@@ -7,6 +7,7 @@
 \usepackage[a4paper,margin=2.5cm]{geometry}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage{caption}
 \captionsetup[figure]{format=hang,font=small,labelfont=bf,labelsep=colon,
 	justification=raggedright,singlelinecheck=true,skip=8pt}
@@ -22,10 +23,6 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.55em}
 \setlength{\emergencystretch}{2em}
-\renewcommand{\topfraction}{0.85}
-\renewcommand{\bottomfraction}{0.7}
-\renewcommand{\textfraction}{0.1}
-\renewcommand{\floatpagefraction}{0.75}
 \graphicspath{{img/}{../../docs/daten/img/}{../../docs/modelle/img/}{../figures/}}
 
 \title{Abschlussbericht\\Kulturpflanzen- und Entwicklungsstadiumsklassifikation}
@@ -148,7 +145,7 @@ Kombinationen aus Kultur und Stadium kommen 23 vor. Fehlende Paare sind ein
 Befund der Stichprobe, keine fachliche Unm\"oglichkeit; Vorhersagen werden
 dennoch auf die beobachteten Paare beschr\"ankt.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Beobachtungen je Kultur und Stadium in \texttt{train.csv}
 	(vor der Duplikatbereinigung).}
@@ -209,7 +206,7 @@ keine einzelne Kurve eine Klasse festlegt. Das Helligkeitsniveau selbst
 tr\"agt Information; eine Normalisierung jedes Spektrums (SNV) verschlechtert
 die Klassifikation entsprechend.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{spektren_nach_kultur.png}
 \caption{Mittlere Spektren je Kultur ($\pm$ eine Standardabweichung).
@@ -237,7 +234,7 @@ Aufnahme- und Regionseffekte statt spektraler Unterschiede abbilden. Wie stark
 die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
 (Abschnitt~\ref{sec:ergebnisse}).
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{stadien_monat_crop.png}
 \caption{Beobachtungen je Monat und Stadium innerhalb jeder Kultur.}
@@ -249,7 +246,7 @@ die Leistung f\"ur unbekannte Zonen oder Monate sinkt, pr\"uft die Gruppen-CV
 Abbildung~\ref{fig:methodik-pipeline} fasst die Trennung von Modellauswahl
 und Holdout-Bewertung zusammen.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[
 	>={Stealth[length=2mm]},
@@ -308,7 +305,7 @@ Die Aufteilung erfolgt mit Seed 42 stratifiziert nach \texttt{Crop|Stage},
 damit auch seltene Zielpaare in beiden Teilen vertreten sind.
 Alle Ans\"atze laden dieselbe gespeicherte Zuordnung.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Gemeinsame Datenaufteilung nach der Duplikatbereinigung.}
 \label{tab:methodik-split}
@@ -415,7 +412,7 @@ Werte stammen aus zwei Splitprotokollen (70/30 bis zum 20.\,Oktober, danach
 80/20) und sind nur innerhalb eines Blocks vergleichbar. CV-Werte sind
 Mittelwerte der f\"unf Trainingsfolds, Holdout-Werte einmalige Bewertungen.
 
-\begin{table}[htbp]
+\begin{table}[H]
 	\centering
 	\caption{Wichtigste Kandidaten. Alle Modelle au\ss er der Random-Forest-Baseline
 		sagen nur beobachtete Crop-Stage-Paare vorher. AutoML: Zusatzexperiment, bewertet auf
@@ -471,7 +468,7 @@ verschlechtert sie (CV 0,823 statt 0,847, Split 70/30). Savitzky-Golay-Gl\"attun
 zyklisch 0,849) bleiben unter der Mindestschwelle. Nur AEZ-Monat-Indikatoren
 verbessern die SVM geringf\"ugig (CV +0,005, Holdout +0,003).
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 	\centering
 	\includegraphics[width=0.85\linewidth]{modellvergleich.png}
 	\caption{CV- und Holdout-BAcc kombiniert der wichtigsten Kandidaten (Split
@@ -533,7 +530,7 @@ Sentinel-2 (B2--B8A, B11, B12) nach. Jedes simulierte Band ist der
 Mittelwert der Hyperion-B\"ander innerhalb seiner Bandbreite
 (Rechteckn\"aherung).
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Gepr\"ufte Eingabevarianten der Datenreduktion.}
 \label{tab:reduktion-varianten}
@@ -565,7 +562,7 @@ Variante wird einmal auf dem Holdout bewertet.
 
 \subsection{Ergebnisse}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{datenreduktion_tradeoff_baender.png}
 \caption{CV-BAcc f\"ur Kulturart, Stadium und kombinierte Klasse je Anzahl
@@ -612,7 +609,7 @@ etwas schlechter. Hierarchisch ist das Bild \"ahnlich. Sentinel-2 lag dort
 in der CV knapp au\ss{}erhalb der Regel ($-0{,}012$), wurde aber zum
 Vergleich mitbewertet.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Holdout-Ergebnisse der gew\"ahlten Varianten (BAcc; CV: kombiniert
 im Trainingsanteil).}
@@ -661,7 +658,7 @@ war festgelegt, die PCA-Variante nur dann zu validieren, wenn sie mindestens
 0,005 besser oder doppelt so schnell ist. Beides trifft nicht zu, daher gibt
 es keinen Holdout-Wert.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{pca_studie_kurve.png}
 \caption{Kombinierte SVM: CV-BAcc je Anzahl PCA-Komponenten (Band:
@@ -716,7 +713,7 @@ G\"utema\ss e. Zum Vergleich wurden die Random-Forest-Baseline und die
 hierarchische SVM mit ihren protokollierten Einstellungen auf demselben
 80/20-Split neu trainiert.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Holdout-Ergebnisse des Endmodells und der Vergleichsmodelle (Split 80/20).}
 \label{tab:ergebnisse}
@@ -759,7 +756,7 @@ gleichwertig. F\"ur das kombinierte Modell sprechen der kleine Vorsprung
 und der einfachere Aufbau. Der Holdout wurde bei der Modellwahl schon
 mehrfach betrachtet, die Intervalle sind deshalb eher zu optimistisch.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{endmodell_bootstrap.png}
 \caption{Kombinierte BAcc auf dem Holdout (links) und Vorsprung des
@@ -784,7 +781,7 @@ mit 0,859 den niedrigsten Stadium-Recall. Von den 32 reinen Stadiumfehlern
 betreffen 21 innerhalb der Kultur benachbarte Stadien; auff\"allig ist Soja
 \texttt{Critical} gegen \texttt{Mature\_Senesc} (10 Zeilen).
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{endmodell_konfusion.png}
 \caption{Zeilennormierte Confusion Matrices des Endmodells f\"ur Kulturart
@@ -804,7 +801,7 @@ erreichen im Mittel einen Recall von 0,907, die \"ubrigen 0,852. Bei 2 bis
 13 F\"allen schwanken die Werte aber stark. So beruht der Recall von 1,00
 f\"ur \texttt{cotton|Harvest} auf nur zwei Zeilen.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.65\linewidth]{endmodell_recall_faelle.png}
 \caption{Recall je kombinierter Klasse gegen ihre Fallzahl im Holdout
@@ -826,7 +823,7 @@ gepr\"ufte Erkl\"arung: Am Saisonanfang bedeckt der Bestand wenig Boden, am
 Ende ist er abgereift oder geerntet. Das Signal wird dann vom Boden gepr\"agt,
 und die Spektren der Kulturen gleichen sich an.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.9\linewidth]{endmodell_kulturfehler_kontext.png}
 \caption{Anteil der Holdout-Zeilen mit falscher Kulturart nach Monat (links)
@@ -843,7 +840,7 @@ einen unbekannten Monat erreicht sie 0,421, f\"ur eine unbekannte Region
 0,284. Das Modell ist deshalb nicht ohne neue Labels auf andere Regionen
 oder Zeitpunkte \"ubertragbar.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.65\linewidth]{uebertragbarkeit.png}
 \caption{Kombinierte CV-BAcc der SVM mit allen B\"andern bei zuf\"alligen
@@ -867,7 +864,7 @@ KernelSHAP die Entscheidungsfunktion derselben SVM f\"ur dieselben neun
 Gruppen. Die Rangfolge der Gruppen stimmt nahezu \"uberein
 (Spearman-Korrelation 0,95).
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{feature_importance_regionen.png}
 \caption{Permutation Importance je Gruppe: Abfall der CV-BAcc f\"ur
